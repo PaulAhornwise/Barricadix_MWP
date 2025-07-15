@@ -1,0 +1,6 @@
+{
+  "name": "Hostile Vehicle Mitigation Dashboard",
+  "description": "A dashboard for planning and managing hostile vehicle mitigation strategies, based on a MOC-UP. Features an interactive map, data inputs, and product recommendations.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

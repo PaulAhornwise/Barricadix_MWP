@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarricadiX - HVM Dashboard</title>
+
+    <!-- Leaflet.js CSS for OpenStreetMap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <link rel="stylesheet" href="index.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet.js Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Application Logic -->
+    <script type="module" src="index.tsx" defer></script>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.9.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- =============================================== -->
+        <!-- HEADER -->
+        <!-- =============================================== -->
+        <header class="app-header">
+            <div class="logo" role="img" aria-label="BarricadiX Logo"></div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="#" id="nav-param-input" class="active" aria-current="page">Parametereingabe</a></li>
+                    <li><a href="#" id="nav-marking-area">Sicherheitsbereich markieren</a></li>
+                    <li><a href="#" id="nav-threat-analysis">Gefahrenanalyse</a></li>
+                    <li><a href="#" id="nav-risk-report">Risikobericht</a></li>
+                    <li><a href="#" id="nav-product-selection">Produktauswahl & Projektausschreibung</a></li>
+                    <li><a href="#" id="nav-publish-project">Projektausschreibung veröffentlichen</a></li>
+                </ul>
+            </nav>
+            <div class="header-right">
+                <div class="header-icons">
+                    <button aria-label="Search"><i class="fas fa-search"></i></button>
+                    <button aria-label="Email"><i class="fas fa-envelope"></i></button>
+                    <button aria-label="Settings"><i class="fas fa-cog"></i></button>
+                </div>
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Angemeldet: Bundespolizei Berlin</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <!-- =============================================== -->
+            <!-- LEFT SIDEBAR -->
+            <!-- =============================================== -->
+            <aside class="sidebar">
+                <section class="sidebar-section">
+                    <h3>Verkehrsdaten</h3>
+                    <div class="form-group">
+                        <label for="vehicle-select">Fahrzeugauswahl</label>
+                        <select id="vehicle-select" name="vehicle-select">
+                            <option value="alle">alle</option>
+                            <option value="Motorrad">Motorrad</option>
+                            <option value="KFZ <3.5t">KFZ &lt;3.5t</option>
+                            <option value="LKW <7.5t">LKW &lt;7.5t</option>
+                            <option value="LKW <12t">LKW &lt;12t</option>
+                            <option value="LKW <40t">LKW &lt;40t</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="access-select">Zufahrten</label>
+                        <select id="access-select" name="access-select">
+                            <option value="alle">alle</option>
+                            <option value="Wiese">Wiese</option>
+                            <option value="Waldweg">Waldweg</option>
+                            <option value="Fußgängerweg">Fußgängerweg</option>
+                            <option value="Einbahnstraße">Einbahnstraße</option>
+                            <option value="Zweispur">Zweispur</option>
+                            <option value="Dreispur">Dreispur</option>
+                            <option value="Vierspur">Vierspur</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="curb-select">Bordsteinkanten</label>
+                        <select id="curb-select" name="curb-select">
+                            <option value="ja">ja</option>
+                            <option value="nein">nein</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="obstacle-select">Hindernisse</label>
+                        <select id="obstacle-select" name="obstacle-select">
+                            <option value="keine">keine</option>
+                            <option value="Bäume">Bäume</option>
+                            <option value="Pfosten">Pfosten</option>
+                            <option value="Mülltonnen">Mülltonnen</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="sidebar-section">
+                    <h3>Schutzauswahl</h3>
+                    <div class="form-group">
+                        <label for="protection-period-select">Schutzzeitraum</label>
+                        <select id="protection-period-select" name="protection-period-select">
+                            <option value="dauerhaft">dauerhaft</option>
+                            <option value="temporär">temporär</option>
+                            <option value="eventuell">eventuell</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="protection-product-select">Schutzprodukte</label>
+                        <select id="protection-product-select" name="protection-product-select">
+                            <option value="Poller">Poller</option>
+                            <option value="Barriere">Barriere</option>
+                            <option value="Pfosten">Pfosten</option>
+                            <option value="Graben">Graben</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-property-select">Produkteigenschaft</label>
+                        <select id="product-property-select" name="product-property-select">
+                            <option value="aut./starr">aut./starr</option>
+                            <option value="versenkbar">versenkbar</option>
+                            <option value="entfernbar">entfernbar</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="sidebar-section">
+                    <h3>Risikobewertung</h3>
+                    <div class="form-group slider-group">
+                        <label for="security-risk-slider">Sicherheitsrisiko
+                            <i class="fas fa-info-circle info-icon" data-tooltip="Information about security risk."></i>
+                        </label>
+                        <div class="slider-wrapper">
+                            <span>niedrig</span>
+                            <input type="range" id="security-risk-slider" min="0" max="100" value="75">
+                            <span>hoch</span>
+                        </div>
+                    </div>
+                    <div class="form-group slider-group">
+                        <label for="product-class-slider">Empfohlene Produktklasse
+                            <i class="fas fa-info-circle info-icon" data-tooltip="Information about recommended product class."></i>
+                        </label>
+                        <div class="slider-wrapper">
+                            <span>niedrig</span>
+                            <input type="range" id="product-class-slider" min="0" max="100" value="60">
+                            <span>hoch</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- =============================================== -->
+            <!-- MAIN CONTENT -->
+            <!-- =============================================== -->
+            <main class="main-content">
+                <div class="map-area">
+                    <div class="map-toolbar">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="map-search-input" placeholder="Paderborn, Domplatz">
+                            <button id="map-search-button">Suchen</button>
+                        </div>
+                        <div class="map-actions">
+                            <button id="toggle-draw-mode" class="map-action-btn hidden">
+                                <i class="fas fa-pencil-alt"></i> Wegpunkte setzen
+                            </button>
+                            <button id="reset-drawing" class="map-action-btn hidden">
+                                <i class="fas fa-trash-alt"></i> Zurücksetzen
+                            </button>
+                            <button id="analyze-threats" class="map-action-btn hidden">
+                                <i class="fas fa-route"></i> Analyse der Zufahrten
+                            </button>
+                            <button id="create-report-btn" class="map-action-btn hidden">
+                                <i class="fas fa-file-alt"></i> Bericht erstellen
+                            </button>
+                            <button id="download-report-btn" class="map-action-btn hidden" disabled>
+                                <i class="fas fa-download"></i> Bericht Downloaden
+                            </button>
+                        </div>
+                    </div>
+                    <!-- The map will be injected here by Leaflet.js -->
+                    <div id="map"></div>
+                    <!-- The report preview will be shown here -->
+                    <div id="report-preview-area" class="hidden">
+                         <div class="report-loading-overlay hidden">Bericht wird erstellt...</div>
+                         <iframe id="report-iframe" title="Risikobericht Vorschau"></iframe>
+                    </div>
+                </div>
+                <div class="analysis-area">
+                    <div class="threat-list-container">
+                        <h4>Eindringungsgefahren</h4>
+                        <ol class="threat-list">
+                            <!-- Threat items will be added here dynamically -->
+                        </ol>
+                        <div class="loading-indicator hidden">
+                            Analysiere Zufahrten...
+                        </div>
+                    </div>
+                    <div class="product-recommendations-container">
+                        <h4>Produktempfehlungen</h4>
+                        <div class="product-category">
+                            <h5>Fest installierte Poller <small>Widerstandsklasse: hoch</small></h5>
+                            <div class="product-grid">
+                                <div class="product-card">
+                                    <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=P1" alt="Product 1">
+                                    <span class="flags">K12</span>
+                                </div>
+                                <div class="product-card">
+                                    <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=P2" alt="Product 2">
+                                    <span class="flags">K8</span>
+                                </div>
+                                <div class="product-card">
+                                    <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=P3" alt="Product 3">
+                                    <span class="flags">K12</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="product-category">
+                            <h5>Mobile Barrieren <small>Widerstandsklasse: mittel</small></h5>
+                             <div class="product-grid">
+                                <div class="product-card">
+                                    <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=B1" alt="Barrier 1">
+                                    <span class="flags">K4</span>
+                                </div>
+                                 <div class="product-card">
+                                    <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=B2" alt="Barrier 2">
+                                     <span class="flags">K8</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="more-products-btn">Weitere Produkte anzeigen</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <div id="tooltip" class="tooltip" role="tooltip"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
