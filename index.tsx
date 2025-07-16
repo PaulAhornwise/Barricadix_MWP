@@ -1,3 +1,4 @@
+
 /**
  * This script handles the interactivity for the HVM dashboard.
  * - Initializes a clean OpenStreetMap map using Leaflet.js.
@@ -33,7 +34,7 @@ let waypointMarkers: any[] = [];
 let pathLine: any = null;
 let drawnPolygon: any = null;
 let polygonLabel: any = null; // To store the label for the polygon
-let threatMarkers: any[] = []; // To keep track of threat analysis markers (circles and polylines)
+let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
 let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][] }>(); // To store analysis data for report
 let generatedPdf: any = null; // To hold the generated PDF object
 
@@ -47,7 +48,6 @@ function initOpenStreetMap(): void {
         return;
     }
     
-    // Changed to Paderborn Domplatz as requested
     const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn, Domplatz
     map = L.map(mapDiv, {
       zoomControl: false // Disable default zoom control
@@ -66,8 +66,10 @@ function initOpenStreetMap(): void {
  * Clears the threat markers (red circles and lines) and the list from the map and UI.
  */
 const clearThreatAnalysis = () => {
-    threatMarkers.forEach(marker => map.removeLayer(marker));
-    threatMarkers = [];
+    threatMarkersMap.forEach(markers => {
+        markers.forEach(marker => map.removeLayer(marker));
+    });
+    threatMarkersMap.clear();
     threatsMap.clear();
     const threatList = document.querySelector('.threat-list') as HTMLOListElement;
     if (threatList) {
@@ -76,18 +78,53 @@ const clearThreatAnalysis = () => {
 };
 
 /**
+ * Finds the intersection point of two line segments.
+ * @param p1 - Start of line 1
+ * @param p2 - End of line 1
+ * @param p3 - Start of line 2
+ * @param p4 - End of line 2
+ * @returns The intersection point {lat, lon} or null if they don't intersect.
+ */
+function getLineSegmentIntersection(
+    p1: { lat: number; lon: number }, p2: { lat: number; lon: number },
+    p3: { lat: number; lon: number }, p4: { lat: number; lon: number }
+): { lat: number; lon: number } | null {
+    // Using lat for y and lon for x
+    const x1 = p1.lon, y1 = p1.lat;
+    const x2 = p2.lon, y2 = p2.lat;
+    const x3 = p3.lon, y3 = p3.lat;
+    const x4 = p4.lon, y4 = p4.lat;
+
+    const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (den === 0) {
+        return null; // Parallel or collinear
+    }
+
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+
+    if (t > 0 && t < 1 && u > 0 && u < 1) { // Strict intersection (not on endpoints)
+        return {
+            lat: y1 + t * (y2 - y1),
+            lon: x1 + t * (x2 - x1),
+        };
+    }
+    return null;
+}
+
+/**
  * Checks if a point is inside a polygon using the ray-casting algorithm.
- * @param point - The point to check {lat, lng}.
- * @param polygon - An array of polygon vertices [{lat, lng}, ...].
+ * @param point - The point to check {lat, lon}.
+ * @param polygon - An array of polygon vertices [{lat, lon}, ...].
  * @returns true if the point is inside, false otherwise.
  */
-const isPointInPolygon = (point: { lat: number, lng: number }, polygon: { lat: number, lng: number }[]): boolean => {
+const isPointInPolygon = (point: { lat: number, lon: number }, polygon: { lat: number, lon: number }[]): boolean => {
     let isInside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].lng, yi = polygon[i].lat;
-        const xj = polygon[j].lng, yj = polygon[j].lat;
+        const xi = polygon[i].lon, yi = polygon[i].lat;
+        const xj = polygon[j].lon, yj = polygon[j].lat;
         const intersect = ((yi > point.lat) !== (yj > point.lat))
-            && (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+            && (point.lon < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
         if (intersect) isInside = !isInside;
     }
     return isInside;
@@ -134,77 +171,66 @@ const analyzeAndMarkThreats = async () => {
         const data = await response.json();
 
         const nodes: { [id: number]: { lat: number, lon: number } } = {};
-        const ways: { [id: number]: { name?: string, nodes: number[] } } = {};
+        const ways: { [id: number]: { name: string, nodes: number[] } } = {};
 
         data.elements.forEach((el: any) => {
             if (el.type === 'node') {
                 nodes[el.id] = { lat: el.lat, lon: el.lon };
             } else if (el.type === 'way' && el.tags && (el.tags.highway || el.tags.railway)) {
-                ways[el.id] = { name: el.tags.name || `Unbenannter Weg (ID: ${el.id})`, nodes: el.nodes };
+                // Only process ways that have a name to filter out "Unbenannter Weg"
+                if (el.tags.name) {
+                    ways[el.id] = { name: el.tags.name, nodes: el.nodes };
+                }
             }
         });
         
-        const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: {lat: number, lon: number}[][] }>();
-        const polygonVertices = latLngs.map((p:any) => ({lat: p.lat, lng: p.lng}));
+        const polygonVertices = latLngs.map((p:any) => ({lat: p.lat, lon: p.lng}));
+        const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: any[][] }>();
 
         for (const wayId in ways) {
             const way = ways[wayId];
-            if (!way.name) continue;
+            const wayNodes = way.nodes.map(id => nodes[id]).filter(Boolean);
+            if (wayNodes.length < 2) continue;
+            
+            for (let i = 1; i < wayNodes.length; i++) {
+                const prevNode = wayNodes[i - 1];
+                const currNode = wayNodes[i];
 
-            let currentPathInside: {lat: number, lon: number}[] = [];
+                const isPrevIn = isPointInPolygon(prevNode, polygonVertices);
+                const isCurrIn = isPointInPolygon(currNode, polygonVertices);
 
-            for (let i = 0; i < way.nodes.length; i++) {
-                const nodeId = way.nodes[i];
-                const node = nodes[nodeId];
-                if (!node) continue;
-                
-                const isNodeInside = isPointInPolygon({ lat: node.lat, lng: node.lon }, polygonVertices);
+                if (isPrevIn !== isCurrIn) {
+                    for (let j = 0; j < polygonVertices.length; j++) {
+                        const polyP1 = polygonVertices[j];
+                        const polyP2 = polygonVertices[(j + 1) % polygonVertices.length];
+                        
+                        const intersection = getLineSegmentIntersection(prevNode, currNode, polyP1, polyP2);
 
-                if (isNodeInside) {
-                    if (currentPathInside.length === 0) {
-                        if (i > 0) {
-                            const prevNode = nodes[way.nodes[i - 1]];
-                            if (prevNode) {
-                                currentPathInside.push({ lat: prevNode.lat, lon: prevNode.lon });
+                        if (intersection) {
+                            if (!threats.has(way.name)) {
+                                threats.set(way.name, { entryPoints: [], pathSegments: [] });
                             }
+                            threats.get(way.name)!.entryPoints.push(intersection);
+                            break; 
                         }
-                        if (!threats.has(way.name)) {
-                            threats.set(way.name, { entryPoints: [], pathSegments: [] });
-                        }
-                        threats.get(way.name)!.entryPoints.push({ lat: node.lat, lon: node.lon });
-                    }
-                    currentPathInside.push({ lat: node.lat, lon: node.lon });
-                } else {
-                    if (currentPathInside.length > 0) {
-                        currentPathInside.push({ lat: node.lat, lon: node.lon });
-                        if (!threats.has(way.name)) {
-                            threats.set(way.name, { entryPoints: [], pathSegments: [] });
-                        }
-                        threats.get(way.name)!.pathSegments.push(currentPathInside);
-                        currentPathInside = [];
                     }
                 }
-            }
-            if (currentPathInside.length > 1) {
-                if (!threats.has(way.name)) {
-                    threats.set(way.name, { entryPoints: [], pathSegments: [] });
-                }
-                threats.get(way.name)!.pathSegments.push(currentPathInside);
             }
         }
         
-        threatsMap = threats; // Store for the report
+        threatsMap = threats;
         
         if (threatsMap.size > 0) {
-            const uniqueStreetNames = new Set<string>();
-            threatsMap.forEach((data, name) => {
-                if (!uniqueStreetNames.has(name)) {
-                    const li = document.createElement('li');
-                    li.textContent = name;
-                    threatList.appendChild(li);
-                    uniqueStreetNames.add(name);
-                }
+             threatList.innerHTML = '';
+             threatsMap.forEach((data, name) => {
+                if (data.entryPoints.length === 0) return;
+
+                const li = document.createElement('li');
+                li.textContent = name;
+                li.setAttribute('role', 'button');
+                li.setAttribute('tabindex', '0');
                 
+                const currentStreetMarkers: any[] = [];
                 data.entryPoints.forEach(point => {
                     const threatCircle = L.circle([point.lat, point.lon], {
                         radius: 5,
@@ -213,19 +239,37 @@ const analyzeAndMarkThreats = async () => {
                         fillOpacity: 1,
                         weight: 2
                     }).addTo(map).bindPopup(`<b>Zufahrt</b><br>${name}`);
-                    threatMarkers.push(threatCircle);
+                    currentStreetMarkers.push(threatCircle);
                 });
 
-                data.pathSegments.forEach(segment => {
-                    const latlngs = segment.map(p => [p.lat, p.lon]);
-                    const threatPath = L.polyline(latlngs, {
-                        color: 'red',
-                        weight: 5,
-                        opacity: 0.7
-                    }).addTo(map);
-                    threatMarkers.push(threatPath);
-                });
+                if (currentStreetMarkers.length > 0) {
+                    threatMarkersMap.set(name, currentStreetMarkers);
+                    
+                    li.addEventListener('click', () => {
+                        threatList.querySelectorAll('li').forEach(item => item.classList.remove('active'));
+                        li.classList.add('active');
+                        
+                        const markersToZoom = threatMarkersMap.get(name);
+                        if (markersToZoom && markersToZoom.length > 0) {
+                            const featureGroup = L.featureGroup(markersToZoom);
+                            map.fitBounds(featureGroup.getBounds().pad(0.5));
+                        }
+                    });
+                     li.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            li.click();
+                        }
+                    });
+
+                    threatList.appendChild(li);
+                }
             });
+            
+            if (threatList.children.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Keine querenden Wege an der Grenze gefunden.';
+                threatList.appendChild(li);
+            }
         } else {
             const li = document.createElement('li');
             li.textContent = 'Keine querenden Wege im markierten Bereich gefunden.';
@@ -295,29 +339,29 @@ async function generateRiskReport() {
     
     const reportIframe = document.getElementById('report-iframe') as HTMLIFrameElement;
     const loadingOverlay = document.querySelector('.report-loading-overlay') as HTMLElement;
-    const downloadBtn = document.getElementById('download-report-btn') as HTMLButtonElement;
+    const downloadReportBtn = document.getElementById('download-report-btn') as HTMLButtonElement;
     const mapDiv = document.getElementById('map') as HTMLElement;
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
     
     loadingOverlay.classList.remove('hidden');
-    downloadBtn.disabled = true;
+    downloadReportBtn.disabled = true;
 
-    // Temporarily make the map visible for the screenshot
     reportPreviewArea.classList.add('hidden');
     mapDiv.classList.remove('hidden');
-    map.invalidateSize();
-    // Wait for map to redraw
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    await new Promise<void>(resolve => {
+        map.invalidateSize(); 
+        map.fitBounds(drawnPolygon.getBounds());
+        map.once('moveend', () => {
+            setTimeout(resolve, 400); 
+        });
+    });
 
     try {
-        // 1. Get location name
         const locationName = await getReportLocationName(drawnPolygon.getBounds().getCenter());
-        
-        // 2. Get AI analysis
         const threatList = Array.from(threatsMap.keys());
         const aiText = await getAIAnalysis(locationName, threatList);
 
-        // 3. Capture map screenshot
         const canvas = await html2canvas(mapDiv, {
             useCORS: true,
             logging: false,
@@ -328,7 +372,6 @@ async function generateRiskReport() {
         });
         const mapImageData = canvas.toDataURL('image/jpeg', 0.9);
 
-        // 4. Create PDF
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
             orientation: 'p',
@@ -340,7 +383,6 @@ async function generateRiskReport() {
         const page_width = pdf.internal.pageSize.getWidth();
         const content_width = page_width - (page_margin * 2);
 
-        // --- PDF Content ---
         pdf.setFont('helvetica', 'bold').setFontSize(22).text('Risikobericht', page_margin, 25);
         pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, 28, page_width - page_margin, 28);
         
@@ -382,19 +424,19 @@ async function generateRiskReport() {
             currentY += 7;
         });
 
-        // 5. Display PDF and enable download
         reportIframe.src = pdf.output('datauristring');
         generatedPdf = pdf;
-        downloadBtn.disabled = false;
+        downloadReportBtn.disabled = false;
         
     } catch (error) {
         console.error("Fehler bei der Erstellung des Berichts:", error);
         alert("Der Bericht konnte nicht erstellt werden. Details finden Sie in der Konsole.");
     } finally {
-        // Restore UI state
-        mapDiv.classList.add('hidden');
-        reportPreviewArea.classList.remove('hidden');
-        loadingOverlay.classList.add('hidden');
+        setTimeout(() => {
+            mapDiv.classList.add('hidden');
+            reportPreviewArea.classList.remove('hidden');
+            loadingOverlay.classList.add('hidden');
+        }, 0);
     }
 }
 
@@ -414,7 +456,6 @@ function downloadRiskReport() {
 document.addEventListener('DOMContentLoaded', () => {
     initOpenStreetMap();
     
-    // --- Sidebar Controls ---
     const allSelects = document.querySelectorAll('.sidebar select');
     allSelects.forEach(select => {
         select.addEventListener('change', (event) => {
@@ -423,10 +464,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // --- Tooltip Logic ---
     const tooltip = document.getElementById('tooltip') as HTMLElement;
     const infoIcons = document.querySelectorAll('.info-icon');
-
     infoIcons.forEach(icon => {
         icon.addEventListener('mouseover', (event) => {
             const target = event.currentTarget as HTMLElement;
@@ -442,13 +481,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // --- Slider value logic ---
     const securitySlider = document.getElementById('security-risk-slider');
     securitySlider?.addEventListener('input', (e) => (e.target as HTMLInputElement).value);
     const productClassSlider = document.getElementById('product-class-slider');
     productClassSlider?.addEventListener('input', (e) => (e.target as HTMLInputElement).value);
 
-    // --- Map Search Logic ---
     const searchInput = document.getElementById('map-search-input') as HTMLInputElement;
     const searchButton = document.getElementById('map-search-button') as HTMLButtonElement;
     
@@ -476,7 +513,6 @@ document.addEventListener('DOMContentLoaded', () => {
     searchButton.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') handleSearch(); });
     
-    // --- Drawing Logic Elements ---
     const toggleDrawModeBtn = document.getElementById('toggle-draw-mode') as HTMLButtonElement;
     const resetDrawingBtn = document.getElementById('reset-drawing') as HTMLButtonElement;
     const mapContainer = document.getElementById('map');
@@ -538,7 +574,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePathLine();
     };
 
-    // --- Navigation & Button Logic ---
+    map.on('click', onMapClick);
+
     const navLinks = document.querySelectorAll('.main-nav a');
     const analyzeThreatsBtn = document.getElementById('analyze-threats') as HTMLButtonElement;
     const createReportBtn = document.getElementById('create-report-btn') as HTMLButtonElement;
@@ -556,42 +593,35 @@ document.addEventListener('DOMContentLoaded', () => {
             navLinks.forEach(l => l.classList.remove('active'));
             clickedLink.classList.add('active');
 
-            // --- State Reset Logic ---
-            // If navigating back to a previous step in the workflow, clear subsequent data.
             if (newTabId === 'nav-param-input') {
                 resetDrawing();
                 clearThreatAnalysis();
                 generatedPdf = null;
             }
             if (newTabId === 'nav-marking-area') {
-                clearThreatAnalysis(); // Clear analysis if user wants to redraw
+                clearThreatAnalysis();
                 generatedPdf = null;
             }
             if (newTabId === 'nav-threat-analysis') {
-                generatedPdf = null; // Clear old report if re-analyzing
+                generatedPdf = null;
             }
             
-            // --- UI Visibility Logic ---
-            // Hide all action buttons initially
             toggleDrawModeBtn.classList.add('hidden');
             resetDrawingBtn.classList.add('hidden');
             analyzeThreatsBtn.classList.add('hidden');
             createReportBtn.classList.add('hidden');
             downloadReportBtn.classList.add('hidden');
             
-            // Show/Hide map vs report view
             const isReportView = newTabId === 'nav-risk-report';
             mapDiv.classList.toggle('hidden', isReportView);
             reportPreviewArea.classList.toggle('hidden', !isReportView);
             if (isReportView && map) map.invalidateSize();
 
-            // Reset report view if no PDF is generated
             if (!generatedPdf) {
                 reportIframe.src = 'about:blank';
                 downloadReportBtn.disabled = true;
             }
 
-            // Show context-specific buttons
             if (newTabId === 'nav-marking-area') {
                 toggleDrawModeBtn.classList.remove('hidden');
                 resetDrawingBtn.classList.remove('hidden');
@@ -609,12 +639,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (drawnPolygon) resetDrawing();
         setDrawingMode(!isDrawingMode);
     });
+
     resetDrawingBtn.addEventListener('click', () => {
         resetDrawing();
         clearThreatAnalysis();
     });
+    
     analyzeThreatsBtn.addEventListener('click', analyzeAndMarkThreats);
     createReportBtn.addEventListener('click', generateRiskReport);
     downloadReportBtn.addEventListener('click', downloadRiskReport);
-    map.on('click', onMapClick);
+
+    // Set initial state
+    document.getElementById('nav-param-input')?.click();
 });

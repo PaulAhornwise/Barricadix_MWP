@@ -1,3 +1,4 @@
+
 :root {
     --bg-color: #05325B;
     --header-bg: #012a4a;
@@ -7,6 +8,7 @@
     --secondary-text: #a7b4c2;
     --accent-color: #1e90ff;
     --accent-color-dark: #0073e6;
+    --accent-orange: #ff9900; /* Added for logo highlight */
     --border-color: #1e4a78;
     --shadow-color: rgba(0, 0, 0, 0.2);
 
@@ -63,19 +65,18 @@ body {
 }
 
 .logo {
-    width: 40px;
-    height: 40px;
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
     margin-right: 48px;
-    border-radius: 50%;
-    /* Use an embedded SVG for the logo to ensure it always loads */
-    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMTJhNGEiLz48ZyB0cmFuc2Zvcm09InJvdGF0ZSg0NSA1MCA1MCkiPjxyZWN0IHg9IjE1IiB5PSI0Mi41IiB3aWR0aD0iNzAiIGhlaWdodD0iMTUiIGZpbGw9IiMxZTkwZmYiIHJ4PSI1Ii8+PHJlY3QgeD0iNDIuNSIgeT0iMTUiIHdpZHRoPSIxNSIgaGVpZ2h0PSI3MCIgZmlsbD0iIzFlOTBmZiIgcng9IjUiLz48L2c+PC9zdmc+");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    /* A subtle border to frame the logo */
-    border: 2px solid var(--border-color);
-    /* A fallback background color in case the image fails to load */
-    background-color: var(--card-bg);
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.logo span {
+    color: var(--accent-orange);
 }
 
 
@@ -397,9 +398,13 @@ input[type="range"]::-moz-range-thumb {
     font-weight: bold;
     font-size: 16px;
     text-shadow: 0 0 5px black, 0 0 5px black; /* Enhances readability on any map background */
-    text-align: center;
-    line-height: 24px; /* Matches iconSize height */
     white-space: nowrap;
+    /* Use flexbox for robust centering */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
 }
 
 
@@ -443,10 +448,16 @@ input[type="range"]::-moz-range-thumb {
     cursor: pointer;
     transition: background-color 0.2s;
     font-size: 13px;
+    list-style: none;
 }
 
 .threat-list li:hover {
     background-color: rgba(30, 144, 255, 0.15);
+}
+
+.threat-list li.active {
+    background-color: var(--accent-color);
+    color: white;
 }
 
 .loading-indicator {
