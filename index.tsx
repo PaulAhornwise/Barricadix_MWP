@@ -1,4 +1,3 @@
-
 /**
  * This script handles the interactivity for the HVM dashboard.
  * - Initializes a clean OpenStreetMap map using Leaflet.js.
@@ -35,7 +34,7 @@ let pathLine: any = null;
 let drawnPolygon: any = null;
 let polygonLabel: any = null; // To store the label for the polygon
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
-let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][] }>(); // To store analysis data for report
+let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], totalLength: number }>(); // To store analysis data for report
 let generatedPdf: any = null; // To hold the generated PDF object
 
 /**
@@ -130,10 +129,56 @@ const isPointInPolygon = (point: { lat: number, lon: number }, polygon: { lat: n
     return isInside;
 };
 
+/**
+ * Calculates the distance between two points in meters using the Haversine formula.
+ * @param p1 - Point 1 {lat, lon}
+ * @param p2 - Point 2 {lat, lon}
+ * @returns The distance in meters.
+ */
+function getHaversineDistance(p1: { lat: number; lon: number }, p2: { lat: number; lon: number }): number {
+    const R = 6371e3; // Radius of Earth in meters
+    const phi1 = p1.lat * Math.PI / 180;
+    const phi2 = p2.lat * Math.PI / 180;
+    const deltaPhi = (p2.lat - p1.lat) * Math.PI / 180;
+    const deltaLambda = (p2.lon - p1.lon) * Math.PI / 180;
+
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // in meters
+}
+
+/**
+ * Calculates the angle at point p2 formed by the line segment p1-p2-p3.
+ * @param p1 - First point {lat, lon}
+ * @param p2 - The vertex {lat, lon}
+ * @param p3 - Third point {lat, lon}
+ * @returns The angle in degrees (0-180). A straight line is 180.
+ */
+function getAngle(p1: { lat: number, lon: number }, p2: { lat: number, lon: number }, p3: { lat: number, lon: number }): number {
+    const v1 = { x: p1.lon - p2.lon, y: p1.lat - p2.lat };
+    const v2 = { x: p3.lon - p2.lon, y: p3.lat - p2.lat };
+
+    const dotProduct = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    
+    if (mag1 === 0 || mag2 === 0) return 180; // Treat as a straight line if points are identical
+
+    const cosTheta = dotProduct / (mag1 * mag2);
+    const clampedCosTheta = Math.max(-1, Math.min(1, cosTheta)); // Clamp for float precision errors
+    const angleRad = Math.acos(clampedCosTheta);
+    
+    return angleRad * (180 / Math.PI);
+}
+
 
 /**
  * Analyzes the drawn polygon to identify intersecting ways (roads, paths, etc.) using the Overpass API.
- * It marks the exact entry points and highlights the path of the way inside the polygon.
+ * It marks the entry points and highlights the approach path to the polygon. The path tracing ignores intersections
+ * and only stops at sharp turns (>30 degrees).
  */
 const analyzeAndMarkThreats = async () => {
     if (!drawnPolygon) {
@@ -150,14 +195,18 @@ const analyzeAndMarkThreats = async () => {
     loadingIndicator.classList.remove('hidden');
 
     try {
-        const latLngs = drawnPolygon.getLatLngs()[0];
-        const polyString = latLngs.map((p: any) => `${p.lat} ${p.lng}`).join(' ');
+        const bounds = drawnPolygon.getBounds();
+        // Buffer to query a larger area, ensuring we catch nearby intersections. ~200m buffer.
+        const buffer = 0.002; 
+        const southWest = bounds.getSouthWest();
+        const northEast = bounds.getNorthEast();
+        const bbox = `${southWest.lat - buffer},${southWest.lng - buffer},${northEast.lat + buffer},${northEast.lng + buffer}`;
         
         const query = `
             [out:json][timeout:25];
             (
-              way["highway"](poly:"${polyString}");
-              way["railway"="tram"](poly:"${polyString}");
+              way["highway"](bbox:${bbox});
+              way["railway"="tram"](bbox:${bbox});
             );
             (._;>;);
             out;
@@ -170,51 +219,105 @@ const analyzeAndMarkThreats = async () => {
         }
         const data = await response.json();
 
+        // Pre-process data to find all nodes and ways
         const nodes: { [id: number]: { lat: number, lon: number } } = {};
-        const ways: { [id: number]: { name: string, nodes: number[] } } = {};
+        const ways: { [id: number]: { name: string, nodes: number[], id: number } } = {};
 
         data.elements.forEach((el: any) => {
             if (el.type === 'node') {
                 nodes[el.id] = { lat: el.lat, lon: el.lon };
             } else if (el.type === 'way' && el.tags && (el.tags.highway || el.tags.railway)) {
-                // Only process ways that have a name to filter out "Unbenannter Weg"
-                if (el.tags.name) {
-                    ways[el.id] = { name: el.tags.name, nodes: el.nodes };
+                if (el.tags.name) { // Only consider named ways
+                    ways[el.id] = { name: el.tags.name, nodes: el.nodes, id: el.id };
                 }
             }
         });
-        
-        const polygonVertices = latLngs.map((p:any) => ({lat: p.lat, lon: p.lng}));
-        const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: any[][] }>();
+
+        // Analyze ways for polygon intersection and trace approach paths
+        const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: {lat: number, lon: number}[][], totalLength: number }>();
+        const polygonVertices = drawnPolygon.getLatLngs()[0].map((p: any) => ({ lat: p.lat, lon: p.lng }));
 
         for (const wayId in ways) {
             const way = ways[wayId];
-            const wayNodes = way.nodes.map(id => nodes[id]).filter(Boolean);
+            const wayNodes = way.nodes.map(id => ({ id, ...nodes[id] })).filter(n => n.lat && n.lon);
             if (wayNodes.length < 2) continue;
-            
-            for (let i = 1; i < wayNodes.length; i++) {
-                const prevNode = wayNodes[i - 1];
-                const currNode = wayNodes[i];
+
+            const wayThreatSegments: { lat: number, lon: number }[][] = [];
+            const wayEntryPoints: { lat: number, lon: number }[] = [];
+
+            for (let i = 0; i < wayNodes.length - 1; i++) {
+                const prevNode = wayNodes[i];
+                const currNode = wayNodes[i + 1];
 
                 const isPrevIn = isPointInPolygon(prevNode, polygonVertices);
                 const isCurrIn = isPointInPolygon(currNode, polygonVertices);
 
-                if (isPrevIn !== isCurrIn) {
+                if (isPrevIn !== isCurrIn) { // Segment crosses the boundary
+                    let intersectionPoint: { lat: number; lon: number } | null = null;
                     for (let j = 0; j < polygonVertices.length; j++) {
                         const polyP1 = polygonVertices[j];
                         const polyP2 = polygonVertices[(j + 1) % polygonVertices.length];
-                        
                         const intersection = getLineSegmentIntersection(prevNode, currNode, polyP1, polyP2);
-
                         if (intersection) {
-                            if (!threats.has(way.name)) {
-                                threats.set(way.name, { entryPoints: [], pathSegments: [] });
-                            }
-                            threats.get(way.name)!.entryPoints.push(intersection);
-                            break; 
+                            intersectionPoint = intersection;
+                            break;
                         }
                     }
+                    
+                    if (intersectionPoint) {
+                        wayEntryPoints.push(intersectionPoint);
+                        const pathSegment: { lat: number, lon: number }[] = [intersectionPoint];
+                        let traceStartIndex: number;
+                        let traceDirection: number;
+
+                        if (isCurrIn) { // Way is entering, trace backwards from prevNode
+                            pathSegment.push({ lat: prevNode.lat, lon: prevNode.lon });
+                            traceStartIndex = i - 1;
+                            traceDirection = -1;
+                        } else { // Way is exiting, trace forwards from currNode
+                            pathSegment.push({ lat: currNode.lat, lon: currNode.lon });
+                            traceStartIndex = i + 1;
+                            traceDirection = 1;
+                        }
+                        
+                        for (let k = traceStartIndex; k >= 0 && k < wayNodes.length; k += traceDirection) {
+                            const traceNode = wayNodes[k];
+                            
+                            // Check angle condition before adding the new node
+                            if (pathSegment.length >= 2) {
+                                const p1 = pathSegment[pathSegment.length - 2];
+                                const p2 = pathSegment[pathSegment.length - 1];
+                                const p3 = { lat: traceNode.lat, lon: traceNode.lon };
+                                const angle = getAngle(p1, p2, p3);
+
+                                // Turn angle is 180 - angle. Stop if turn > 30 degrees (i.e., angle < 150)
+                                if (angle < 150) {
+                                    break; 
+                                }
+                            }
+
+                            pathSegment.push({ lat: traceNode.lat, lon: traceNode.lon });
+                        }
+                        wayThreatSegments.push(pathSegment);
+                    }
                 }
+            }
+            
+            if (wayEntryPoints.length > 0) {
+                if (!threats.has(way.name)) {
+                    threats.set(way.name, { entryPoints: [], pathSegments: [], totalLength: 0 });
+                }
+                const threatData = threats.get(way.name)!;
+                threatData.entryPoints.push(...wayEntryPoints);
+                threatData.pathSegments.push(...wayThreatSegments);
+
+                let segmentsLength = 0;
+                wayThreatSegments.forEach(segment => {
+                    for (let i = 0; i < segment.length - 1; i++) {
+                        segmentsLength += getHaversineDistance(segment[i], segment[i + 1]);
+                    }
+                });
+                threatData.totalLength += segmentsLength;
             }
         }
         
@@ -226,11 +329,13 @@ const analyzeAndMarkThreats = async () => {
                 if (data.entryPoints.length === 0) return;
 
                 const li = document.createElement('li');
-                li.textContent = name;
+                const lengthInMeters = Math.round(data.totalLength);
+                li.textContent = `${name} (${lengthInMeters} m)`;
                 li.setAttribute('role', 'button');
                 li.setAttribute('tabindex', '0');
                 
                 const currentStreetMarkers: any[] = [];
+
                 data.entryPoints.forEach(point => {
                     const threatCircle = L.circle([point.lat, point.lon], {
                         radius: 5,
@@ -240,6 +345,18 @@ const analyzeAndMarkThreats = async () => {
                         weight: 2
                     }).addTo(map).bindPopup(`<b>Zufahrt</b><br>${name}`);
                     currentStreetMarkers.push(threatCircle);
+                });
+
+                data.pathSegments.forEach(segment => {
+                    if (segment.length > 1) {
+                        const latLngsSegment = segment.map(p => [p.lat, p.lon]);
+                        const threatPath = L.polyline(latLngsSegment, {
+                            color: 'red',
+                            weight: 4,
+                            opacity: 0.8
+                        }).addTo(map);
+                        currentStreetMarkers.push(threatPath);
+                    }
                 });
 
                 if (currentStreetMarkers.length > 0) {
@@ -295,7 +412,7 @@ const analyzeAndMarkThreats = async () => {
  */
 async function getAIAnalysis(locationName: string, threatList: string[]): Promise<string> {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const prompt = `Erstelle eine kurze, professionelle Lagebeurteilung für einen Risikobericht zum Thema "Schutz vor Überfahrttaten" für den folgenden Standort: ${locationName}. Berücksichtige dabei die folgenden identifizierten Zufahrtswege: ${threatList.join(', ')}. Der Text sollte die allgemeine Bedrohungslage kontextualisieren, auf die spezifischen Schwachstellen hinweisen und in einem sachlichen, klaren Ton verfasst sein. Formuliere den Text als Fließtext mit 2-3 Absätzen.`;
 
         const response = await ai.models.generateContent({
