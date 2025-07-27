@@ -43,15 +43,22 @@
             <div class="logo">Barricadi<span>X</span></div>
             <nav class="main-nav">
                 <ul>
-                    <li><a href="#" id="nav-param-input" class="active" aria-current="page">Parametereingabe</a></li>
-                    <li><a href="#" id="nav-marking-area">Sicherheitsbereich markieren</a></li>
-                    <li><a href="#" id="nav-threat-analysis">Gefahrenanalyse</a></li>
-                    <li><a href="#" id="nav-risk-report">Risikobericht</a></li>
-                    <li><a href="#" id="nav-product-selection">Produktauswahl & Projektausschreibung</a></li>
-                    <li><a href="#" id="nav-publish-project">Projektausschreibung veröffentlichen</a></li>
+                    <li><a href="#" id="nav-param-input" class="active" aria-current="page" data-translate-key="nav.paramInput">Parametereingabe</a></li>
+                    <li><a href="#" id="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich markieren</a></li>
+                    <li><a href="#" id="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a></li>
+                    <li><a href="#" id="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a></li>
+                    <li><a href="#" id="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl & Projektausschreibung</a></li>
+                    <li><a href="#" id="nav-publish-project" data-translate-key="nav.publishProject">Projektausschreibung veröffentlichen</a></li>
                 </ul>
             </nav>
             <div class="header-right">
+                <div class="lang-switcher">
+                    <button class="lang-btn" data-lang="de">DE</button>
+                    <button class="lang-btn" data-lang="en">EN</button>
+                    <button class="lang-btn" data-lang="es">ES</button>
+                    <button class="lang-btn" data-lang="fr">FR</button>
+                    <button class="lang-btn" data-lang="it">IT</button>
+                </div>
                 <div class="header-icons">
                     <button aria-label="Search"><i class="fas fa-search"></i></button>
                     <button aria-label="Email"><i class="fas fa-envelope"></i></button>
@@ -59,7 +66,7 @@
                 </div>
                 <div class="user-info">
                     <i class="fas fa-user-circle"></i>
-                    <span>Angemeldet: BarricadiX Admin</span>
+                    <span data-translate-key="user.loggedIn">Angemeldet: BarricadiX Admin</span>
                 </div>
             </div>
         </header>
@@ -70,20 +77,20 @@
             <!-- =============================================== -->
             <aside class="sidebar">
                 <section class="sidebar-section">
-                    <h3>Verkehrsdaten</h3>
+                    <h3 data-translate-key="sidebar.trafficData">Verkehrsdaten</h3>
                     <div class="form-group">
-                        <label for="vehicle-select">Fahrzeugauswahl</label>
+                        <label for="vehicle-select" data-translate-key="sidebar.vehicleSelect">Fahrzeugauswahl</label>
                         <select id="vehicle-select" name="vehicle-select">
                             <option value="alle">alle</option>
-                            <option value="Motorrad">Motorrad</option>
-                            <option value="KFZ <3.5t">KFZ &lt;3.5t</option>
-                            <option value="LKW <7.5t">LKW &lt;7.5t</option>
-                            <option value="LKW <12t">LKW &lt;12t</option>
-                            <option value="LKW <40t">LKW &lt;40t</option>
+                            <option value="500">Motorrad</option>
+                            <option value="3500">KFZ &lt;3.5t</option>
+                            <option value="7500">LKW &lt;7.5t</option>
+                            <option value="12000">LKW &lt;12t</option>
+                            <option value="40000">LKW &lt;40t</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="access-select">Zufahrten</label>
+                        <label for="access-select" data-translate-key="sidebar.accessRoads">Zufahrten</label>
                         <select id="access-select" name="access-select">
                             <option value="alle">alle</option>
                             <option value="Wiese">Wiese</option>
@@ -96,14 +103,14 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="curb-select">Bordsteinkanten</label>
+                        <label for="curb-select" data-translate-key="sidebar.curbs">Bordsteinkanten</label>
                         <select id="curb-select" name="curb-select">
                             <option value="ja">ja</option>
                             <option value="nein">nein</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="obstacle-select">Hindernisse</label>
+                        <label for="obstacle-select" data-translate-key="sidebar.obstacles">Hindernisse</label>
                         <select id="obstacle-select" name="obstacle-select">
                             <option value="keine">keine</option>
                             <option value="Bäume">Bäume</option>
@@ -114,9 +121,9 @@
                 </section>
 
                 <section class="sidebar-section">
-                    <h3>Schutzauswahl</h3>
+                    <h3 data-translate-key="sidebar.protectionSelection">Schutzauswahl</h3>
                     <div class="form-group">
-                        <label for="protection-period-select">Schutzzeitraum</label>
+                        <label for="protection-period-select" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum</label>
                         <select id="protection-period-select" name="protection-period-select">
                             <option value="dauerhaft">dauerhaft</option>
                             <option value="temporär">temporär</option>
@@ -124,7 +131,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="protection-product-select">Schutzprodukte</label>
+                        <label for="protection-product-select" data-translate-key="sidebar.protectionProducts">Schutzprodukte</label>
                         <select id="protection-product-select" name="protection-product-select">
                             <option value="Poller">Poller</option>
                             <option value="Barriere">Barriere</option>
@@ -133,7 +140,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="product-property-select">Produkteigenschaft</label>
+                        <label for="product-property-select" data-translate-key="sidebar.productProperty">Produkteigenschaft</label>
                         <select id="product-property-select" name="product-property-select">
                             <option value="aut./starr">aut./starr</option>
                             <option value="versenkbar">versenkbar</option>
@@ -143,25 +150,25 @@
                 </section>
 
                 <section class="sidebar-section">
-                    <h3>Risikobewertung</h3>
+                    <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
                     <div class="form-group slider-group">
-                        <label for="security-risk-slider">Sicherheitsrisiko
+                        <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
                             <i class="fas fa-info-circle info-icon" data-tooltip="Information about security risk."></i>
                         </label>
                         <div class="slider-wrapper">
-                            <span>niedrig</span>
+                            <span data-translate-key="sidebar.low">niedrig</span>
                             <input type="range" id="security-risk-slider" min="0" max="100" value="75">
-                            <span>hoch</span>
+                            <span data-translate-key="sidebar.high">hoch</span>
                         </div>
                     </div>
                     <div class="form-group slider-group">
-                        <label for="product-class-slider">Empfohlene Produktklasse
+                        <label for="product-class-slider" data-translate-key="sidebar.recommendedProductClass">Empfohlene Produktklasse
                             <i class="fas fa-info-circle info-icon" data-tooltip="Information about recommended product class."></i>
                         </label>
                         <div class="slider-wrapper">
-                            <span>niedrig</span>
+                            <span data-translate-key="sidebar.low">niedrig</span>
                             <input type="range" id="product-class-slider" min="0" max="100" value="60">
-                            <span>hoch</span>
+                            <span data-translate-key="sidebar.high">hoch</span>
                         </div>
                     </div>
                 </section>
@@ -172,26 +179,27 @@
             <!-- =============================================== -->
             <main class="main-content">
                 <div class="map-area">
+                    <div id="selection-error-message" class="selection-error hidden"></div>
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Paderborn, Domplatz">
-                            <button id="map-search-button">Suchen</button>
+                            <input type="text" id="map-search-input" placeholder="Paderborn, Domplatz" data-translate-key="map.searchPlaceholder">
+                            <button id="map-search-button" data-translate-key="map.searchButton">Suchen</button>
                         </div>
                         <div class="map-actions">
-                            <button id="toggle-draw-mode" class="map-action-btn hidden">
+                            <button id="toggle-draw-mode" class="map-action-btn hidden" data-translate-key="map.setWaypoints">
                                 <i class="fas fa-pencil-alt"></i> Wegpunkte setzen
                             </button>
-                            <button id="reset-drawing" class="map-action-btn hidden">
+                            <button id="reset-drawing" class="map-action-btn hidden" data-translate-key="map.reset">
                                 <i class="fas fa-trash-alt"></i> Zurücksetzen
                             </button>
-                            <button id="analyze-threats" class="map-action-btn hidden">
+                            <button id="analyze-threats" class="map-action-btn hidden" data-translate-key="map.analyzeAccess">
                                 <i class="fas fa-route"></i> Analyse der Zufahrten
                             </button>
-                            <button id="create-report-btn" class="map-action-btn hidden">
+                            <button id="create-report-btn" class="map-action-btn hidden" data-translate-key="map.createReport">
                                 <i class="fas fa-file-alt"></i> Bericht erstellen
                             </button>
-                            <button id="download-report-btn" class="map-action-btn hidden" disabled>
+                            <button id="download-report-btn" class="map-action-btn hidden" disabled data-translate-key="map.downloadReport">
                                 <i class="fas fa-download"></i> Bericht Downloaden
                             </button>
                         </div>
@@ -200,24 +208,24 @@
                     <div id="map"></div>
                     <!-- The report preview will be shown here -->
                     <div id="report-preview-area" class="hidden">
-                         <div class="report-loading-overlay hidden">Bericht wird erstellt...</div>
+                         <div class="report-loading-overlay hidden" data-translate-key="report.generating">Bericht wird erstellt...</div>
                          <iframe id="report-iframe" title="Risikobericht Vorschau"></iframe>
                     </div>
                 </div>
                 <div class="analysis-area">
                     <div class="threat-list-container">
-                        <h4>Eindringungsgefahren</h4>
+                        <h4 data-translate-key="threats.title">Eindringungsgefahren</h4>
                         <ol class="threat-list">
                             <!-- Threat items will be added here dynamically -->
                         </ol>
-                        <div class="loading-indicator hidden">
+                        <div class="loading-indicator hidden" data-translate-key="threats.loading">
                             Analysiere Zufahrten...
                         </div>
                     </div>
-                    <div class="product-recommendations-container">
-                        <h4>Produktempfehlungen</h4>
+                    <div class="product-recommendations-container hidden">
+                        <h4 data-translate-key="products.title">Produktempfehlungen</h4>
                         <div class="product-category">
-                            <h5>Fest installierte Poller <small>Widerstandsklasse: hoch</small></h5>
+                            <h5 id="poller-category-header" data-translate-key="products.pollers">Fest installierte Poller <small data-translate-key="products.resistanceHigh">Widerstandsklasse: hoch</small></h5>
                             <div class="product-grid">
                                 <div class="product-card">
                                     <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=P1" alt="Product 1">
@@ -234,7 +242,7 @@
                             </div>
                         </div>
                         <div class="product-category">
-                            <h5>Mobile Barrieren <small>Widerstandsklasse: mittel</small></h5>
+                            <h5 id="barrier-category-header" data-translate-key="products.barriers">Mobile Barrieren <small data-translate-key="products.resistanceMedium">Widerstandsklasse: mittel</small></h5>
                              <div class="product-grid">
                                 <div class="product-card">
                                     <img src="https://placehold.co/100x100/012a4a/e0e6eb?text=B1" alt="Barrier 1">
@@ -246,7 +254,7 @@
                                 </div>
                             </div>
                         </div>
-                        <button class="more-products-btn">Weitere Produkte anzeigen</button>
+                        <button class="more-products-btn" data-translate-key="products.showMore">Weitere Produkte anzeigen</button>
                     </div>
                 </div>
             </main>

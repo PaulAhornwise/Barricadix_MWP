@@ -49,6 +49,10 @@ body {
     overflow: hidden;
 }
 
+.hidden {
+    display: none !important;
+}
+
 /* =============================================== */
 /* HEADER */
 /* =============================================== */
@@ -112,6 +116,35 @@ body {
     display: flex;
     align-items: center;
     gap: 24px;
+}
+
+.lang-switcher {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lang-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--secondary-text);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    user-select: none;
+}
+
+.lang-btn:hover {
+    background-color: var(--bg-color);
+    color: var(--primary-text);
+}
+
+.lang-btn.active {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
 }
 
 .header-icons {
@@ -280,6 +313,17 @@ input[type="range"]::-moz-range-thumb {
     position: relative;
 }
 
+.selection-error {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-align: center;
+    background-color: #a41e1e;
+    color: white;
+    border: 1px solid #c73e3e;
+}
+
 .map-toolbar {
     display: flex;
     justify-content: space-between;
@@ -401,249 +445,190 @@ input[type="range"]::-moz-range-thumb {
     white-space: nowrap;
     /* Use flexbox for robust centering */
     display: flex;
-    align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
+    align-items: center;
 }
 
-
-.map-legend {
-    display: flex;
-    justify-content: space-around;
-    padding-top: 16px;
-    font-size: 12px;
-    color: var(--secondary-text);
-    font-weight: 600;
-}
-
-.analysis-area {
-    gap: 24px;
-}
-
-.threat-list-container, .product-recommendations-container {
-    display: flex;
-    flex-direction: column;
-}
+/* =============================================== */
+/* ANALYSIS AREA & REPORT */
+/* =============================================== */
 
 .analysis-area h4 {
     font-size: 16px;
-    margin-bottom: 16px;
     font-weight: 700;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--accent-color);
+    padding-bottom: 8px;
 }
 
 .threat-list-container {
-    position: relative;
-    min-height: 100px;
+    margin-bottom: 24px;
+    flex-grow: 1; 
+    display: flex;
+    flex-direction: column;
+    min-height: 150px; /* Ensure it has some height even when empty */
 }
 
 .threat-list {
-    list-style-position: inside;
+    list-style: none; 
     padding-left: 0;
+    margin-top: 0;
+    overflow-y: auto;
+    flex-grow: 1;
 }
 
 .threat-list li {
-    padding: 8px;
-    border-radius: 4px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s;
-    font-size: 13px;
-    list-style: none;
+    border-radius: 4px;
+    margin-bottom: 4px;
 }
 
 .threat-list li:hover {
-    background-color: rgba(30, 144, 255, 0.15);
+    background-color: var(--bg-color);
 }
 
 .threat-list li.active {
     background-color: var(--accent-color);
     color: white;
+    font-weight: 600;
 }
 
 .loading-indicator {
-    position: absolute;
-    top: 40px; /* Below the header */
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(1, 42, 74, 0.7);
-    border-radius: 4px;
-    color: var(--primary-text);
+    padding: 16px;
+    text-align: center;
+    color: var(--secondary-text);
     font-style: italic;
-    z-index: 10;
 }
 
-#report-preview-area {
-    width: 100%;
-    height: 100%;
-    min-height: 500px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    flex-grow: 1;
-}
-
-#report-iframe {
-    flex-grow: 1;
-    width: 100%;
-    height: 100%;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-}
-
-.report-loading-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(1, 42, 74, 0.85);
-    color: var(--primary-text);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2em;
-    font-style: italic;
-    z-index: 20;
-    border-radius: 4px;
-}
-
+/* Product Recommendations */
 .product-recommendations-container {
-    flex-grow: 1;
+     border-top: 1px solid var(--border-color);
+     padding-top: 24px;
+     margin-top: auto; /* Push to bottom if threat list is short */
+}
+
+.product-category {
+    margin-bottom: 24px;
 }
 
 .product-category h5 {
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .product-category h5 small {
-    font-weight: 400;
+    font-weight: normal;
+    font-size: 12px;
     color: var(--secondary-text);
-    margin-left: 8px;
 }
 
 .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .product-card {
     position: relative;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 8px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    aspect-ratio: 1 / 1;
-    background-color: var(--bg-color);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-color);
 }
 
 .product-card img {
-    max-width: 80%;
-    max-height: 80%;
-    object-fit: contain;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
 }
 
-.product-card .flags {
+.flags {
     position: absolute;
-    bottom: 5px;
-    right: 5px;
-    font-size: 12px;
-    background: rgba(1, 42, 74, 0.8);
-    color: var(--primary-text);
+    top: 4px;
+    right: 4px;
+    background-color: var(--accent-orange);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
     padding: 2px 4px;
-    border-radius: 2px;
+    border-radius: 3px;
 }
 
 .more-products-btn {
     width: 100%;
-    padding: 12px;
-    background-color: transparent;
-    border: 1px solid var(--accent-color);
+    padding: 10px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
     border-radius: 4px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s, color 0.2s;
-    margin-top: auto; /* Pushes button to bottom */
-    color: var(--accent-color);
+    transition: background-color 0.2s;
     user-select: none;
 }
 
 .more-products-btn:hover {
-    background-color: var(--accent-color);
-    color: var(--card-bg);
+    background-color: var(--accent-color-dark);
 }
 
 
-/* =============================================== */
-/* UTILITIES & HELPERS */
-/* =============================================== */
+/* Report Preview */
+#report-preview-area {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    flex-grow: 1;
+}
+
+.report-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(1, 42, 74, 0.8);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    z-index: 10;
+}
+
+#report-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 4px;
+}
+
+
+/* Tooltip */
 .tooltip {
     position: absolute;
     background-color: #333;
     color: white;
-    padding: 8px 12px;
+    padding: 5px 10px;
     border-radius: 4px;
     font-size: 12px;
-    z-index: 1001;
-    pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s;
-    white-space: nowrap;
-}
-
-.hidden {
-    display: none !important;
-}
-
-
-/* =============================================== */
-/* RESPONSIVENESS */
-/* =============================================== */
-@media (max-width: 1200px) {
-    .main-content {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 992px) {
-    .sidebar {
-        width: 250px;
-    }
-    .main-nav {
-        display: none; /* Simple solution for smaller screens */
-    }
-    .logo {
-        margin-right: auto;
-    }
-}
-
-@media (max-width: 768px) {
-    .content-wrapper {
-        flex-direction: column;
-    }
-    .sidebar {
-        width: 100%;
-        height: auto;
-        max-height: 40vh;
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-    }
-    .main-content {
-        height: auto;
-    }
-    .header-right {
-        gap: 12px;
-    }
-    .user-info span {
-        display: none;
-    }
+    pointer-events: none;
+    z-index: 2000;
 }

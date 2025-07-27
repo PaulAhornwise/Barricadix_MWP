@@ -1,3 +1,5 @@
+
+
 /**
  * This script handles the interactivity for the HVM dashboard.
  * - Initializes a clean OpenStreetMap map using Leaflet.js.
@@ -36,6 +38,7 @@ let polygonLabel: any = null; // To store the label for the polygon
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
 let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], totalLength: number }>(); // To store analysis data for report
 let generatedPdf: any = null; // To hold the generated PDF object
+let productDatabase: any[] = []; // To cache the product data
 
 /**
  * Initializes the OpenStreetMap map using Leaflet.
@@ -73,6 +76,10 @@ const clearThreatAnalysis = () => {
     const threatList = document.querySelector('.threat-list') as HTMLOListElement;
     if (threatList) {
         threatList.innerHTML = '';
+    }
+    const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
+    if (productRecommendationsContainer) {
+        productRecommendationsContainer.classList.add('hidden');
     }
 };
 
@@ -172,6 +179,37 @@ function getAngle(p1: { lat: number, lon: number }, p2: { lat: number, lon: numb
     const angleRad = Math.acos(clampedCosTheta);
     
     return angleRad * (180 / Math.PI);
+}
+
+/**
+ * Returns the theoretical min/max acceleration range for a given vehicle weight.
+ * @param vehicleWeight - The selected vehicle weight from the dropdown.
+ * @returns A tuple [minAcceleration, maxAcceleration] in m/s² or null.
+ */
+function getAccelerationRange(vehicleWeight: string): [number, number] | null {
+    switch (vehicleWeight) {
+        case '500': return [4.0, 6.0];    // Motorrad
+        case '3500': return [3.0, 4.0];   // KFZ < 3.5t
+        case '7500': return [1.5, 2.5];   // LKW < 7.5t
+        case '12000': return [1.0, 1.5];  // LKW < 12t
+        case '40000': return [0.5, 1.0];  // LKW < 40t
+        default: return null;
+    }
+}
+
+/**
+ * Calculates the final velocity based on acceleration and distance, assuming starting from rest.
+ * Uses the formula v = sqrt(2 * a * s).
+ * @param acceleration - The vehicle's acceleration in m/s².
+ * @param distance - The distance in meters.
+ * @returns The final velocity in km/h.
+ */
+function calculateVelocity(acceleration: number, distance: number): number {
+    if (distance <= 0) return 0;
+    // v = sqrt(2 * a * s)
+    const velocityInMs = Math.sqrt(2 * acceleration * distance);
+    // Convert m/s to km/h (1 m/s = 3.6 km/h)
+    return velocityInMs * 3.6;
 }
 
 
@@ -325,12 +363,25 @@ const analyzeAndMarkThreats = async () => {
         
         if (threatsMap.size > 0) {
              threatList.innerHTML = '';
+             const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+             const selectedWeight = vehicleSelect.value;
+             const accelerationRange = getAccelerationRange(selectedWeight);
+
              threatsMap.forEach((data, name) => {
                 if (data.entryPoints.length === 0) return;
 
                 const li = document.createElement('li');
                 const lengthInMeters = Math.round(data.totalLength);
-                li.textContent = `${name} (${lengthInMeters} m)`;
+                
+                let speedText = '';
+                if (accelerationRange && lengthInMeters > 0) {
+                    const [minAcc, maxAcc] = accelerationRange;
+                    const minSpeed = Math.round(calculateVelocity(minAcc, lengthInMeters));
+                    const maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+                    speedText = ` | Geschw.: ${minSpeed}-${maxSpeed} km/h`;
+                }
+
+                li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
                 li.setAttribute('role', 'button');
                 li.setAttribute('tabindex', '0');
                 
@@ -386,6 +437,12 @@ const analyzeAndMarkThreats = async () => {
                 const li = document.createElement('li');
                 li.textContent = 'Keine querenden Wege an der Grenze gefunden.';
                 threatList.appendChild(li);
+            } else {
+                const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
+                if (productRecommendationsContainer) {
+                    productRecommendationsContainer.classList.remove('hidden');
+                    await updateProductRecommendations();
+                }
             }
         } else {
             const li = document.createElement('li');
@@ -446,6 +503,74 @@ async function getReportLocationName(center: any): Promise<string> {
 }
 
 /**
+ * Updates the product recommendation section based on vehicle selection.
+ */
+async function updateProductRecommendations() {
+    // Lazy load the database
+    if (productDatabase.length === 0) {
+        try {
+            const response = await fetch('product-database.json');
+            if (!response.ok) throw new Error('Product database fetch failed');
+            productDatabase = await response.json();
+        } catch (error) {
+            console.error("Error loading product database:", error);
+            const pollerRecommendationEl = document.querySelector('#poller-category-header small');
+            const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
+            if (pollerRecommendationEl) pollerRecommendationEl.textContent = 'Produkt-DB Fehler';
+            if (barrierRecommendationEl) barrierRecommendationEl.textContent = 'Produkt-DB Fehler';
+            return;
+        }
+    }
+    
+    const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+    const selectedWeight = vehicleSelect.value;
+    
+    const pollerRecommendationEl = document.querySelector('#poller-category-header small');
+    const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
+    
+    const defaultPollerText = 'Widerstandsklasse: hoch';
+    const defaultBarrierText = 'Widerstandsklasse: mittel';
+    
+    if (selectedWeight === 'alle') {
+        if (pollerRecommendationEl) pollerRecommendationEl.textContent = defaultPollerText;
+        if (barrierRecommendationEl) barrierRecommendationEl.textContent = defaultBarrierText;
+        return;
+    }
+    
+    const pollerKeywords = ['bollard', 'poller'];
+    const barrierKeywords = ['barrier', 'barriere', 'gate'];
+
+    const recommendedPoller = productDatabase.find(p => 
+        p.vehicleWeight === selectedWeight &&
+        p.type &&
+        pollerKeywords.some(kw => p.type.toLowerCase().includes(kw))
+    );
+    
+    const recommendedBarrier = productDatabase.find(p => 
+        p.vehicleWeight === selectedWeight &&
+        p.type &&
+        barrierKeywords.some(kw => p.type.toLowerCase().includes(kw))
+    );
+
+    if (pollerRecommendationEl) {
+        if (recommendedPoller) {
+            pollerRecommendationEl.textContent = `Empfehlung: ${recommendedPoller.type}`;
+        } else {
+            pollerRecommendationEl.textContent = 'Keine passende Empfehlung gefunden';
+        }
+    }
+
+    if (barrierRecommendationEl) {
+        if (recommendedBarrier) {
+            barrierRecommendationEl.textContent = `Empfehlung: ${recommendedBarrier.type}`;
+        } else {
+            barrierRecommendationEl.textContent = 'Keine passende Empfehlung gefunden';
+        }
+    }
+}
+
+
+/**
  * Generates the full risk report as a PDF.
  */
 async function generateRiskReport() {
@@ -487,7 +612,6 @@ async function generateRiskReport() {
                 popups.forEach(p => (p as HTMLElement).style.display = 'none');
             }
         });
-        const mapImageData = canvas.toDataURL('image/jpeg', 0.9);
 
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
@@ -496,9 +620,37 @@ async function generateRiskReport() {
             format: 'a4'
         });
 
+        const addWatermarkToCurrentPage = () => {
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            
+            pdf.saveGraphicsState();
+            
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(120);
+            pdf.setTextColor(200, 200, 200); // Light grey for watermark
+            
+            // Set transparency for the watermark text
+            if (jsPDF.GState) {
+                 const gState = new jsPDF.GState({ opacity: 0.2 });
+                 pdf.setGState(gState);
+            }
+            
+            pdf.text(
+                'Erstentwurf', 
+                (pageWidth / 2) + 50, 
+                (pageHeight / 2) + 50, 
+                { align: 'center', angle: 45 } // Diagonal, bottom-left to top-right
+            );
+            
+            pdf.restoreGraphicsState(); // Restore graphics state for other content
+        };
+
         const page_margin = 20;
         const page_width = pdf.internal.pageSize.getWidth();
         const content_width = page_width - (page_margin * 2);
+
+        addWatermarkToCurrentPage(); // Add to first page
 
         pdf.setFont('helvetica', 'bold').setFontSize(22).text('Risikobericht', page_margin, 25);
         pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, 28, page_width - page_margin, 28);
@@ -515,30 +667,52 @@ async function generateRiskReport() {
 
         pdf.setFont('helvetica', 'bold').setFontSize(14).text('Visuelle Analyse', page_margin, currentY);
         currentY += 7;
-        const imgProps = pdf.getImageProperties(mapImageData);
-        const imgHeight = (imgProps.height * content_width) / imgProps.width;
+        
+        // Directly use the canvas element with jsPDF to avoid data URL issues.
+        const imgRatio = canvas.height / canvas.width;
+        const imgHeight = content_width * imgRatio;
         if (currentY + imgHeight > 270) {
             pdf.addPage();
+            addWatermarkToCurrentPage();
             currentY = 25;
         }
-        pdf.addImage(mapImageData, 'JPEG', page_margin, currentY, content_width, imgHeight);
+        pdf.addImage(canvas, 'PNG', page_margin, currentY, content_width, imgHeight);
         currentY += imgHeight + 10;
         
         if (currentY > 250) {
             pdf.addPage();
+            addWatermarkToCurrentPage();
             currentY = 25;
         }
 
         pdf.setFont('helvetica', 'bold').setFontSize(14).text('Identifizierte Eindringungsgefahren', page_margin, currentY);
         currentY += 10;
         pdf.setFont('helvetica', 'normal').setFontSize(11);
-        threatList.forEach(threat => {
-            if (currentY > 280) {
+        
+        const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+        const selectedWeight = vehicleSelect.value;
+        const accelerationRange = getAccelerationRange(selectedWeight);
+
+        threatsMap.forEach((data, name) => {
+            let reportLine = `• ${name} (${Math.round(data.totalLength)} m)`;
+
+            if (accelerationRange && data.totalLength > 0) {
+                const [minAcc, maxAcc] = accelerationRange;
+                const minSpeed = Math.round(calculateVelocity(minAcc, data.totalLength));
+                const maxSpeed = Math.round(calculateVelocity(maxAcc, data.totalLength));
+                reportLine += ` | Geschw.: ${minSpeed}-${maxSpeed} km/h`;
+            }
+
+            const splitLines = pdf.splitTextToSize(reportLine, content_width - 10);
+            
+            if (currentY + (splitLines.length * 7) > 280) {
                 pdf.addPage();
+                addWatermarkToCurrentPage();
                 currentY = 25;
             }
-            pdf.text(`• ${threat}`, page_margin + 5, currentY);
-            currentY += 7;
+            
+            pdf.text(splitLines, page_margin + 5, currentY);
+            currentY += (splitLines.length * 7);
         });
 
         reportIframe.src = pdf.output('datauristring');
@@ -700,12 +874,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const reportIframe = document.getElementById('report-iframe') as HTMLIFrameElement;
     const mapDiv = document.getElementById('map') as HTMLElement;
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
+    const selectionErrorMessage = document.getElementById('selection-error-message') as HTMLElement;
+    const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
 
     navLinks.forEach(link => {
-        link.addEventListener('click', (event) => {
+        link.addEventListener('click', async (event) => {
             event.preventDefault();
             const clickedLink = event.currentTarget as HTMLAnchorElement;
             const newTabId = clickedLink.id;
+
+            // VALIDATION: Check for vehicle selection if trying to navigate away from the first tab
+            if (vehicleSelect.value === 'alle' && newTabId !== 'nav-param-input') {
+                selectionErrorMessage.textContent = 'Bitte treffen Sie eine Fahrzeugauswahl bevor Sie fortfahren.';
+                selectionErrorMessage.classList.remove('hidden');
+                return; // Stop navigation if validation fails
+            }
+            selectionErrorMessage.classList.add('hidden'); // Hide message if validation passes
 
             navLinks.forEach(l => l.classList.remove('active'));
             clickedLink.classList.add('active');
@@ -721,6 +905,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (newTabId === 'nav-threat-analysis') {
                 generatedPdf = null;
+            }
+             if (newTabId === 'nav-product-selection') {
+                await updateProductRecommendations();
             }
             
             toggleDrawModeBtn.classList.add('hidden');
@@ -750,6 +937,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 downloadReportBtn.disabled = !generatedPdf;
             }
         });
+    });
+
+    // Add listener to the select to hide the error message on valid change
+    vehicleSelect.addEventListener('change', () => {
+        if (vehicleSelect.value !== 'alle') {
+            selectionErrorMessage.classList.add('hidden');
+        }
+        // When vehicle changes, re-run analysis if threats are already displayed
+        if (threatsMap.size > 0) {
+             analyzeAndMarkThreats();
+        }
+        if (document.querySelector('.product-recommendations-container')?.classList.contains('hidden') === false) {
+             updateProductRecommendations();
+        }
     });
 
     toggleDrawModeBtn.addEventListener('click', () => {
