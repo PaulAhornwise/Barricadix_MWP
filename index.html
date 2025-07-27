@@ -53,16 +53,13 @@
             </nav>
             <div class="header-right">
                 <div class="lang-switcher">
-                    <button class="lang-btn" data-lang="de">DE</button>
+                    <button class="lang-btn active" data-lang="de">DE</button>
                     <button class="lang-btn" data-lang="en">EN</button>
-                    <button class="lang-btn" data-lang="es">ES</button>
-                    <button class="lang-btn" data-lang="fr">FR</button>
-                    <button class="lang-btn" data-lang="it">IT</button>
                 </div>
                 <div class="header-icons">
-                    <button aria-label="Search"><i class="fas fa-search"></i></button>
-                    <button aria-label="Email"><i class="fas fa-envelope"></i></button>
-                    <button aria-label="Settings"><i class="fas fa-cog"></i></button>
+                    <button data-translate-key-aria="aria.search" aria-label="Suche"><i class="fas fa-search"></i></button>
+                    <button data-translate-key-aria="aria.email" aria-label="E-Mail"><i class="fas fa-envelope"></i></button>
+                    <button data-translate-key-aria="aria.settings" aria-label="Einstellungen"><i class="fas fa-cog"></i></button>
                 </div>
                 <div class="user-info">
                     <i class="fas fa-user-circle"></i>
@@ -81,41 +78,41 @@
                     <div class="form-group">
                         <label for="vehicle-select" data-translate-key="sidebar.vehicleSelect">Fahrzeugauswahl</label>
                         <select id="vehicle-select" name="vehicle-select">
-                            <option value="alle">alle</option>
-                            <option value="500">Motorrad</option>
-                            <option value="3500">KFZ &lt;3.5t</option>
-                            <option value="7500">LKW &lt;7.5t</option>
-                            <option value="12000">LKW &lt;12t</option>
-                            <option value="40000">LKW &lt;40t</option>
+                            <option value="alle" data-translate-key="sidebar.options.vehicle.all">alle</option>
+                            <option value="500" data-translate-key="sidebar.options.vehicle.motorcycle">Motorrad</option>
+                            <option value="3500" data-translate-key="sidebar.options.vehicle.car_light">KFZ &lt;3.5t</option>
+                            <option value="7500" data-translate-key="sidebar.options.vehicle.truck_light">LKW &lt;7.5t</option>
+                            <option value="12000" data-translate-key="sidebar.options.vehicle.truck_medium">LKW &lt;12t</option>
+                            <option value="40000" data-translate-key="sidebar.options.vehicle.truck_heavy">LKW &lt;40t</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="access-select" data-translate-key="sidebar.accessRoads">Zufahrten</label>
                         <select id="access-select" name="access-select">
-                            <option value="alle">alle</option>
-                            <option value="Wiese">Wiese</option>
-                            <option value="Waldweg">Waldweg</option>
-                            <option value="Fußgängerweg">Fußgängerweg</option>
-                            <option value="Einbahnstraße">Einbahnstraße</option>
-                            <option value="Zweispur">Zweispur</option>
-                            <option value="Dreispur">Dreispur</option>
-                            <option value="Vierspur">Vierspur</option>
+                            <option value="alle" data-translate-key="sidebar.options.access.all">alle</option>
+                            <option value="Wiese" data-translate-key="sidebar.options.access.meadow">Wiese</option>
+                            <option value="Waldweg" data-translate-key="sidebar.options.access.forest_path">Waldweg</option>
+                            <option value="Fußgängerweg" data-translate-key="sidebar.options.access.pedestrian_path">Fußgängerweg</option>
+                            <option value="Einbahnstraße" data-translate-key="sidebar.options.access.one_way">Einbahnstraße</option>
+                            <option value="Zweispur" data-translate-key="sidebar.options.access.two_lane">Zweispur</option>
+                            <option value="Dreispur" data-translate-key="sidebar.options.access.three_lane">Dreispur</option>
+                            <option value="Vierspur" data-translate-key="sidebar.options.access.four_lane">Vierspur</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="curb-select" data-translate-key="sidebar.curbs">Bordsteinkanten</label>
                         <select id="curb-select" name="curb-select">
-                            <option value="ja">ja</option>
-                            <option value="nein">nein</option>
+                            <option value="ja" data-translate-key="sidebar.options.curbs.yes">ja</option>
+                            <option value="nein" data-translate-key="sidebar.options.curbs.no">nein</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="obstacle-select" data-translate-key="sidebar.obstacles">Hindernisse</label>
                         <select id="obstacle-select" name="obstacle-select">
-                            <option value="keine">keine</option>
-                            <option value="Bäume">Bäume</option>
-                            <option value="Pfosten">Pfosten</option>
-                            <option value="Mülltonnen">Mülltonnen</option>
+                            <option value="keine" data-translate-key="sidebar.options.obstacles.none">keine</option>
+                            <option value="Bäume" data-translate-key="sidebar.options.obstacles.trees">Bäume</option>
+                            <option value="Pfosten" data-translate-key="sidebar.options.obstacles.posts">Pfosten</option>
+                            <option value="Mülltonnen" data-translate-key="sidebar.options.obstacles.bins">Mülltonnen</option>
                         </select>
                     </div>
                 </section>
@@ -125,35 +122,39 @@
                     <div class="form-group">
                         <label for="protection-period-select" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum</label>
                         <select id="protection-period-select" name="protection-period-select">
-                            <option value="dauerhaft">dauerhaft</option>
-                            <option value="temporär">temporär</option>
-                            <option value="eventuell">eventuell</option>
+                            <option value="dauerhaft" data-translate-key="sidebar.options.period.permanent">dauerhaft</option>
+                            <option value="temporär" data-translate-key="sidebar.options.period.temporary">temporär</option>
+                            <option value="eventuell" data-translate-key="sidebar.options.period.eventual">eventuell</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="protection-product-select" data-translate-key="sidebar.protectionProducts">Schutzprodukte</label>
                         <select id="protection-product-select" name="protection-product-select">
-                            <option value="Poller">Poller</option>
-                            <option value="Barriere">Barriere</option>
-                            <option value="Pfosten">Pfosten</option>
-                            <option value="Graben">Graben</option>
+                            <option value="Poller" data-translate-key="sidebar.options.products.bollard">Poller</option>
+                            <option value="Barriere" data-translate-key="sidebar.options.products.barrier">Barriere</option>
+                            <option value="Pfosten" data-translate-key="sidebar.options.products.post">Pfosten</option>
+                            <option value="Graben" data-translate-key="sidebar.options.products.ditch">Graben</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="product-property-select" data-translate-key="sidebar.productProperty">Produkteigenschaft</label>
                         <select id="product-property-select" name="product-property-select">
-                            <option value="aut./starr">aut./starr</option>
-                            <option value="versenkbar">versenkbar</option>
-                            <option value="entfernbar">entfernbar</option>
+                            <option value="aut./starr" data-translate-key="sidebar.options.property.automatic_rigid">aut./starr</option>
+                            <option value="versenkbar" data-translate-key="sidebar.options.property.retractable">versenkbar</option>
+                            <option value="entfernbar" data-translate-key="sidebar.options.property.removable">entfernbar</option>
                         </select>
                     </div>
                 </section>
 
                 <section class="sidebar-section">
                     <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
+                     <div class="form-group">
+                        <label for="asset-to-protect" data-translate-key="sidebar.assetToProtect">Was geschützt werden soll</label>
+                        <input type="text" id="asset-to-protect" data-translate-key-placeholder="placeholders.assetToProtect" placeholder="z.B. Haupteingang Stadion">
+                    </div>
                     <div class="form-group slider-group">
                         <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
-                            <i class="fas fa-info-circle info-icon" data-tooltip="Information about security risk."></i>
+                            <i class="fas fa-info-circle info-icon" data-translate-key-tooltip="tooltips.securityRisk"></i>
                         </label>
                         <div class="slider-wrapper">
                             <span data-translate-key="sidebar.low">niedrig</span>
@@ -163,7 +164,7 @@
                     </div>
                     <div class="form-group slider-group">
                         <label for="product-class-slider" data-translate-key="sidebar.recommendedProductClass">Empfohlene Produktklasse
-                            <i class="fas fa-info-circle info-icon" data-tooltip="Information about recommended product class."></i>
+                            <i class="fas fa-info-circle info-icon" data-translate-key-tooltip="tooltips.productClass"></i>
                         </label>
                         <div class="slider-wrapper">
                             <span data-translate-key="sidebar.low">niedrig</span>
@@ -179,7 +180,6 @@
             <!-- =============================================== -->
             <main class="main-content">
                 <div class="map-area">
-                    <div id="selection-error-message" class="selection-error hidden"></div>
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
@@ -187,20 +187,20 @@
                             <button id="map-search-button" data-translate-key="map.searchButton">Suchen</button>
                         </div>
                         <div class="map-actions">
-                            <button id="toggle-draw-mode" class="map-action-btn hidden" data-translate-key="map.setWaypoints">
-                                <i class="fas fa-pencil-alt"></i> Wegpunkte setzen
+                            <button id="toggle-draw-mode" class="map-action-btn hidden" >
+                                <i class="fas fa-pencil-alt"></i> <span data-translate-key="map.setWaypoints"></span>
                             </button>
-                            <button id="reset-drawing" class="map-action-btn hidden" data-translate-key="map.reset">
-                                <i class="fas fa-trash-alt"></i> Zurücksetzen
+                            <button id="reset-drawing" class="map-action-btn hidden">
+                                <i class="fas fa-trash-alt"></i> <span data-translate-key="map.reset"></span>
                             </button>
-                            <button id="analyze-threats" class="map-action-btn hidden" data-translate-key="map.analyzeAccess">
-                                <i class="fas fa-route"></i> Analyse der Zufahrten
+                            <button id="analyze-threats" class="map-action-btn hidden">
+                                <i class="fas fa-route"></i> <span data-translate-key="map.analyzeAccess"></span>
                             </button>
-                            <button id="create-report-btn" class="map-action-btn hidden" data-translate-key="map.createReport">
-                                <i class="fas fa-file-alt"></i> Bericht erstellen
+                            <button id="create-report-btn" class="map-action-btn hidden">
+                                <i class="fas fa-file-alt"></i> <span data-translate-key="map.createReport"></span>
                             </button>
-                            <button id="download-report-btn" class="map-action-btn hidden" disabled data-translate-key="map.downloadReport">
-                                <i class="fas fa-download"></i> Bericht Downloaden
+                            <button id="download-report-btn" class="map-action-btn hidden" disabled>
+                                <i class="fas fa-download"></i> <span data-translate-key="map.downloadReport"></span>
                             </button>
                         </div>
                     </div>

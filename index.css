@@ -216,7 +216,8 @@ body {
     margin-bottom: 8px;
 }
 
-.form-group select {
+.form-group select,
+.form-group input[type="text"] {
     width: 100%;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
@@ -225,6 +226,15 @@ body {
     color: var(--primary-text);
     font-family: var(--font-family);
     font-size: 14px;
+}
+
+.form-group input[type="text"]::placeholder {
+    color: var(--secondary-text);
+    opacity: 0.7;
+}
+
+
+.form-group select {
     cursor: pointer;
     appearance: none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23e0e6eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
@@ -322,6 +332,14 @@ input[type="range"]::-moz-range-thumb {
     background-color: #a41e1e;
     color: white;
     border: 1px solid #c73e3e;
+}
+
+.selection-error span {
+    display: block;
+}
+
+.selection-error span:not(:first-child) {
+    margin-top: 8px;
 }
 
 .map-toolbar {

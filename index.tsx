@@ -11,7 +11,7 @@
  * - Generates a PDF risk report with an AI-powered summary.
  */
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -25,10 +25,9 @@ declare const L: any;
 declare const jsPDF: any;
 declare const html2canvas: any;
 
-let map: any; // Module-scoped map object to be accessible by multiple functions
+// App state
+let map: any; // Module-scoped map object
 let searchMarker: any = null; // To keep track of the current search marker
-
-// State for drawing functionality
 let isDrawingMode = false;
 let waypoints: any[] = [];
 let waypointMarkers: any[] = [];
@@ -39,6 +38,139 @@ let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array
 let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], totalLength: number }>(); // To store analysis data for report
 let generatedPdf: any = null; // To hold the generated PDF object
 let productDatabase: any[] = []; // To cache the product data
+
+// Internationalization (i18n) state
+let currentLanguage = 'de';
+let translations: any = {};
+
+
+// ===============================================
+// I18n & TRANSLATION FUNCTIONS
+// ===============================================
+
+/**
+ * Retrieves a nested property from an object using a string path.
+ * @param obj The object to search.
+ * @param path The string path (e.g., 'nav.header').
+ * @returns The value of the property or undefined if not found.
+ */
+function getProperty(obj: any, path: string) {
+    return path.split('.').reduce((o, i) => (o ? o[i] : undefined), obj);
+}
+
+/**
+ * Main translation function.
+ * @param key The key for the translation string (e.g., 'alerts.noPolygon').
+ * @param replacements An object of placeholders to replace in the string.
+ * @returns The translated string.
+ */
+function t(key: string, replacements?: { [key: string]: string | number }): string {
+    let text = getProperty(translations[currentLanguage], key);
+    if (typeof text !== 'string') {
+        console.warn(`Translation key not found for language '${currentLanguage}': ${key}`);
+        return key; // Return the key as a fallback
+    }
+    if (replacements) {
+        for (const placeholder in replacements) {
+            text = text.replace(`{${placeholder}}`, String(replacements[placeholder]));
+        }
+    }
+    return text;
+}
+
+/**
+ * Applies the current language's translations to all tagged DOM elements.
+ */
+async function translateUI() {
+    if (!translations[currentLanguage]) {
+        await loadTranslations();
+    }
+    
+    document.querySelectorAll('[data-translate-key]').forEach(element => {
+        const key = element.getAttribute('data-translate-key')!;
+        const translatedText = t(key);
+        if (element.hasAttribute('placeholder')) {
+             (element as HTMLInputElement).placeholder = translatedText;
+        } else if (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'text') {
+             (element as HTMLInputElement).value = translatedText;
+        }
+        else {
+            // Find the deepest text node if any, otherwise set textContent
+            const textNode = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+            if (textNode) {
+                textNode.textContent = translatedText;
+            } else {
+                 element.textContent = translatedText;
+            }
+        }
+    });
+
+     document.querySelectorAll('[data-translate-key-placeholder]').forEach(element => {
+        const key = element.getAttribute('data-translate-key-placeholder')!;
+        (element as HTMLInputElement).placeholder = t(key);
+    });
+
+    document.querySelectorAll('[data-translate-key-aria]').forEach(element => {
+        const key = element.getAttribute('data-translate-key-aria')!;
+        element.setAttribute('aria-label', t(key));
+    });
+    
+    document.querySelectorAll('[data-translate-key-tooltip]').forEach(element => {
+        const key = element.getAttribute('data-translate-key-tooltip')!;
+        (element as HTMLElement).dataset.tooltip = t(key);
+    });
+    
+    // Special handling for buttons with icons
+    const toggleDrawModeBtn = document.getElementById('toggle-draw-mode');
+    if (toggleDrawModeBtn) {
+       const textSpan = toggleDrawModeBtn.querySelector('span');
+       if (textSpan) {
+           textSpan.textContent = isDrawingMode ? t('map.setWaypointsActive') : t('map.setWaypoints');
+       }
+    }
+}
+
+/**
+ * Fetches the translation data from the JSON file.
+ */
+async function loadTranslations() {
+    try {
+        const response = await fetch('translations.json');
+        if (!response.ok) throw new Error('Failed to load translations file.');
+        translations = await response.json();
+    } catch (error) {
+        console.error("Could not load translations:", error);
+    }
+}
+
+/**
+ * Sets the application language and updates the UI.
+ * @param lang The language code to set (e.g., 'de' or 'en').
+ */
+async function setLanguage(lang: string) {
+    currentLanguage = lang;
+    localStorage.setItem('language', lang);
+    document.documentElement.lang = lang;
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+    });
+
+    await translateUI();
+
+    // Re-render UI components that depend on the language
+    if (threatsMap.size > 0) {
+        renderThreatList();
+    }
+    if (document.querySelector('.product-recommendations-container')?.classList.contains('hidden') === false) {
+        await updateProductRecommendations();
+    }
+}
+
+
+// ===============================================
+// CORE APPLICATION LOGIC
+// ===============================================
 
 /**
  * Initializes the OpenStreetMap map using Leaflet.
@@ -212,29 +344,86 @@ function calculateVelocity(acceleration: number, distance: number): number {
     return velocityInMs * 3.6;
 }
 
+/**
+ * Renders the list of identified threats into the UI based on the current state of threatsMap.
+ */
+function renderThreatList() {
+    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
+    if (!threatList) return;
+    
+    threatList.innerHTML = '';
+
+    if (threatsMap.size === 0) {
+        return; // Nothing to render
+    }
+
+    const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+    const selectedWeight = vehicleSelect.value;
+    const accelerationRange = getAccelerationRange(selectedWeight);
+
+    threatsMap.forEach((data, name) => {
+        if (data.entryPoints.length === 0) return;
+
+        const li = document.createElement('li');
+        const lengthInMeters = Math.round(data.totalLength);
+        
+        let speedText = '';
+        if (accelerationRange && lengthInMeters > 0) {
+            const [minAcc, maxAcc] = accelerationRange;
+            const minSpeed = Math.round(calculateVelocity(minAcc, lengthInMeters));
+            const maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+            speedText = ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
+        }
+
+        li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
+        li.setAttribute('role', 'button');
+        li.setAttribute('tabindex', '0');
+
+        li.addEventListener('click', () => {
+            threatList.querySelectorAll('li').forEach(item => item.classList.remove('active'));
+            li.classList.add('active');
+            
+            const markersToZoom = threatMarkersMap.get(name);
+            if (markersToZoom && markersToZoom.length > 0) {
+                const featureGroup = L.featureGroup(markersToZoom);
+                map.fitBounds(featureGroup.getBounds().pad(0.5));
+            }
+        });
+         li.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                li.click();
+            }
+        });
+
+        threatList.appendChild(li);
+    });
+
+    if (threatList.children.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = t('threats.noCrossingWaysBoundary');
+        threatList.appendChild(li);
+    }
+}
+
 
 /**
  * Analyzes the drawn polygon to identify intersecting ways (roads, paths, etc.) using the Overpass API.
- * It marks the entry points and highlights the approach path to the polygon. The path tracing ignores intersections
- * and only stops at sharp turns (>30 degrees).
+ * It marks the entry points and highlights the approach path to the polygon.
  */
 const analyzeAndMarkThreats = async () => {
     if (!drawnPolygon) {
-        alert("Bitte markieren Sie zuerst einen Sicherheitsbereich unter dem Reiter 'Sicherheitsbereich markieren'.");
+        alert(t('alerts.noPolygon'));
         return;
     }
 
-    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
     const loadingIndicator = document.querySelector('.loading-indicator') as HTMLElement;
-
-    if (!threatList || !loadingIndicator) return;
+    if (!loadingIndicator) return;
     
     clearThreatAnalysis();
     loadingIndicator.classList.remove('hidden');
 
     try {
         const bounds = drawnPolygon.getBounds();
-        // Buffer to query a larger area, ensuring we catch nearby intersections. ~200m buffer.
         const buffer = 0.002; 
         const southWest = bounds.getSouthWest();
         const northEast = bounds.getNorthEast();
@@ -253,11 +442,10 @@ const analyzeAndMarkThreats = async () => {
 
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Overpass API request failed with status ${response.status}`);
+            throw new Error(t('alerts.overpassError', { status: response.status }));
         }
         const data = await response.json();
 
-        // Pre-process data to find all nodes and ways
         const nodes: { [id: number]: { lat: number, lon: number } } = {};
         const ways: { [id: number]: { name: string, nodes: number[], id: number } } = {};
 
@@ -265,13 +453,12 @@ const analyzeAndMarkThreats = async () => {
             if (el.type === 'node') {
                 nodes[el.id] = { lat: el.lat, lon: el.lon };
             } else if (el.type === 'way' && el.tags && (el.tags.highway || el.tags.railway)) {
-                if (el.tags.name) { // Only consider named ways
+                if (el.tags.name) {
                     ways[el.id] = { name: el.tags.name, nodes: el.nodes, id: el.id };
                 }
             }
         });
 
-        // Analyze ways for polygon intersection and trace approach paths
         const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: {lat: number, lon: number}[][], totalLength: number }>();
         const polygonVertices = drawnPolygon.getLatLngs()[0].map((p: any) => ({ lat: p.lat, lon: p.lng }));
 
@@ -286,11 +473,10 @@ const analyzeAndMarkThreats = async () => {
             for (let i = 0; i < wayNodes.length - 1; i++) {
                 const prevNode = wayNodes[i];
                 const currNode = wayNodes[i + 1];
-
                 const isPrevIn = isPointInPolygon(prevNode, polygonVertices);
                 const isCurrIn = isPointInPolygon(currNode, polygonVertices);
 
-                if (isPrevIn !== isCurrIn) { // Segment crosses the boundary
+                if (isPrevIn !== isCurrIn) {
                     let intersectionPoint: { lat: number; lon: number } | null = null;
                     for (let j = 0; j < polygonVertices.length; j++) {
                         const polyP1 = polygonVertices[j];
@@ -308,11 +494,11 @@ const analyzeAndMarkThreats = async () => {
                         let traceStartIndex: number;
                         let traceDirection: number;
 
-                        if (isCurrIn) { // Way is entering, trace backwards from prevNode
+                        if (isCurrIn) {
                             pathSegment.push({ lat: prevNode.lat, lon: prevNode.lon });
                             traceStartIndex = i - 1;
                             traceDirection = -1;
-                        } else { // Way is exiting, trace forwards from currNode
+                        } else {
                             pathSegment.push({ lat: currNode.lat, lon: currNode.lon });
                             traceStartIndex = i + 1;
                             traceDirection = 1;
@@ -320,20 +506,13 @@ const analyzeAndMarkThreats = async () => {
                         
                         for (let k = traceStartIndex; k >= 0 && k < wayNodes.length; k += traceDirection) {
                             const traceNode = wayNodes[k];
-                            
-                            // Check angle condition before adding the new node
                             if (pathSegment.length >= 2) {
                                 const p1 = pathSegment[pathSegment.length - 2];
                                 const p2 = pathSegment[pathSegment.length - 1];
                                 const p3 = { lat: traceNode.lat, lon: traceNode.lon };
                                 const angle = getAngle(p1, p2, p3);
-
-                                // Turn angle is 180 - angle. Stop if turn > 30 degrees (i.e., angle < 150)
-                                if (angle < 150) {
-                                    break; 
-                                }
+                                if (angle < 150) break; 
                             }
-
                             pathSegment.push({ lat: traceNode.lat, lon: traceNode.lon });
                         }
                         wayThreatSegments.push(pathSegment);
@@ -362,99 +541,46 @@ const analyzeAndMarkThreats = async () => {
         threatsMap = threats;
         
         if (threatsMap.size > 0) {
-             threatList.innerHTML = '';
-             const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
-             const selectedWeight = vehicleSelect.value;
-             const accelerationRange = getAccelerationRange(selectedWeight);
-
              threatsMap.forEach((data, name) => {
                 if (data.entryPoints.length === 0) return;
-
-                const li = document.createElement('li');
-                const lengthInMeters = Math.round(data.totalLength);
-                
-                let speedText = '';
-                if (accelerationRange && lengthInMeters > 0) {
-                    const [minAcc, maxAcc] = accelerationRange;
-                    const minSpeed = Math.round(calculateVelocity(minAcc, lengthInMeters));
-                    const maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
-                    speedText = ` | Geschw.: ${minSpeed}-${maxSpeed} km/h`;
-                }
-
-                li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
-                li.setAttribute('role', 'button');
-                li.setAttribute('tabindex', '0');
-                
                 const currentStreetMarkers: any[] = [];
-
                 data.entryPoints.forEach(point => {
                     const threatCircle = L.circle([point.lat, point.lon], {
-                        radius: 5,
-                        color: 'red',
-                        fillColor: '#f03',
-                        fillOpacity: 1,
-                        weight: 2
-                    }).addTo(map).bindPopup(`<b>Zufahrt</b><br>${name}`);
+                        radius: 5, color: 'red', fillColor: '#f03', fillOpacity: 1, weight: 2
+                    }).addTo(map).bindPopup(`<b>${t('threats.popupHeader')}</b><br>${name}`);
                     currentStreetMarkers.push(threatCircle);
                 });
-
                 data.pathSegments.forEach(segment => {
                     if (segment.length > 1) {
                         const latLngsSegment = segment.map(p => [p.lat, p.lon]);
-                        const threatPath = L.polyline(latLngsSegment, {
-                            color: 'red',
-                            weight: 4,
-                            opacity: 0.8
-                        }).addTo(map);
+                        const threatPath = L.polyline(latLngsSegment, { color: 'red', weight: 4, opacity: 0.8 }).addTo(map);
                         currentStreetMarkers.push(threatPath);
                     }
                 });
-
                 if (currentStreetMarkers.length > 0) {
                     threatMarkersMap.set(name, currentStreetMarkers);
-                    
-                    li.addEventListener('click', () => {
-                        threatList.querySelectorAll('li').forEach(item => item.classList.remove('active'));
-                        li.classList.add('active');
-                        
-                        const markersToZoom = threatMarkersMap.get(name);
-                        if (markersToZoom && markersToZoom.length > 0) {
-                            const featureGroup = L.featureGroup(markersToZoom);
-                            map.fitBounds(featureGroup.getBounds().pad(0.5));
-                        }
-                    });
-                     li.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            li.click();
-                        }
-                    });
-
-                    threatList.appendChild(li);
                 }
             });
+            renderThreatList(); // Render the list from the new data
             
-            if (threatList.children.length === 0) {
-                const li = document.createElement('li');
-                li.textContent = 'Keine querenden Wege an der Grenze gefunden.';
-                threatList.appendChild(li);
-            } else {
-                const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
-                if (productRecommendationsContainer) {
-                    productRecommendationsContainer.classList.remove('hidden');
-                    await updateProductRecommendations();
-                }
+            const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
+            if (productRecommendationsContainer) {
+                productRecommendationsContainer.classList.remove('hidden');
+                await updateProductRecommendations();
             }
         } else {
+            const threatList = document.querySelector('.threat-list') as HTMLOListElement;
             const li = document.createElement('li');
-            li.textContent = 'Keine querenden Wege im markierten Bereich gefunden.';
+            li.textContent = t('threats.noCrossingWaysArea');
             threatList.appendChild(li);
         }
 
     } catch (error) {
         console.error("Fehler bei der Gefahrenanalyse:", error);
-        alert("Bei der Analyse ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.");
+        alert(t('alerts.analysisError'));
+        const threatList = document.querySelector('.threat-list') as HTMLOListElement;
         const li = document.createElement('li');
-        li.textContent = 'Analyse fehlgeschlagen.';
+        li.textContent = t('threats.analysisFailed');
         threatList.appendChild(li);
     } finally {
         loadingIndicator.classList.add('hidden');
@@ -462,25 +588,53 @@ const analyzeAndMarkThreats = async () => {
 };
 
 /**
- * Generates an AI-powered risk assessment using the Gemini API.
- * @param locationName - The name of the location being analyzed.
- * @param threatList - A list of identified threat street names.
- * @returns A string containing the AI-generated analysis.
+ * Generates structured content for the risk report using the Gemini API.
+ * @param context - All necessary data for the AI prompt.
+ * @returns A structured object with content for each report section.
  */
-async function getAIAnalysis(locationName: string, threatList: string[]): Promise<string> {
+async function getAIReportSections(context: any): Promise<any> {
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Erstelle eine kurze, professionelle Lagebeurteilung für einen Risikobericht zum Thema "Schutz vor Überfahrttaten" für den folgenden Standort: ${locationName}. Berücksichtige dabei die folgenden identifizierten Zufahrtswege: ${threatList.join(', ')}. Der Text sollte die allgemeine Bedrohungslage kontextualisieren, auf die spezifischen Schwachstellen hinweisen und in einem sachlichen, klaren Ton verfasst sein. Formuliere den Text als Fließtext mit 2-3 Absätzen.`;
+        const prompt = t('ai.reportPrompt', {
+            locationName: context.locationName,
+            assetToProtect: context.assetToProtect,
+            securityLevel: context.securityLevel,
+            protectionGrade: context.protectionGrade,
+            threatList: context.threatList,
+            protectionPeriod: context.protectionPeriod,
+            productType: context.productType,
+            penetration: context.penetration,
+            debrisDistance: context.debrisDistance,
+            language: currentLanguage === 'de' ? 'German' : 'English'
+        });
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        purpose: { type: Type.STRING },
+                        threatAnalysis: { type: Type.STRING },
+                        vulnerabilities: { type: Type.STRING },
+                        hvmMeasures: { type: Type.STRING },
+                        siteConsiderations: { type: Type.STRING },
+                        operationalImpact: { type: Type.STRING }
+                    },
+                    required: ["purpose", "threatAnalysis", "vulnerabilities", "hvmMeasures", "siteConsiderations", "operationalImpact"]
+                }
+            }
         });
         
-        return response.text;
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+
     } catch (error) {
-        console.error("Fehler bei der Gemini-API-Anfrage:", error);
-        return "Die KI-gestützte Analyse konnte aufgrund eines Fehlers nicht generiert werden.";
+        console.error("Fehler bei der Gemini-API-Anfrage für den Bericht:", error);
+        alert(t('alerts.geminiError'));
+        return null;
     }
 }
 
@@ -492,13 +646,13 @@ async function getAIAnalysis(locationName: string, threatList: string[]): Promis
 async function getReportLocationName(center: any): Promise<string> {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${center.lat}&lon=${center.lng}&zoom=18&addressdetails=1`;
     try {
-        const response = await fetch(url, { headers: { 'Accept-Language': 'de,en' } });
-        if (!response.ok) return "Unbekannter Standort";
+        const response = await fetch(url, { headers: { 'Accept-Language': currentLanguage } });
+        if (!response.ok) return "Unknown Location";
         const data = await response.json();
-        return data.display_name || "Unbekannter Standort";
+        return data.display_name || "Unknown Location";
     } catch (error) {
         console.error("Fehler beim Reverse Geocoding:", error);
-        return "Standort konnte nicht ermittelt werden";
+        return "Could not determine location";
     }
 }
 
@@ -506,18 +660,17 @@ async function getReportLocationName(center: any): Promise<string> {
  * Updates the product recommendation section based on vehicle selection.
  */
 async function updateProductRecommendations() {
-    // Lazy load the database
     if (productDatabase.length === 0) {
         try {
             const response = await fetch('product-database.json');
             if (!response.ok) throw new Error('Product database fetch failed');
             productDatabase = await response.json();
         } catch (error) {
-            console.error("Error loading product database:", error);
+            console.error(t('alerts.productDbError'), error);
             const pollerRecommendationEl = document.querySelector('#poller-category-header small');
             const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
-            if (pollerRecommendationEl) pollerRecommendationEl.textContent = 'Produkt-DB Fehler';
-            if (barrierRecommendationEl) barrierRecommendationEl.textContent = 'Produkt-DB Fehler';
+            if (pollerRecommendationEl) pollerRecommendationEl.textContent = t('products.dbError');
+            if (barrierRecommendationEl) barrierRecommendationEl.textContent = t('products.dbError');
             return;
         }
     }
@@ -528,57 +681,65 @@ async function updateProductRecommendations() {
     const pollerRecommendationEl = document.querySelector('#poller-category-header small');
     const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
     
-    const defaultPollerText = 'Widerstandsklasse: hoch';
-    const defaultBarrierText = 'Widerstandsklasse: mittel';
-    
-    if (selectedWeight === 'alle') {
-        if (pollerRecommendationEl) pollerRecommendationEl.textContent = defaultPollerText;
-        if (barrierRecommendationEl) barrierRecommendationEl.textContent = defaultBarrierText;
-        return;
-    }
+    if (pollerRecommendationEl) pollerRecommendationEl.textContent = t('products.resistanceHigh');
+    if (barrierRecommendationEl) barrierRecommendationEl.textContent = t('products.resistanceMedium');
+
+    if (selectedWeight === 'alle') return;
     
     const pollerKeywords = ['bollard', 'poller'];
     const barrierKeywords = ['barrier', 'barriere', 'gate'];
 
     const recommendedPoller = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight &&
-        p.type &&
-        pollerKeywords.some(kw => p.type.toLowerCase().includes(kw))
+        p.vehicleWeight === selectedWeight && p.type && pollerKeywords.some(kw => p.type.toLowerCase().includes(kw))
     );
-    
     const recommendedBarrier = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight &&
-        p.type &&
-        barrierKeywords.some(kw => p.type.toLowerCase().includes(kw))
+        p.vehicleWeight === selectedWeight && p.type && barrierKeywords.some(kw => p.type.toLowerCase().includes(kw))
     );
 
     if (pollerRecommendationEl) {
-        if (recommendedPoller) {
-            pollerRecommendationEl.textContent = `Empfehlung: ${recommendedPoller.type}`;
-        } else {
-            pollerRecommendationEl.textContent = 'Keine passende Empfehlung gefunden';
-        }
+        pollerRecommendationEl.textContent = recommendedPoller 
+            ? `${t('products.recommendation')} ${recommendedPoller.type}` 
+            : t('products.noRecommendation');
     }
-
     if (barrierRecommendationEl) {
-        if (recommendedBarrier) {
-            barrierRecommendationEl.textContent = `Empfehlung: ${recommendedBarrier.type}`;
-        } else {
-            barrierRecommendationEl.textContent = 'Keine passende Empfehlung gefunden';
-        }
+        barrierRecommendationEl.textContent = recommendedBarrier
+            ? `${t('products.recommendation')} ${recommendedBarrier.type}`
+            : t('products.noRecommendation');
     }
 }
 
+function getSecurityLevelText(value: number): string {
+    if (value < 33) return t('sidebar.low');
+    if (value < 66) return t('products.resistanceMedium');
+    return t('sidebar.high');
+}
+
+function findBestProductMatch() {
+    const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+    const selectedWeight = parseInt(vehicleSelect.value, 10);
+    if (isNaN(selectedWeight)) return null;
+
+    let bestMatch = null;
+    let minPenetration = Infinity;
+
+    for (const product of productDatabase) {
+        const productWeight = parseInt(product.vehicleWeight, 10);
+        const penetration = parseFloat(product.penetration);
+
+        if (!isNaN(productWeight) && !isNaN(penetration) && productWeight >= selectedWeight) {
+            if (penetration < minPenetration) {
+                minPenetration = penetration;
+                bestMatch = product;
+            }
+        }
+    }
+    return bestMatch;
+}
 
 /**
- * Generates the full risk report as a PDF.
+ * Generates the full risk report as a PDF, filling in missing information with AI-generated placeholders.
  */
 async function generateRiskReport() {
-    if (!drawnPolygon || threatsMap.size === 0) {
-        alert("Bitte führen Sie zuerst eine vollständige Gefahrenanalyse durch (Bereich markieren und Zufahrten analysieren).");
-        return;
-    }
-    
     const reportIframe = document.getElementById('report-iframe') as HTMLIFrameElement;
     const loadingOverlay = document.querySelector('.report-loading-overlay') as HTMLElement;
     const downloadReportBtn = document.getElementById('download-report-btn') as HTMLButtonElement;
@@ -587,133 +748,169 @@ async function generateRiskReport() {
     
     loadingOverlay.classList.remove('hidden');
     downloadReportBtn.disabled = true;
-
     reportPreviewArea.classList.add('hidden');
     mapDiv.classList.remove('hidden');
 
-    await new Promise<void>(resolve => {
-        map.invalidateSize(); 
-        map.fitBounds(drawnPolygon.getBounds());
-        map.once('moveend', () => {
-            setTimeout(resolve, 400); 
-        });
-    });
+    // Wait for the browser to render the map before capturing it.
+    await new Promise(resolve => setTimeout(resolve, 50)); 
+    map.invalidateSize();
+    
+    if (drawnPolygon) {
+        // By disabling animation on fitBounds, we prevent html2canvas from capturing
+        // the map mid-transition, which can cause overlays (like the polygon) to appear shifted.
+        map.fitBounds(drawnPolygon.getBounds(), { animate: false });
+        
+        // Even without animation, we wait a brief moment to ensure all layers have
+        // been fully rendered by the browser before we take the screenshot.
+        await new Promise(resolve => setTimeout(resolve, 150));
+    }
+
 
     try {
-        const locationName = await getReportLocationName(drawnPolygon.getBounds().getCenter());
-        const threatList = Array.from(threatsMap.keys());
-        const aiText = await getAIAnalysis(locationName, threatList);
+        const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : t('report.undefinedLocation');
+        
+        const assetInput = document.getElementById('asset-to-protect') as HTMLInputElement;
+        const assetToProtect = assetInput.value.trim() || t('report.undefinedAsset');
+        
+        const threatList = threatsMap.size > 0 ? Array.from(threatsMap.keys()).join(', ') : t('report.noThreatAnalysis');
 
-        const canvas = await html2canvas(mapDiv, {
-            useCORS: true,
-            logging: false,
-            onclone: (doc) => {
-                const popups = doc.querySelectorAll('.leaflet-popup-pane > *');
-                popups.forEach(p => (p as HTMLElement).style.display = 'none');
-            }
-        });
+        // --- Gather all context for the AI ---
+        const securityRiskSlider = document.getElementById('security-risk-slider') as HTMLInputElement;
+        const productClassSlider = document.getElementById('product-class-slider') as HTMLInputElement;
+        const protectionPeriodSelect = document.getElementById('protection-period-select') as HTMLSelectElement;
+        const protectionProductSelect = document.getElementById('protection-product-select') as HTMLSelectElement;
+        const bestProduct = findBestProductMatch();
+
+        const context = {
+            locationName: locationName,
+            assetToProtect: assetToProtect,
+            securityLevel: getSecurityLevelText(parseInt(securityRiskSlider.value)),
+            protectionGrade: getSecurityLevelText(parseInt(productClassSlider.value)),
+            threatList: threatList,
+            protectionPeriod: protectionPeriodSelect.options[protectionPeriodSelect.selectedIndex].text,
+            productType: protectionProductSelect.options[protectionProductSelect.selectedIndex].text,
+            penetration: bestProduct ? bestProduct.penetration : t('report.undefinedValue'),
+            debrisDistance: bestProduct ? (bestProduct.debrisDistance || t('report.undefinedValue')) : t('report.undefinedValue'),
+        };
+        
+        const aiSections = await getAIReportSections(context);
+        if (!aiSections) {
+             throw new Error("AI did not return report sections.");
+        }
+
+        let canvas = null;
+        if (drawnPolygon) {
+            canvas = await html2canvas(mapDiv, {
+                useCORS: true, logging: false,
+                onclone: (doc) => doc.querySelectorAll('.leaflet-popup-pane > *').forEach(p => (p as HTMLElement).style.display = 'none')
+            });
+        }
 
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-            orientation: 'p',
-            unit: 'mm',
-            format: 'a4'
-        });
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
         const addWatermarkToCurrentPage = () => {
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            
             pdf.saveGraphicsState();
-            
             pdf.setFont('helvetica', 'bold');
             pdf.setFontSize(120);
-            pdf.setTextColor(200, 200, 200); // Light grey for watermark
-            
-            // Set transparency for the watermark text
+            pdf.setTextColor(200, 200, 200);
             if (jsPDF.GState) {
                  const gState = new jsPDF.GState({ opacity: 0.2 });
                  pdf.setGState(gState);
             }
-            
-            pdf.text(
-                'Erstentwurf', 
-                (pageWidth / 2) + 50, 
-                (pageHeight / 2) + 50, 
-                { align: 'center', angle: 45 } // Diagonal, bottom-left to top-right
-            );
-            
-            pdf.restoreGraphicsState(); // Restore graphics state for other content
+            pdf.text(t('report.watermark'), (pageWidth / 2) + 50, (pageHeight / 2) + 50, { align: 'center', angle: 45 });
+            pdf.restoreGraphicsState();
         };
 
         const page_margin = 20;
         const page_width = pdf.internal.pageSize.getWidth();
         const content_width = page_width - (page_margin * 2);
+        let currentY = 25;
 
-        addWatermarkToCurrentPage(); // Add to first page
-
-        pdf.setFont('helvetica', 'bold').setFontSize(22).text('Risikobericht', page_margin, 25);
-        pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, 28, page_width - page_margin, 28);
-        
-        pdf.setFont('helvetica', 'bold').setFontSize(14).text('Analysierter Bereich:', page_margin, 40);
-        pdf.setFont('helvetica', 'normal').setFontSize(12).text(locationName, page_margin, 47, { maxWidth: content_width });
-
-        let currentY = 65;
-        pdf.setFont('helvetica', 'bold').setFontSize(14).text('Lagebeurteilung (KI-gestützt)', page_margin, currentY);
-        currentY += 7;
-        const aiTextLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(aiText, content_width);
-        pdf.text(aiTextLines, page_margin, currentY);
-        currentY += (aiTextLines.length * 5) + 10;
-
-        pdf.setFont('helvetica', 'bold').setFontSize(14).text('Visuelle Analyse', page_margin, currentY);
-        currentY += 7;
-        
-        // Directly use the canvas element with jsPDF to avoid data URL issues.
-        const imgRatio = canvas.height / canvas.width;
-        const imgHeight = content_width * imgRatio;
-        if (currentY + imgHeight > 270) {
-            pdf.addPage();
-            addWatermarkToCurrentPage();
-            currentY = 25;
-        }
-        pdf.addImage(canvas, 'PNG', page_margin, currentY, content_width, imgHeight);
-        currentY += imgHeight + 10;
-        
-        if (currentY > 250) {
-            pdf.addPage();
-            addWatermarkToCurrentPage();
-            currentY = 25;
-        }
-
-        pdf.setFont('helvetica', 'bold').setFontSize(14).text('Identifizierte Eindringungsgefahren', page_margin, currentY);
-        currentY += 10;
-        pdf.setFont('helvetica', 'normal').setFontSize(11);
-        
-        const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
-        const selectedWeight = vehicleSelect.value;
-        const accelerationRange = getAccelerationRange(selectedWeight);
-
-        threatsMap.forEach((data, name) => {
-            let reportLine = `• ${name} (${Math.round(data.totalLength)} m)`;
-
-            if (accelerationRange && data.totalLength > 0) {
-                const [minAcc, maxAcc] = accelerationRange;
-                const minSpeed = Math.round(calculateVelocity(minAcc, data.totalLength));
-                const maxSpeed = Math.round(calculateVelocity(maxAcc, data.totalLength));
-                reportLine += ` | Geschw.: ${minSpeed}-${maxSpeed} km/h`;
-            }
-
-            const splitLines = pdf.splitTextToSize(reportLine, content_width - 10);
-            
-            if (currentY + (splitLines.length * 7) > 280) {
+        const addSection = (titleKey: string, content: string) => {
+            if (currentY > 250) { // Check for page break before adding section
                 pdf.addPage();
                 addWatermarkToCurrentPage();
                 currentY = 25;
             }
-            
-            pdf.text(splitLines, page_margin + 5, currentY);
-            currentY += (splitLines.length * 7);
-        });
+            pdf.setFont('helvetica', 'bold').setFontSize(14).text(t(titleKey), page_margin, currentY);
+            currentY += 7;
+            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(content, content_width);
+            if (currentY + (textLines.length * 5) > 280) { // Check for page break before adding content
+                pdf.addPage();
+                addWatermarkToCurrentPage();
+                currentY = 25;
+            }
+            pdf.text(textLines, page_margin, currentY);
+            currentY += (textLines.length * 5) + 10;
+        };
+
+        addWatermarkToCurrentPage();
+        
+        // Report Header
+        pdf.setFont('helvetica', 'bold').setFontSize(18).text(t('report.mainTitle', { locationName: locationName }), page_margin, currentY);
+        currentY += 5;
+        pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
+        currentY += 15;
+
+        // --- Sections from AI ---
+        addSection('report.sections.purpose.title', aiSections.purpose);
+        
+        // Section 2: Threat Analysis + List
+        addSection('report.sections.threatAnalysis.title', aiSections.threatAnalysis);
+        if (threatsMap.size > 0) {
+            currentY -= 5; // Reduce space before list
+            pdf.setFont('helvetica', 'normal').setFontSize(11);
+            const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+            const selectedWeight = vehicleSelect.value;
+            const accelerationRange = getAccelerationRange(selectedWeight);
+            threatsMap.forEach((data, name) => {
+                let reportLine = `• ${name} (${Math.round(data.totalLength)} m)`;
+                if (accelerationRange && data.totalLength > 0) {
+                    const [minAcc, maxAcc] = accelerationRange;
+                    const minSpeed = Math.round(calculateVelocity(minAcc, data.totalLength));
+                    const maxSpeed = Math.round(calculateVelocity(maxAcc, data.totalLength));
+                    reportLine += ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
+                }
+                const splitLines = pdf.splitTextToSize(reportLine, content_width - 5);
+                if (currentY + (splitLines.length * 7) > 280) {
+                    pdf.addPage(); addWatermarkToCurrentPage(); currentY = 25;
+                }
+                pdf.text(splitLines, page_margin + 5, currentY);
+                currentY += (splitLines.length * 6);
+            });
+            currentY += 10;
+        }
+
+        addSection('report.sections.vulnerabilities.title', aiSections.vulnerabilities);
+        addSection('report.sections.hvmMeasures.title', aiSections.hvmMeasures);
+        
+        // Section 5: Site Considerations + Map Image
+        addSection('report.sections.siteConsiderations.title', aiSections.siteConsiderations);
+        if (canvas) {
+            const imgRatio = canvas.height / canvas.width;
+            const imgHeight = content_width * imgRatio;
+            if (currentY + imgHeight > 280) {
+                pdf.addPage(); addWatermarkToCurrentPage(); currentY = 25;
+            }
+            pdf.addImage(canvas, 'PNG', page_margin, currentY, content_width, imgHeight);
+            currentY += imgHeight + 10;
+        } else {
+             const placeholderText = t('report.noMapAvailable');
+             const textLines = pdf.setFont('helvetica', 'italic').setFontSize(10).splitTextToSize(placeholderText, content_width);
+             if (currentY + (textLines.length * 5) > 280) { // Check for page break
+                 pdf.addPage();
+                 addWatermarkToCurrentPage();
+                 currentY = 25;
+             }
+             pdf.text(textLines, page_margin, currentY);
+             currentY += (textLines.length * 5) + 10;
+        }
+
+
+        addSection('report.sections.operationalImpact.title', aiSections.operationalImpact);
 
         reportIframe.src = pdf.output('datauristring');
         generatedPdf = pdf;
@@ -721,7 +918,7 @@ async function generateRiskReport() {
         
     } catch (error) {
         console.error("Fehler bei der Erstellung des Berichts:", error);
-        alert("Der Bericht konnte nicht erstellt werden. Details finden Sie in der Konsole.");
+        alert(t('alerts.reportCreationError'));
     } finally {
         setTimeout(() => {
             mapDiv.classList.add('hidden');
@@ -731,27 +928,33 @@ async function generateRiskReport() {
     }
 }
 
-
 /**
  * Triggers the download of the generated PDF report.
  */
 function downloadRiskReport() {
     if (generatedPdf) {
-        generatedPdf.save('Risikobericht-BarricadiX.pdf');
+        generatedPdf.save(t('report.reportFilename'));
     } else {
-        alert("Es wurde noch kein Bericht erstellt, der heruntergeladen werden könnte.");
+        alert(t('alerts.noReportToDownload'));
     }
 }
 
-// Wait for the DOM to be fully loaded before setting up event listeners
-document.addEventListener('DOMContentLoaded', () => {
+// ===============================================
+// EVENT LISTENERS & INITIALIZATION
+// ===============================================
+document.addEventListener('DOMContentLoaded', async () => {
     initOpenStreetMap();
-    
-    const allSelects = document.querySelectorAll('.sidebar select');
-    allSelects.forEach(select => {
-        select.addEventListener('change', (event) => {
-            const target = event.target as HTMLSelectElement;
-            console.log(`'${target.name}' changed to '${target.value}'. In a real app, this would trigger a data refetch and map/product update.`);
+    await loadTranslations();
+
+    const savedLang = localStorage.getItem('language') || 'de';
+    await setLanguage(savedLang);
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', (event) => {
+            const lang = (event.currentTarget as HTMLElement).dataset.lang;
+            if (lang && lang !== currentLanguage) {
+                setLanguage(lang);
+            }
         });
     });
     
@@ -772,11 +975,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    const securitySlider = document.getElementById('security-risk-slider');
-    securitySlider?.addEventListener('input', (e) => (e.target as HTMLInputElement).value);
-    const productClassSlider = document.getElementById('product-class-slider');
-    productClassSlider?.addEventListener('input', (e) => (e.target as HTMLInputElement).value);
-
     const searchInput = document.getElementById('map-search-input') as HTMLInputElement;
     const searchButton = document.getElementById('map-search-button') as HTMLButtonElement;
     
@@ -785,7 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!query) return;
         const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
         try {
-            const response = await fetch(url, { headers: { 'Accept-Language': 'de,en' } });
+            const response = await fetch(url, { headers: { 'Accept-Language': currentLanguage } });
             if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
             const data = await response.json();
             if (data && data.length > 0) {
@@ -794,11 +992,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (searchMarker) map.removeLayer(searchMarker);
                 searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${display_name}</b>`).openPopup();
             } else {
-                alert('Standort nicht gefunden.');
+                alert(t('alerts.locationNotFound'));
             }
         } catch (error) {
             console.error('Fehler bei der Kartensuche:', error);
-            alert('Bei der Suche ist ein Fehler aufgetreten.');
+            alert(t('alerts.searchError'));
         }
     };
     searchButton.addEventListener('click', handleSearch);
@@ -810,13 +1008,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const setDrawingMode = (enabled: boolean) => {
         isDrawingMode = enabled;
+        const textSpan = toggleDrawModeBtn.querySelector('span');
         if (enabled) {
             toggleDrawModeBtn.classList.add('active');
-            toggleDrawModeBtn.innerHTML = `<i class="fas fa-check"></i> Zeichnen aktiv`;
+            if (textSpan) textSpan.textContent = t('map.setWaypointsActive');
             mapContainer?.classList.add('drawing-mode');
         } else {
             toggleDrawModeBtn.classList.remove('active');
-            toggleDrawModeBtn.innerHTML = `<i class="fas fa-pencil-alt"></i> Wegpunkte setzen`;
+            if (textSpan) textSpan.textContent = t('map.setWaypoints');
             mapContainer?.classList.remove('drawing-mode');
         }
     };
@@ -844,7 +1043,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (drawnPolygon) map.removeLayer(drawnPolygon);
         drawnPolygon = L.polygon(waypoints, { color: 'yellow', fillColor: '#FFFF00', fillOpacity: 0.3, weight: 2 }).addTo(map);
         const polygonCenter = drawnPolygon.getBounds().getCenter();
-        polygonLabel = L.marker(polygonCenter, { icon: L.divIcon({ className: 'polygon-label', html: 'Sicherheitsbereich', iconSize: [150, 24] }) }).addTo(map);
+        polygonLabel = L.marker(polygonCenter, { icon: L.divIcon({ className: 'polygon-label', html: t('map.securityAreaLabel'), iconSize: [150, 24] }) }).addTo(map);
         if (pathLine) map.removeLayer(pathLine);
         pathLine = null;
         waypointMarkers.forEach(marker => map.removeLayer(marker));
@@ -874,7 +1073,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const reportIframe = document.getElementById('report-iframe') as HTMLIFrameElement;
     const mapDiv = document.getElementById('map') as HTMLElement;
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
-    const selectionErrorMessage = document.getElementById('selection-error-message') as HTMLElement;
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
 
     navLinks.forEach(link => {
@@ -882,14 +1080,6 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
             const clickedLink = event.currentTarget as HTMLAnchorElement;
             const newTabId = clickedLink.id;
-
-            // VALIDATION: Check for vehicle selection if trying to navigate away from the first tab
-            if (vehicleSelect.value === 'alle' && newTabId !== 'nav-param-input') {
-                selectionErrorMessage.textContent = 'Bitte treffen Sie eine Fahrzeugauswahl bevor Sie fortfahren.';
-                selectionErrorMessage.classList.remove('hidden');
-                return; // Stop navigation if validation fails
-            }
-            selectionErrorMessage.classList.add('hidden'); // Hide message if validation passes
 
             navLinks.forEach(l => l.classList.remove('active'));
             clickedLink.classList.add('active');
@@ -919,7 +1109,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const isReportView = newTabId === 'nav-risk-report';
             mapDiv.classList.toggle('hidden', isReportView);
             reportPreviewArea.classList.toggle('hidden', !isReportView);
-            if (isReportView && map) map.invalidateSize();
+            
+            // If the map is now visible (i.e., we are NOT on the report tab)
+            // and the map object exists, tell it to update its size. This prevents
+            // the map from losing its center/zoom state.
+            if (!isReportView && map) {
+                map.invalidateSize();
+            }
 
             if (!generatedPdf) {
                 reportIframe.src = 'about:blank';
@@ -939,17 +1135,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Add listener to the select to hide the error message on valid change
-    vehicleSelect.addEventListener('change', () => {
-        if (vehicleSelect.value !== 'alle') {
-            selectionErrorMessage.classList.add('hidden');
-        }
-        // When vehicle changes, re-run analysis if threats are already displayed
+    vehicleSelect.addEventListener('change', async () => {
         if (threatsMap.size > 0) {
-             analyzeAndMarkThreats();
+             await analyzeAndMarkThreats();
         }
         if (document.querySelector('.product-recommendations-container')?.classList.contains('hidden') === false) {
-             updateProductRecommendations();
+             await updateProductRecommendations();
         }
     });
 

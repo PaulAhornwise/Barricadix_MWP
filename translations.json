@@ -1,0 +1,309 @@
+
+{
+  "de": {
+    "nav": {
+      "paramInput": "Parametereingabe",
+      "markingArea": "Sicherheitsbereich markieren",
+      "threatAnalysis": "Gefahrenanalyse",
+      "riskReport": "Risikobericht",
+      "productSelection": "Produktauswahl & Projektausschreibung",
+      "publishProject": "Projektausschreibung veröffentlichen"
+    },
+    "aria": {
+      "search": "Suche",
+      "email": "E-Mail",
+      "settings": "Einstellungen"
+    },
+    "user": {
+      "loggedIn": "Angemeldet: BarricadiX Admin"
+    },
+    "sidebar": {
+      "trafficData": "Verkehrsdaten",
+      "vehicleSelect": "Fahrzeugauswahl",
+      "accessRoads": "Zufahrten",
+      "curbs": "Bordsteinkanten",
+      "obstacles": "Hindernisse",
+      "protectionSelection": "Schutzauswahl",
+      "protectionPeriod": "Schutzzeitraum",
+      "protectionProducts": "Schutzprodukte",
+      "productProperty": "Produkteigenschaft",
+      "riskAssessment": "Risikobewertung",
+      "assetToProtect": "Was geschützt werden soll",
+      "securityRisk": "Sicherheitsrisiko",
+      "recommendedProductClass": "Empfohlene Produktklasse",
+      "low": "niedrig",
+      "high": "hoch",
+      "options": {
+        "vehicle": {
+          "all": "alle",
+          "motorcycle": "Motorrad",
+          "car_light": "KFZ <3.5t",
+          "truck_light": "LKW <7.5t",
+          "truck_medium": "LKW <12t",
+          "truck_heavy": "LKW <40t"
+        },
+        "access": {
+          "all": "alle",
+          "meadow": "Wiese",
+          "forest_path": "Waldweg",
+          "pedestrian_path": "Fußgängerweg",
+          "one_way": "Einbahnstraße",
+          "two_lane": "Zweispur",
+          "three_lane": "Dreispur",
+          "four_lane": "Vierspur"
+        },
+        "curbs": {
+          "yes": "ja",
+          "no": "nein"
+        },
+        "obstacles": {
+          "none": "keine",
+          "trees": "Bäume",
+          "posts": "Pfosten",
+          "bins": "Mülltonnen"
+        },
+        "period": {
+          "permanent": "dauerhaft",
+          "temporary": "temporär",
+          "eventual": "eventuell"
+        },
+        "products": {
+          "bollard": "Poller",
+          "barrier": "Barriere",
+          "post": "Pfosten",
+          "ditch": "Graben"
+        },
+        "property": {
+          "automatic_rigid": "aut./starr",
+          "retractable": "versenkbar",
+          "removable": "entfernbar"
+        }
+      }
+    },
+    "placeholders": {
+        "assetToProtect": "z.B. Haupteingang Stadion"
+    },
+    "tooltips": {
+      "securityRisk": "Informationen zum Sicherheitsrisiko.",
+      "productClass": "Informationen zur empfohlenen Produktklasse."
+    },
+    "map": {
+      "searchPlaceholder": "Paderborn, Domplatz",
+      "searchButton": "Suchen",
+      "setWaypoints": "Wegpunkte setzen",
+      "setWaypointsActive": "Zeichnen aktiv",
+      "reset": "Zurücksetzen",
+      "analyzeAccess": "Analyse der Zufahrten",
+      "createReport": "Bericht erstellen",
+      "downloadReport": "Bericht Downloaden",
+      "securityAreaLabel": "Sicherheitsbereich"
+    },
+    "report": {
+      "generating": "Bericht wird erstellt...",
+      "mainTitle": "Reduzierter Erstbericht – Zufahrtsschutzkonzept für {locationName}",
+      "sections": {
+        "purpose": { "title": "1. Zweck und Schutzziele" },
+        "threatAnalysis": { "title": "2. Bedrohungsanalyse & Risikobewertung" },
+        "vulnerabilities": { "title": "3. Kritische Schwachstellen" },
+        "hvmMeasures": { "title": "4. Vorgeschlagene HVM-Maßnahmen" },
+        "siteConsiderations": { "title": "5. Standortspezifische Überlegungen & Integration" },
+        "operationalImpact": { "title": "6. Betriebliche und Ästhetische Auswirkungen" }
+      },
+      "watermark": "Erstentwurf",
+      "reportFilename": "Risikobericht-BarricadiX.pdf",
+      "not_applicable": "N/A",
+      "undefinedLocation": "[Standort nicht auf Karte definiert]",
+      "undefinedAsset": "[Kein spezifisches Schutzobjekt angegeben]",
+      "noThreatAnalysis": "[Keine Gefahrenanalyse durchgeführt]",
+      "undefinedValue": "[Wert nicht ermittelt]",
+      "noMapAvailable": "Hier würde eine Karte des Sicherheitsbereichs angezeigt. Um diese zu generieren, markieren Sie bitte einen Bereich im Reiter 'Sicherheitsbereich markieren'."
+    },
+    "threats": {
+      "title": "Eindringungsgefahren",
+      "loading": "Analysiere Zufahrten...",
+      "speed": "Geschw.",
+      "noCrossingWaysBoundary": "Keine querenden Wege an der Grenze gefunden.",
+      "noCrossingWaysArea": "Keine querenden Wege im markierten Bereich gefunden.",
+      "analysisFailed": "Analyse fehlgeschlagen.",
+      "popupHeader": "Zufahrt"
+    },
+    "products": {
+      "title": "Produktempfehlungen",
+      "pollers": "Fest installierte Poller",
+      "resistanceHigh": "Widerstandsklasse: hoch",
+      "barriers": "Mobile Barrieren",
+      "resistanceMedium": "mittel",
+      "showMore": "Weitere Produkte anzeigen",
+      "dbError": "Produkt-DB Fehler",
+      "recommendation": "Empfehlung:",
+      "noRecommendation": "Keine passende Empfehlung gefunden"
+    },
+    "alerts": {
+      "noPolygon": "Bitte markieren Sie zuerst einen Sicherheitsbereich unter dem Reiter 'Sicherheitsbereich markieren'.",
+      "overpassError": "Overpass API Anfrage fehlgeschlagen mit Status {status}",
+      "analysisError": "Bei der Analyse ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.",
+      "locationNotFound": "Standort nicht gefunden.",
+      "searchError": "Bei der Suche ist ein Fehler aufgetreten.",
+      "reportCreationError": "Der Bericht konnte nicht erstellt werden. Details finden Sie in der Konsole.",
+      "noReportToDownload": "Es wurde noch kein Bericht erstellt, der heruntergeladen werden könnte.",
+      "productDbError": "Fehler beim Laden der Produktdatenbank:",
+      "geminiError": "Die KI-gestützte Analyse konnte aufgrund eines Fehlers nicht generiert werden."
+    },
+    "ai": {
+      "reportPrompt": "Du bist ein professioneller Sicherheitsberater, der einen Risikobericht für Fahrzeuganprallschutz (HVM) erstellt. Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Hier sind die Kontextdaten:\n\n- **Standortname**: {locationName}\n- **Zu schützendes Objekt**: {assetToProtect}\n- **Angestrebtes Sicherheitsniveau**: {securityLevel}\n- **Abgeleiteter Sicherungsgrad**: {protectionGrade}\n- **Hauptbedrohungen (Zufahrtsstraßen)**: {threatList}\n- **Art der HVM-Lösung**: {protectionPeriod}\n- **Empfohlener FSB-Typ**: {productType}\n- **Erwartete Mindestanprallleistung**: Eindringtiefe von {penetration} m und Trümmerflugweite von {debrisDistance} m.\n\nFülle jeden der folgenden Abschnitte mit sinnvollem, professionellem Text, der auf den bereitgestellten Daten basiert. Wenn ein Wert ein Platzhalter in eckigen Klammern ist (z.B. '[Keine Gefahrenanalyse durchgeführt]'), erkenne an, dass diese Information fehlt, und formuliere stattdessen eine allgemeine Beschreibung, welche Art von Information an dieser Stelle für einen vollständigen Bericht erforderlich wäre."
+    }
+  },
+  "en": {
+    "nav": {
+      "paramInput": "Parameter Input",
+      "markingArea": "Mark Security Area",
+      "threatAnalysis": "Threat Analysis",
+      "riskReport": "Risk Report",
+      "productSelection": "Product Selection & Tender",
+      "publishProject": "Publish Project Tender"
+    },
+    "aria": {
+      "search": "Search",
+      "email": "Email",
+      "settings": "Settings"
+    },
+    "user": {
+      "loggedIn": "Logged in: BarricadiX Admin"
+    },
+    "sidebar": {
+      "trafficData": "Traffic Data",
+      "vehicleSelect": "Vehicle Selection",
+      "accessRoads": "Access Roads",
+      "curbs": "Curbs",
+      "obstacles": "Obstacles",
+      "protectionSelection": "Protection Selection",
+      "protectionPeriod": "Protection Period",
+      "protectionProducts": "Protection Products",
+      "productProperty": "Product Property",
+      "riskAssessment": "Risk Assessment",
+      "assetToProtect": "Asset to be protected",
+      "securityRisk": "Security Risk",
+      "recommendedProductClass": "Recommended Product Class",
+      "low": "low",
+      "high": "high",
+      "options": {
+        "vehicle": {
+          "all": "all",
+          "motorcycle": "Motorcycle",
+          "car_light": "Car <3.5t",
+          "truck_light": "Truck <7.5t",
+          "truck_medium": "Truck <12t",
+          "truck_heavy": "Truck <40t"
+        },
+        "access": {
+          "all": "all",
+          "meadow": "Meadow",
+          "forest_path": "Forest Path",
+          "pedestrian_path": "Pedestrian Path",
+          "one_way": "One-way Street",
+          "two_lane": "Two-lane",
+          "three_lane": "Three-lane",
+          "four_lane": "Four-lane"
+        },
+        "curbs": {
+          "yes": "yes",
+          "no": "no"
+        },
+        "obstacles": {
+          "none": "none",
+          "trees": "Trees",
+          "posts": "Posts",
+          "bins": "Trash Cans"
+        },
+        "period": {
+          "permanent": "permanent",
+          "temporary": "temporary",
+          "eventual": "eventual"
+        },
+        "products": {
+          "bollard": "Bollard",
+          "barrier": "Barrier",
+          "post": "Post",
+          "ditch": "Ditch"
+        },
+        "property": {
+          "automatic_rigid": "auto/rigid",
+          "retractable": "retractable",
+          "removable": "removable"
+        }
+      }
+    },
+    "placeholders": {
+        "assetToProtect": "e.g., Main stadium entrance"
+    },
+    "tooltips": {
+      "securityRisk": "Information about security risk.",
+      "productClass": "Information about recommended product class."
+    },
+    "map": {
+      "searchPlaceholder": "Paderborn, Cathedral Square",
+      "searchButton": "Search",
+      "setWaypoints": "Set Waypoints",
+      "setWaypointsActive": "Drawing active",
+      "reset": "Reset",
+      "analyzeAccess": "Analyze Access Roads",
+      "createReport": "Create Report",
+      "downloadReport": "Download Report",
+      "securityAreaLabel": "Security Area"
+    },
+    "report": {
+      "generating": "Generating report...",
+      "mainTitle": "Initial Report – Access Protection Concept for {locationName}",
+      "sections": {
+        "purpose": { "title": "1. Purpose and Protection Goals" },
+        "threatAnalysis": { "title": "2. Threat Analysis & Risk Assessment" },
+        "vulnerabilities": { "title": "3. Critical Vulnerabilities" },
+        "hvmMeasures": { "title": "4. Proposed HVM Measures" },
+        "siteConsiderations": { "title": "5. Site-specific Considerations & Integration" },
+        "operationalImpact": { "title": "6. Operational and Aesthetic Impacts" }
+      },
+      "watermark": "Draft",
+      "reportFilename": "Risk-Report-BarricadiX.pdf",
+      "not_applicable": "N/A",
+      "undefinedLocation": "[Location not defined on map]",
+      "undefinedAsset": "[No specific asset to protect specified]",
+      "noThreatAnalysis": "[No threat analysis performed]",
+      "undefinedValue": "[Value not determined]",
+      "noMapAvailable": "A map of the security area would be displayed here. To generate it, please mark an area in the 'Mark Security Area' tab."
+    },
+    "threats": {
+      "title": "Intrusion Threats",
+      "loading": "Analyzing access roads...",
+      "speed": "Speed",
+      "noCrossingWaysBoundary": "No crossing paths found at the boundary.",
+      "noCrossingWaysArea": "No crossing paths found in the marked area.",
+      "analysisFailed": "Analysis failed.",
+      "popupHeader": "Access Road"
+    },
+    "products": {
+      "title": "Product Recommendations",
+      "pollers": "Fixed Bollards",
+      "resistanceHigh": "Resistance class: high",
+      "barriers": "Mobile Barriers",
+      "resistanceMedium": "medium",
+      "showMore": "Show more products",
+      "dbError": "Product DB Error",
+      "recommendation": "Recommendation:",
+      "noRecommendation": "No suitable recommendation found"
+    },
+    "alerts": {
+      "noPolygon": "Please mark a security area first under the 'Mark Security Area' tab.",
+      "overpassError": "Overpass API request failed with status {status}",
+      "analysisError": "An error occurred during the analysis. Please try again later.",
+      "locationNotFound": "Location not found.",
+      "searchError": "An error occurred during the search.",
+      "reportCreationError": "The report could not be created. See console for details.",
+      "noReportToDownload": "No report has been generated to download yet.",
+      "productDbError": "Error loading the product database:",
+      "geminiError": "The AI-powered analysis could not be generated due to an error."
+    },
+    "ai": {
+      "reportPrompt": "You are a professional security consultant creating a risk report for Hostile Vehicle Mitigation (HVM). Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFill each of the following sections with meaningful, professional text based on the provided data. If a value is a placeholder in square brackets (e.g., '[No threat analysis performed]'), acknowledge that this information is missing and instead formulate a general description of what kind of information would be required in this section for a complete report."
+    }
+  }
+}
