@@ -206,11 +206,12 @@
                     </div>
                     <!-- The map will be injected here by Leaflet.js -->
                     <div id="map"></div>
-                    <!-- The report preview will be shown here -->
-                    <div id="report-preview-area" class="hidden">
-                         <div class="report-loading-overlay hidden" data-translate-key="report.generating">Bericht wird erstellt...</div>
+                    <!-- The report preview will be shown here, layered on top of the map container -->
+                    <div id="report-preview-area" class="view-hidden">
                          <iframe id="report-iframe" title="Risikobericht Vorschau"></iframe>
                     </div>
+                    <!-- The loading overlay is a sibling to map/report to cover everything -->
+                    <div class="report-loading-overlay view-hidden" data-translate-key="report.generating">Bericht wird erstellt...</div>
                 </div>
                 <div class="analysis-area">
                     <div class="threat-list-container">

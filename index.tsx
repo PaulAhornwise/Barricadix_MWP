@@ -27,6 +27,7 @@ declare const html2canvas: any;
 
 // App state
 let map: any; // Module-scoped map object
+let tileLayer: any; // Module-scoped tile layer object
 let searchMarker: any = null; // To keep track of the current search marker
 let isDrawingMode = false;
 let waypoints: any[] = [];
@@ -184,14 +185,15 @@ function initOpenStreetMap(): void {
     
     const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn, Domplatz
     map = L.map(mapDiv, {
-      zoomControl: false // Disable default zoom control
+      zoomControl: false, // Disable default zoom control
+      preferCanvas: true // Use canvas renderer for better performance with html2canvas
     }).setView(mapCenter, 16);
 
     L.control.zoom({
         position: 'topright'
     }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 }
@@ -746,27 +748,51 @@ async function generateRiskReport() {
     const mapDiv = document.getElementById('map') as HTMLElement;
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
     
-    loadingOverlay.classList.remove('hidden');
+    loadingOverlay.classList.remove('view-hidden');
     downloadReportBtn.disabled = true;
-    reportPreviewArea.classList.add('hidden');
-    mapDiv.classList.remove('hidden');
 
-    // Wait for the browser to render the map before capturing it.
-    await new Promise(resolve => setTimeout(resolve, 50)); 
-    map.invalidateSize();
-    
-    if (drawnPolygon) {
-        // By disabling animation on fitBounds, we prevent html2canvas from capturing
-        // the map mid-transition, which can cause overlays (like the polygon) to appear shifted.
-        map.fitBounds(drawnPolygon.getBounds(), { animate: false });
-        
-        // Even without animation, we wait a brief moment to ensure all layers have
-        // been fully rendered by the browser before we take the screenshot.
-        await new Promise(resolve => setTimeout(resolve, 150));
-    }
-
+    let canvas = null;
 
     try {
+        if (drawnPolygon) {
+            // Temporarily switch views to make the map visible for capture
+            reportPreviewArea.classList.add('view-hidden');
+            mapDiv.classList.remove('view-hidden');
+
+            // Wait for the map to be fully rendered before taking the screenshot
+            await new Promise<void>(resolve => {
+                map.invalidateSize(); // Crucial for Leaflet to recognize new container size/visibility
+
+                const resolveFn = () => requestAnimationFrame(() => setTimeout(resolve, 250));
+                
+                let moveEndTimeoutId: number;
+
+                // The 'load' event on the tile layer is the best signal that map images are ready.
+                tileLayer.once('load', () => {
+                    clearTimeout(moveEndTimeoutId);
+                    resolveFn();
+                });
+
+                // 'moveend' is a fallback. If tiles are cached, 'load' may not fire.
+                map.once('moveend', () => {
+                    moveEndTimeoutId = window.setTimeout(resolveFn, 500);
+                });
+                
+                // Trigger the process
+                map.fitBounds(drawnPolygon.getBounds(), { animate: false });
+            });
+            
+            // Now that the map is ready and visible, capture it.
+            canvas = await html2canvas(mapDiv, {
+                useCORS: true,
+                logging: false,
+                onclone: (doc) => {
+                    // Ensure popups are not visible in the screenshot
+                    doc.querySelectorAll('.leaflet-popup-pane > *').forEach(p => (p as HTMLElement).style.display = 'none');
+                }
+            });
+        }
+
         const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : t('report.undefinedLocation');
         
         const assetInput = document.getElementById('asset-to-protect') as HTMLInputElement;
@@ -796,14 +822,6 @@ async function generateRiskReport() {
         const aiSections = await getAIReportSections(context);
         if (!aiSections) {
              throw new Error("AI did not return report sections.");
-        }
-
-        let canvas = null;
-        if (drawnPolygon) {
-            canvas = await html2canvas(mapDiv, {
-                useCORS: true, logging: false,
-                onclone: (doc) => doc.querySelectorAll('.leaflet-popup-pane > *').forEach(p => (p as HTMLElement).style.display = 'none')
-            });
         }
 
         const { jsPDF } = window.jspdf;
@@ -911,7 +929,11 @@ async function generateRiskReport() {
 
 
         addSection('report.sections.operationalImpact.title', aiSections.operationalImpact);
-
+        
+        // Switch back to report view before loading the PDF
+        mapDiv.classList.add('view-hidden');
+        reportPreviewArea.classList.remove('view-hidden');
+        
         reportIframe.src = pdf.output('datauristring');
         generatedPdf = pdf;
         downloadReportBtn.disabled = false;
@@ -919,12 +941,11 @@ async function generateRiskReport() {
     } catch (error) {
         console.error("Fehler bei der Erstellung des Berichts:", error);
         alert(t('alerts.reportCreationError'));
+         // Ensure we switch back to the report view on error
+        mapDiv.classList.add('view-hidden');
+        reportPreviewArea.classList.remove('view-hidden');
     } finally {
-        setTimeout(() => {
-            mapDiv.classList.add('hidden');
-            reportPreviewArea.classList.remove('hidden');
-            loadingOverlay.classList.add('hidden');
-        }, 0);
+        loadingOverlay.classList.add('view-hidden');
     }
 }
 
@@ -1107,14 +1128,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             downloadReportBtn.classList.add('hidden');
             
             const isReportView = newTabId === 'nav-risk-report';
-            mapDiv.classList.toggle('hidden', isReportView);
-            reportPreviewArea.classList.toggle('hidden', !isReportView);
+            mapDiv.classList.toggle('view-hidden', isReportView);
+            reportPreviewArea.classList.toggle('view-hidden', !isReportView);
             
-            // If the map is now visible (i.e., we are NOT on the report tab)
-            // and the map object exists, tell it to update its size. This prevents
-            // the map from losing its center/zoom state.
-            if (!isReportView && map) {
-                map.invalidateSize();
+            if (map) {
+                // Invalidate size only if the map is becoming visible
+                if (!isReportView) {
+                    map.invalidateSize();
+                }
             }
 
             if (!generatedPdf) {
