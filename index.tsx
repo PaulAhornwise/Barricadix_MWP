@@ -38,6 +38,7 @@ let polygonLabel: any = null; // To store the label for the polygon
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
 let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], totalLength: number }>(); // To store analysis data for report
 let generatedPdf: any = null; // To hold the generated PDF object
+let generatedPdfUrl: string | null = null; // Object URL for iframe preview
 let productDatabase: any[] = []; // To cache the product data
 
 // Internationalization (i18n) state
@@ -596,7 +597,13 @@ const analyzeAndMarkThreats = async () => {
  */
 async function getAIReportSections(context: any): Promise<any> {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY) as string | undefined;
+        if (!apiKey) {
+            console.error("GEMINI_API_KEY fehlt. Lege eine .env im Projekt an mit 'GEMINI_API_KEY=DEIN_SCHLUESSEL' und starte den Dev-Server neu.");
+            alert(t('alerts.geminiError'));
+            return null;
+        }
+        const ai = new GoogleGenAI({ apiKey });
         const prompt = t('ai.reportPrompt', {
             locationName: context.locationName,
             assetToProtect: context.assetToProtect,
@@ -867,9 +874,18 @@ async function generateRiskReport() {
 
         addWatermarkToCurrentPage();
         
-        // Report Header
-        pdf.setFont('helvetica', 'bold').setFontSize(18).text(t('report.mainTitle', { locationName: locationName }), page_margin, currentY);
-        currentY += 5;
+        // Report Header (wrapped to page width)
+        const headerText = t('report.mainTitle', { locationName: locationName });
+        pdf.setFont('helvetica', 'bold').setFontSize(18);
+        const headerLines = pdf.splitTextToSize(headerText, content_width);
+        const headerLineHeight = 8;
+        if (currentY + (headerLines.length * headerLineHeight) > 280) {
+            pdf.addPage();
+            addWatermarkToCurrentPage();
+            currentY = 25;
+        }
+        pdf.text(headerLines, page_margin, currentY);
+        currentY += (headerLines.length * headerLineHeight) + 5;
         pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
         currentY += 15;
 
@@ -929,12 +945,39 @@ async function generateRiskReport() {
 
 
         addSection('report.sections.operationalImpact.title', aiSections.operationalImpact);
-        
+
+        // Ensure watermark is drawn ON TOP of all content (text and images) on every page
+        try {
+            const getPages = (pdf as any).getNumberOfPages || pdf.internal?.getNumberOfPages;
+            const totalPages: number = typeof getPages === 'function' ? getPages.call(pdf) : 1;
+            for (let p = 1; p <= totalPages; p++) {
+                pdf.setPage(p);
+                addWatermarkToCurrentPage();
+            }
+        } catch (e) {
+            // Fallback: at least watermark current page
+            addWatermarkToCurrentPage();
+        }
+
         // Switch back to report view before loading the PDF
-        mapDiv.classList.add('view-hidden');
+        // Ensure report preview container is visible and has size before setting src
         reportPreviewArea.classList.remove('view-hidden');
-        
-        reportIframe.src = pdf.output('datauristring');
+        mapDiv.classList.add('view-hidden');
+        // Force layout so the iframe becomes visible
+        await new Promise(requestAnimationFrame);
+
+        // Use a Blob URL for iframe preview (more reliable than data URI in some browsers)
+        try {
+            const pdfBlob = pdf.output('blob');
+            if (generatedPdfUrl) {
+                URL.revokeObjectURL(generatedPdfUrl);
+            }
+            generatedPdfUrl = URL.createObjectURL(pdfBlob);
+            reportIframe.src = generatedPdfUrl;
+        } catch (e) {
+            // Fallback to data URI
+            reportIframe.src = pdf.output('datauristring');
+        }
         generatedPdf = pdf;
         downloadReportBtn.disabled = false;
         
