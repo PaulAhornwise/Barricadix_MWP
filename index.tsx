@@ -12,6 +12,12 @@
  */
 
 import { GoogleGenAI, Type } from "@google/genai";
+// React-basierte Chatbot-Komponente ist als separate Datei vorhanden.
+// Import optional, Compiler kann ohne explizites React import arbeiten (no JSX here).
+import { createElement } from "react";
+import type {} from "react-dom";
+import ZufahrtsschutzChatbot from "./ZufahrtsschutzChatbot";
+import { createRoot } from "react-dom/client";
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -28,6 +34,7 @@ declare const html2canvas: any;
 // App state
 let map: any; // Module-scoped map object
 let tileLayer: any; // Module-scoped tile layer object
+let threatLayerGroup: any = null; // Group for all threat overlays to clear in one go
 let searchMarker: any = null; // To keep track of the current search marker
 let isDrawingMode = false;
 let waypoints: any[] = [];
@@ -137,7 +144,7 @@ async function translateUI() {
  */
 async function loadTranslations() {
     try {
-        const response = await fetch('translations.json');
+        const response = await fetch(`${import.meta.env.BASE_URL}translations.json`);
         if (!response.ok) throw new Error('Failed to load translations file.');
         translations = await response.json();
     } catch (error) {
@@ -191,7 +198,7 @@ function initOpenStreetMap(): void {
     }).setView(mapCenter, 16);
 
     L.control.zoom({
-        position: 'topright'
+        position: 'bottomright'
     }).addTo(map);
 
     tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -203,6 +210,14 @@ function initOpenStreetMap(): void {
  * Clears the threat markers (red circles and lines) and the list from the map and UI.
  */
 const clearThreatAnalysis = () => {
+    // Remove grouped layers if present
+    if (threatLayerGroup) {
+        try {
+            threatLayerGroup.clearLayers();
+            map.removeLayer(threatLayerGroup);
+        } catch (e) { /* noop */ }
+        threatLayerGroup = null;
+    }
     threatMarkersMap.forEach(markers => {
         markers.forEach(marker => map.removeLayer(marker));
     });
@@ -212,6 +227,8 @@ const clearThreatAnalysis = () => {
     if (threatList) {
         threatList.innerHTML = '';
     }
+    const floating = document.getElementById('floating-threats');
+    if (floating) floating.classList.add('view-hidden');
     const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
     if (productRecommendationsContainer) {
         productRecommendationsContainer.classList.add('hidden');
@@ -544,19 +561,43 @@ const analyzeAndMarkThreats = async () => {
         threatsMap = threats;
         
         if (threatsMap.size > 0) {
-             threatsMap.forEach((data, name) => {
+            // Prepare a group to hold all overlays so we can clear them reliably later
+            if (threatLayerGroup) {
+                try { threatLayerGroup.clearLayers(); map.removeLayer(threatLayerGroup); } catch {}
+            }
+            threatLayerGroup = L.layerGroup().addTo(map);
+
+            // Choose color by estimated speed (worst-case acceleration)
+            const vehicleSelectEl = document.getElementById('vehicle-select') as HTMLSelectElement;
+            const selectedWeightVal = vehicleSelectEl?.value || 'alle';
+            const accRange = getAccelerationRange(selectedWeightVal);
+            const usedAcc = accRange ? accRange[1] : 3.0;
+
+            threatsMap.forEach((data, name) => {
                 if (data.entryPoints.length === 0) return;
                 const currentStreetMarkers: any[] = [];
                 data.entryPoints.forEach(point => {
                     const threatCircle = L.circle([point.lat, point.lon], {
                         radius: 5, color: 'red', fillColor: '#f03', fillOpacity: 1, weight: 2
-                    }).addTo(map).bindPopup(`<b>${t('threats.popupHeader')}</b><br>${name}`);
+                    }).bindPopup(`<b>${t('threats.popupHeader')}</b><br>${name}`);
+                    threatLayerGroup.addLayer(threatCircle);
                     currentStreetMarkers.push(threatCircle);
                 });
                 data.pathSegments.forEach(segment => {
                     if (segment.length > 1) {
                         const latLngsSegment = segment.map(p => [p.lat, p.lon]);
-                        const threatPath = L.polyline(latLngsSegment, { color: 'red', weight: 4, opacity: 0.8 }).addTo(map);
+                        // Determine segment length to estimate speed
+                        let segLen = 0;
+                        for (let i = 0; i < segment.length - 1; i++) {
+                            segLen += getHaversineDistance(segment[i], segment[i+1]);
+                        }
+                        const vKmH = calculateVelocity(usedAcc, segLen);
+                        let color = '#e74c3c'; // default red (>= 50-70 km/h)
+                        if (vKmH <= 30) color = '#39b54a';
+                        else if (vKmH <= 50) color = '#f1c40f';
+
+                        const threatPath = L.polyline(latLngsSegment, { color, weight: 5, opacity: 0.9 });
+                        threatLayerGroup.addLayer(threatPath);
                         currentStreetMarkers.push(threatPath);
                     }
                 });
@@ -565,6 +606,9 @@ const analyzeAndMarkThreats = async () => {
                 }
             });
             renderThreatList(); // Render the list from the new data
+            // Show floating panel on the map
+            const floating = document.getElementById('floating-threats');
+            if (floating) floating.classList.remove('view-hidden');
             
             const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
             if (productRecommendationsContainer) {
@@ -572,10 +616,12 @@ const analyzeAndMarkThreats = async () => {
                 await updateProductRecommendations();
             }
         } else {
-            const threatList = document.querySelector('.threat-list') as HTMLOListElement;
+    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
             const li = document.createElement('li');
             li.textContent = t('threats.noCrossingWaysArea');
             threatList.appendChild(li);
+            const floating = document.getElementById('floating-threats');
+            if (floating) floating.classList.remove('view-hidden');
         }
 
     } catch (error) {
@@ -597,11 +643,12 @@ const analyzeAndMarkThreats = async () => {
  */
 async function getAIReportSections(context: any): Promise<any> {
     try {
+        const isGithubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
         const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY) as string | undefined;
-        if (!apiKey) {
-            console.error("GEMINI_API_KEY fehlt. Lege eine .env im Projekt an mit 'GEMINI_API_KEY=DEIN_SCHLUESSEL' und starte den Dev-Server neu.");
-            alert(t('alerts.geminiError'));
-            return null;
+        if (!apiKey || isGithubPages) {
+            // Public demo (GitHub Pages) oder kein Key vorhanden: erzeugen wir statische Platzhalterabschnitte
+            console.warn('AI disabled for public/demo build. Using placeholder report sections.');
+            return buildReportFromStateFallback(context);
         }
         const ai = new GoogleGenAI({ apiKey });
         const prompt = t('ai.reportPrompt', {
@@ -637,13 +684,45 @@ async function getAIReportSections(context: any): Promise<any> {
             }
         });
         
-        const jsonText = response.text.trim();
+        const jsonText = (response.text || '').trim();
         return JSON.parse(jsonText);
 
     } catch (error) {
         console.error("Fehler bei der Gemini-API-Anfrage für den Bericht:", error);
         alert(t('alerts.geminiError'));
         return null;
+    }
+}
+
+function buildReportFromStateFallback(context: any) {
+    try {
+        const ps = (window as any).planningState || {};
+        const schutzgueter = ps.schutzgüter?.join(', ') || context.assetToProtect || 'nicht spezifiziert';
+        const bedrohung = ps.risiko?.bedrohung?.art || 'unbekannt';
+        const vKmh = ps.risiko?.dynamik?.v_kmh || context.estimatedSpeedKmH || 'n. a.';
+        const untergrund = ps.risiko?.site?.untergrund || 'unbekannt';
+        const restrisiko = ps.restrisiko?.klasse || context.securityLevel || 'n. a.';
+        const corridors = (ps.risiko?.site?.anfahrkorridore && ps.risiko.site.anfahrkorridore.length>0)
+            ? `${ps.risiko.site.anfahrkorridore.length} identifizierte Korridore`
+            : 'keine Geometrie aus Chatbot übergeben';
+
+        return {
+            purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414‑2 / ISO 22343‑2).`,
+            threatAnalysis: `Bedrohungsannahme: ${bedrohung}. Aus der Karten-/Chat-Analyse ergibt sich eine Zufahrtsgeschwindigkeit von ca. ${vKmh} km/h. Anfahrkorridore laut Chat: ${corridors}.`,
+            vulnerabilities: `Untergrund/Fundamente: ${untergrund}. Restrisiko (Chat/Slider): ${restrisiko}. Kritische Zufahrtswinkel bzw. Engstellen sind bei der Maßnahmendefinition zu berücksichtigen.`,
+            hvmMeasures: `Empfohlene Maßnahmen orientieren sich an der erwarteten Geschwindigkeit und den Schutzzielen. Für ${schutzgueter} mit Geschwindigkeit ~${vKmh} km/h sind FSB mit entsprechendem Leistungsniveau, geprüften Fundamenten und Berücksichtigung des Anprallwinkels anzusetzen.`,
+            siteConsiderations: `Betriebliche Rahmenbedingungen (z. B. Feuerwehrzufahrt, Fluchtwege) aus Chat sollten in die Detailplanung einfließen. Untergrund: ${untergrund}.`,
+            operationalImpact: `Maßnahmen sind so auszulegen, dass Betrieb, Rettungswege und Gestaltung berücksichtigt sind; temporäre Anpassungen (Events) werden unterstützt.`
+        };
+    } catch {
+        return {
+            purpose: `Schutzziel und Rahmenbedingungen für ${context.locationName}.`,
+            threatAnalysis: `Zusammenfassung der Gefahren basierend auf Karten-/Chat-Eingaben.`,
+            vulnerabilities: `Allgemeine Schwachstellen am Standort.`,
+            hvmMeasures: `Empfohlene HVM‑Maßnahmen gemäß Annahmen.`,
+            siteConsiderations: `Standortspezifische Hinweise.`,
+            operationalImpact: `Betriebliche Auswirkungen und Gestaltung.`
+        };
     }
 }
 
@@ -671,7 +750,7 @@ async function getReportLocationName(center: any): Promise<string> {
 async function updateProductRecommendations() {
     if (productDatabase.length === 0) {
         try {
-            const response = await fetch('product-database.json');
+            const response = await fetch(`${import.meta.env.BASE_URL}product-database.json`);
             if (!response.ok) throw new Error('Product database fetch failed');
             productDatabase = await response.json();
         } catch (error) {
@@ -793,9 +872,9 @@ async function generateRiskReport() {
             canvas = await html2canvas(mapDiv, {
                 useCORS: true,
                 logging: false,
-                onclone: (doc) => {
+                onclone: (doc: Document) => {
                     // Ensure popups are not visible in the screenshot
-                    doc.querySelectorAll('.leaflet-popup-pane > *').forEach(p => (p as HTMLElement).style.display = 'none');
+                    doc.querySelectorAll('.leaflet-popup-pane > *').forEach((p: Element) => (p as HTMLElement).style.display = 'none');
                 }
             });
         }
@@ -1041,6 +1120,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const searchInput = document.getElementById('map-search-input') as HTMLInputElement;
     const searchButton = document.getElementById('map-search-button') as HTMLButtonElement;
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar') as HTMLButtonElement | null;
+    const sidebarEl = document.querySelector('.sidebar') as HTMLElement | null;
     
     const handleSearch = async () => {
         const query = searchInput.value.trim();
@@ -1065,6 +1146,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     searchButton.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') handleSearch(); });
+
+    // Sidebar toggle for smaller screens
+    if (toggleSidebarBtn && sidebarEl) {
+        toggleSidebarBtn.addEventListener('click', () => {
+            sidebarEl.classList.toggle('open');
+        });
+    }
     
     const toggleDrawModeBtn = document.getElementById('toggle-draw-mode') as HTMLButtonElement;
     const resetDrawingBtn = document.getElementById('reset-drawing') as HTMLButtonElement;
@@ -1131,6 +1219,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     map.on('click', onMapClick);
 
     const navLinks = document.querySelectorAll('.main-nav a');
+    // Map-tabs spiegeln die gleichen Ansichten über der Karte
+    const mapTabs = document.querySelectorAll('.map-tabs a');
     const analyzeThreatsBtn = document.getElementById('analyze-threats') as HTMLButtonElement;
     const createReportBtn = document.getElementById('create-report-btn') as HTMLButtonElement;
     const downloadReportBtn = document.getElementById('download-report-btn') as HTMLButtonElement;
@@ -1139,63 +1229,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
 
+    const handleNavSwitch = async (newTabId: string, clickedLink?: HTMLAnchorElement) => {
+        if (clickedLink) {
+            navLinks.forEach(l => l.classList.remove('active'));
+            clickedLink.classList.add('active');
+        }
+        // Map-Tabs optisch synchronisieren
+        mapTabs.forEach(tab => {
+            const t = tab as HTMLAnchorElement;
+            t.classList.toggle('active', t.getAttribute('data-target') === newTabId);
+        });
+
+        if (newTabId === 'nav-param-input') {
+            resetDrawing();
+            clearThreatAnalysis();
+            generatedPdf = null;
+        }
+        if (newTabId === 'nav-marking-area') {
+            clearThreatAnalysis();
+            generatedPdf = null;
+        }
+        if (newTabId === 'nav-threat-analysis') {
+            generatedPdf = null;
+        }
+        if (newTabId === 'nav-product-selection') {
+            await updateProductRecommendations();
+        }
+
+        toggleDrawModeBtn.classList.add('hidden');
+        resetDrawingBtn.classList.add('hidden');
+        analyzeThreatsBtn.classList.add('hidden');
+        createReportBtn.classList.add('hidden');
+        downloadReportBtn.classList.add('hidden');
+
+        const isReportView = newTabId === 'nav-risk-report';
+        mapDiv.classList.toggle('view-hidden', isReportView);
+        reportPreviewArea.classList.toggle('view-hidden', !isReportView);
+
+        if (map) {
+            if (!isReportView) {
+                map.invalidateSize();
+            }
+        }
+
+        if (!generatedPdf) {
+            reportIframe.src = 'about:blank';
+            downloadReportBtn.disabled = true;
+        }
+
+        if (newTabId === 'nav-marking-area') {
+            toggleDrawModeBtn.classList.remove('hidden');
+            resetDrawingBtn.classList.remove('hidden');
+        } else if (newTabId === 'nav-threat-analysis') {
+            analyzeThreatsBtn.classList.remove('hidden');
+        } else if (newTabId === 'nav-risk-report') {
+            createReportBtn.classList.remove('hidden');
+            downloadReportBtn.classList.remove('hidden');
+            downloadReportBtn.disabled = !generatedPdf;
+        }
+    };
+
     navLinks.forEach(link => {
         link.addEventListener('click', async (event) => {
             event.preventDefault();
             const clickedLink = event.currentTarget as HTMLAnchorElement;
             const newTabId = clickedLink.id;
+            await handleNavSwitch(newTabId, clickedLink);
+        });
+    });
 
-            navLinks.forEach(l => l.classList.remove('active'));
-            clickedLink.classList.add('active');
-
-            if (newTabId === 'nav-param-input') {
-                resetDrawing();
-                clearThreatAnalysis();
-                generatedPdf = null;
-            }
-            if (newTabId === 'nav-marking-area') {
-                clearThreatAnalysis();
-                generatedPdf = null;
-            }
-            if (newTabId === 'nav-threat-analysis') {
-                generatedPdf = null;
-            }
-             if (newTabId === 'nav-product-selection') {
-                await updateProductRecommendations();
-            }
-            
-            toggleDrawModeBtn.classList.add('hidden');
-            resetDrawingBtn.classList.add('hidden');
-            analyzeThreatsBtn.classList.add('hidden');
-            createReportBtn.classList.add('hidden');
-            downloadReportBtn.classList.add('hidden');
-            
-            const isReportView = newTabId === 'nav-risk-report';
-            mapDiv.classList.toggle('view-hidden', isReportView);
-            reportPreviewArea.classList.toggle('view-hidden', !isReportView);
-            
-            if (map) {
-                // Invalidate size only if the map is becoming visible
-                if (!isReportView) {
-                    map.invalidateSize();
-                }
-            }
-
-            if (!generatedPdf) {
-                reportIframe.src = 'about:blank';
-                downloadReportBtn.disabled = true;
-            }
-
-            if (newTabId === 'nav-marking-area') {
-                toggleDrawModeBtn.classList.remove('hidden');
-                resetDrawingBtn.classList.remove('hidden');
-            } else if (newTabId === 'nav-threat-analysis') {
-                analyzeThreatsBtn.classList.remove('hidden');
-            } else if (newTabId === 'nav-risk-report') {
-                createReportBtn.classList.remove('hidden');
-                downloadReportBtn.classList.remove('hidden');
-                downloadReportBtn.disabled = !generatedPdf;
-            }
+    // Map‑Tabs verknüpfen
+    mapTabs.forEach(tab => {
+        tab.addEventListener('click', async (event) => {
+            event.preventDefault();
+            const link = event.currentTarget as HTMLAnchorElement;
+            const targetId = link.getAttribute('data-target')!;
+            const correspondingHeaderLink = document.getElementById(targetId) as HTMLAnchorElement | null;
+            await handleNavSwitch(targetId, correspondingHeaderLink ?? undefined);
         });
     });
 
@@ -1224,4 +1334,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Set initial state
     document.getElementById('nav-param-input')?.click();
+
+    // ===============================
+
+    // Mount React Chatbot into overlay root (replaces the temporary DOM Chatbot)
+    const overlayRoot = document.getElementById('chatbot-react-root');
+    if (overlayRoot) {
+        try {
+            const root = createRoot(overlayRoot);
+            root.render(createElement(ZufahrtsschutzChatbot));
+        } catch (e) {
+            console.error('Chatbot mount failed:', e);
+        }
+    }
+
 });

@@ -26,6 +26,11 @@
 
     "paths": {
       "@/*" :  ["./*"]
-    }
+    },
+    "types": [
+      "vite/client",
+      "react",
+      "react-dom"
+    ]
   }
 }
