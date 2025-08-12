@@ -704,98 +704,53 @@ function showPlanningView() {
     // Restore all planning view elements
     restorePlanningViewElements();
     
-    // Explicitly restore map container and elements
-    const mapContainer = document.getElementById('map');
-    const mapArea = document.getElementById('map-area');
-    const sidebar = document.getElementById('sidebar');
-    const mapTabs = document.getElementById('map-tabs');
-    const mapToolbar = document.getElementById('map-toolbar');
-    const chatbotRoot = document.getElementById('chatbot-react-root');
+    // CRITICAL: Remove ALL view-hidden classes from map elements
+    const mapElements = [
+        'map',
+        'map-area', 
+        'sidebar',
+        'map-tabs',
+        'map-toolbar',
+        'chatbot-react-root'
+    ];
     
-    if (mapContainer) {
-        mapContainer.style.display = 'block';
-        mapContainer.style.visibility = 'visible';
-        mapContainer.style.opacity = '1';
-        console.log('Map container restored');
-    }
+    mapElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.classList.remove('view-hidden');
+            element.style.display = 'block';
+            element.style.visibility = 'visible';
+            element.style.opacity = '1';
+            console.log(`${elementId} restored and view-hidden removed`);
+        }
+    });
     
-    if (mapArea) {
-        mapArea.style.display = 'block';
-        mapArea.style.visibility = 'visible';
-        mapArea.style.opacity = '1';
-        console.log('Map area restored');
-    }
-    
-    if (sidebar) {
-        sidebar.style.display = 'block';
-        sidebar.style.visibility = 'visible';
-        sidebar.style.opacity = '1';
-        console.log('Sidebar restored');
-    }
-    
-    if (mapTabs) {
-        mapTabs.style.display = 'block';
-        mapTabs.style.visibility = 'visible';
-        mapTabs.style.opacity = '1';
-        console.log('Map tabs restored');
-    }
-    
-    if (mapToolbar) {
-        mapToolbar.style.display = 'block';
-        mapToolbar.style.visibility = 'visible';
-        mapToolbar.style.opacity = '1';
-        console.log('Map toolbar restored');
-    }
-    
-    if (chatbotRoot) {
-        chatbotRoot.style.display = 'block';
-        chatbotRoot.style.visibility = 'visible';
-        chatbotRoot.style.opacity = '1';
-        console.log('Chatbot root restored');
-    }
-    
-    // Force map to update and restore state
+    // CRITICAL: Re-initialize the map completely
     if (map) {
-        console.log('Map object found, restoring...');
+        console.log('Destroying existing map...');
+        map.remove(); // Remove existing map
+        map = null;
+    }
+    
+    // Wait a bit for DOM cleanup, then re-initialize
+    setTimeout(() => {
+        console.log('Re-initializing map...');
+        initOpenStreetMap();
         
-        // Restore map view if we have saved state
+        // Restore map state if available
         if ((window as any).savedMapState) {
             const savedState = (window as any).savedMapState;
-            map.setView(savedState.center, savedState.zoom);
-            console.log('Restored map view to:', savedState.center, 'zoom:', savedState.zoom);
-        }
-        
-        // Force map to update multiple times to ensure proper rendering
-        map.invalidateSize();
-        
-        // Multiple delays to ensure map is properly rendered
-        setTimeout(() => {
-            map.invalidateSize();
-            console.log('Map invalidated after 100ms');
-        }, 100);
-        
-        setTimeout(() => {
-            map.invalidateSize();
-            console.log('Map invalidated after 300ms');
-        }, 300);
-        
-        setTimeout(() => {
-            map.invalidateSize();
-            console.log('Map invalidated after 500ms');
-        }, 500);
-        
-        // Force a complete map refresh
-        setTimeout(() => {
             if (map) {
+                map.setView(savedState.center, savedState.zoom);
+                console.log('Map state restored:', savedState.center, 'zoom:', savedState.zoom);
+                
+                // Force map update
                 map.invalidateSize();
-                // Trigger a resize event to force Leaflet to recalculate
-                window.dispatchEvent(new Event('resize'));
-                console.log('Map refresh triggered');
+                setTimeout(() => map?.invalidateSize(), 100);
+                setTimeout(() => map?.invalidateSize(), 300);
             }
-        }, 800);
-    } else {
-        console.error('Map object not found!');
-    }
+        }
+    }, 100);
     
     // Restore chatbot state if it was open
     if ((window as any).savedChatbotState && (window as any).savedChatbotState.open) {
@@ -808,8 +763,8 @@ function showPlanningView() {
         }
     }
     
-    showNotification('Planungs-Ansicht aktiviert - Alle Funktionen wiederhergestellt', 'success');
-    console.log('Planning view switch completed');
+    showNotification('Planungs-Ansicht aktiviert - Map neu initialisiert', 'success');
+    console.log('Planning view switch completed with map re-initialization');
 }
 
 // Function to show manufacturer view
@@ -859,6 +814,7 @@ function showManufacturerView() {
         mapArea.style.display = 'none';
         mapArea.style.visibility = 'hidden';
         mapArea.style.opacity = '0';
+        mapArea.classList.add('view-hidden'); // CSS-Klasse hinzufügen
     }
     
     // Hide map container completely for manufacturer view
@@ -867,13 +823,20 @@ function showManufacturerView() {
         mapContainer.style.display = 'none';
         mapContainer.style.visibility = 'hidden';
         mapContainer.style.opacity = '0';
+        mapContainer.classList.add('view-hidden'); // CSS-Klasse hinzufügen
     }
     
     // Hide map tabs and toolbar for manufacturer view
     const mapTabs = document.getElementById('map-tabs');
     const mapToolbar = document.getElementById('map-toolbar');
-    if (mapTabs) mapTabs.style.display = 'none';
-    if (mapToolbar) mapToolbar.style.display = 'none';
+    if (mapTabs) {
+        mapTabs.style.display = 'none';
+        mapTabs.classList.add('view-hidden'); // CSS-Klasse hinzufügen
+    }
+    if (mapToolbar) {
+        mapToolbar.style.display = 'none';
+        mapToolbar.classList.add('view-hidden'); // CSS-Klasse hinzufügen
+    }
     
     // Translate manufacturer view after showing it
     setTimeout(() => {
@@ -966,16 +929,23 @@ function getProperty(obj: any, path: string) {
  * @returns The translated string.
  */
 function t(key: string, replacements?: { [key: string]: string | number }): string {
-    if (!translations[currentLanguage]) {
-        console.warn(`No translations loaded for language: ${currentLanguage}`);
-        return key;
+    // Ensure we have translations available
+    if (!translations || !translations[currentLanguage]) {
+        console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
+        translations = embeddedTranslations;
     }
     
-    let text = getProperty(translations[currentLanguage], key);
+    let text = getProperty(translations[currentLanguage as keyof typeof translations], key);
     
+    // If still no text found, try embedded translations
     if (typeof text !== 'string') {
-        console.warn(`Translation key not found for language '${currentLanguage}': ${key}`);
-        return key; // Return the key as a fallback
+        console.warn(`Translation key not found in main translations for language '${currentLanguage}': ${key}`);
+        text = getProperty(embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations], key);
+        
+        if (typeof text !== 'string') {
+            console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
+            return key; // Return the key as a final fallback
+        }
     }
     
     if (replacements) {
@@ -1064,12 +1034,36 @@ async function translateUI() {
  */
 async function loadTranslations() {
     try {
-        const response = await fetch(`${import.meta.env.BASE_URL}translations.json`);
-        if (!response.ok) throw new Error('Failed to load translations file.');
-        translations = await response.json();
+        // Try multiple paths for GitHub Pages compatibility
+        const paths = [
+            `${import.meta.env.BASE_URL}translations.json`,
+            '/translations.json',
+            './translations.json',
+            '../translations.json'
+        ];
+        
+        let loaded = false;
+        for (const path of paths) {
+            try {
+                console.log(`Trying to load translations from: ${path}`);
+                const response = await fetch(path);
+                if (response.ok) {
+                    translations = await response.json();
+                    console.log(`Translations loaded successfully from: ${path}`);
+                    loaded = true;
+                    break;
+                }
+            } catch (pathError) {
+                console.log(`Failed to load from ${path}:`, pathError);
+            }
+        }
+        
+        if (!loaded) {
+            throw new Error('All translation file paths failed');
+        }
     } catch (error) {
-        console.error("Could not load translations from file:", error);
-        // Fallback: try to load from root path
+        console.error("Could not load translations from any file path:", error);
+        // Simplified fallback
         try {
             const fallbackResponse = await fetch('/translations.json');
             if (fallbackResponse.ok) {
@@ -1082,6 +1076,15 @@ async function loadTranslations() {
     
     // If no translations loaded from file, use embedded translations
     if (!translations.de && !translations.en) {
+        console.log('No translations loaded from file, using embedded translations');
+        translations = embeddedTranslations;
+    } else {
+        console.log('Translations loaded successfully from file');
+    }
+    
+    // Ensure we always have translations available
+    if (!translations.de || !translations.en) {
+        console.warn('Incomplete translations, falling back to embedded');
         translations = embeddedTranslations;
     }
 }
@@ -1137,6 +1140,14 @@ function initOpenStreetMap(): void {
         return;
     }
     
+    // Ensure map container is visible and properly sized
+    mapDiv.style.display = 'block';
+    mapDiv.style.visibility = 'visible';
+    mapDiv.style.opacity = '1';
+    mapDiv.classList.remove('view-hidden');
+    
+    console.log('Map container prepared for initialization');
+    
     const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn, Domplatz
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
@@ -1150,6 +1161,8 @@ function initOpenStreetMap(): void {
     tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+    
+    console.log('Map initialized successfully');
 }
 
 /**
