@@ -86,7 +86,7 @@
       }
     },
     "placeholders": {
-        "assetToProtect": "z.B. Haupteingang Stadion"
+        "assetToProtect": "Bitte eintragen"
     },
     "tooltips": {
       "securityRisk": "Informationen zum Sicherheitsrisiko.",
@@ -326,7 +326,7 @@
       }
     },
     "placeholders": {
-        "assetToProtect": "e.g., Main stadium entrance"
+        "assetToProtect": "Please enter"
     },
     "tooltips": {
       "securityRisk": "Information about security risk.",
@@ -465,6 +465,30 @@
             "1year": "Letztes Jahr"
           }
         }
+      },
+      "productDatabase": {
+        "title": "Produktdatenbank",
+        "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
+        "search": "Produktsuche",
+        "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+        "filterBy": "Filtern nach",
+        "manufacturer": "Hersteller",
+        "standard": "Standard",
+        "vehicleWeight": "Fahrzeuggewicht (kg)",
+        "vehicleType": "Fahrzeugtyp",
+        "speed": "Geschwindigkeit (km/h)",
+        "impactAngle": "Anprallwinkel (°)",
+        "penetration": "Penetration (m)",
+        "debrisDistance": "Trümmerdistanz (m)",
+        "noProducts": "Keine Produkte gefunden",
+        "loading": "Produkte werden geladen...",
+        "technicalSpecs": "Technische Spezifikationen",
+        "performanceData": "Leistungsdaten",
+        "certification": "Zertifizierung",
+        "viewDetails": "Details anzeigen",
+        "closeDetails": "Schließen",
+        "exportData": "Daten exportieren",
+        "printSpecs": "Spezifikationen drucken"
       }
     }
   },
@@ -660,6 +684,30 @@
             "1year": "Last Year"
           }
         }
+      },
+      "productDatabase": {
+        "title": "Product Database",
+        "subtitle": "Technical data and specifications of all available products",
+        "search": "Product Search",
+        "searchPlaceholder": "Enter product name, manufacturer or type...",
+        "filterBy": "Filter by",
+        "manufacturer": "Manufacturer",
+        "standard": "Standard",
+        "vehicleWeight": "Vehicle Weight (kg)",
+        "vehicleType": "Vehicle Type",
+        "speed": "Speed (km/h)",
+        "impactAngle": "Impact Angle (°)",
+        "penetration": "Penetration (m)",
+        "debrisDistance": "Debris Distance (m)",
+        "noProducts": "No products found",
+        "loading": "Loading products...",
+        "technicalSpecs": "Technical Specifications",
+        "performanceData": "Performance Data",
+        "certification": "Certification",
+        "viewDetails": "View Details",
+        "closeDetails": "Close",
+        "exportData": "Export Data",
+        "printSpecs": "Print Specifications"
       }
     }
   }

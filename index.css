@@ -834,6 +834,310 @@ div.search-marker.leaflet-marker-icon {
     background: var(--accent-color-dark);
 }
 
+/* Product Database Section */
+.product-database-section {
+    padding: 24px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    margin: 20px;
+}
+
+.section-header {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.section-header h2 {
+    color: var(--primary-text);
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+
+.section-header p {
+    color: var(--secondary-text);
+    font-size: 1rem;
+}
+
+/* Search and Filter Bar */
+.search-filter-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    display: flex;
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px 0 0 6px;
+    background: var(--sidebar-bg);
+    color: var(--primary-text);
+    font-size: 0.9rem;
+}
+
+.search-box input::placeholder {
+    color: var(--secondary-text);
+}
+
+.search-btn {
+    padding: 12px 16px;
+    background: var(--accent-color);
+    border: none;
+    border-radius: 0 6px 6px 0;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-btn:hover {
+    background: var(--accent-color-dark);
+}
+
+.filter-controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--sidebar-bg);
+    color: var(--primary-text);
+    font-size: 0.9rem;
+    min-width: 150px;
+}
+
+/* Products Table */
+.products-table-container {
+    background: var(--sidebar-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.loading-indicator {
+    padding: 40px;
+    text-align: center;
+    color: var(--secondary-text);
+    font-size: 1.1rem;
+}
+
+.products-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    min-width: 1200px; /* Ensure table doesn't get too narrow */
+}
+
+.products-table th,
+.products-table td {
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.products-table th {
+    background: var(--header-bg);
+    color: var(--primary-text);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.products-table td {
+    color: var(--primary-text);
+    vertical-align: middle;
+}
+
+.products-table tbody tr:hover {
+    background: var(--sidebar-bg-2);
+}
+
+.products-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.view-details-btn {
+    padding: 8px 16px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
+}
+
+.view-details-btn:hover {
+    background: var(--accent-color-dark);
+}
+
+.no-products-message {
+    padding: 40px;
+    text-align: center;
+    color: var(--secondary-text);
+    font-size: 1.1rem;
+}
+
+/* Product Modal */
+.product-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    color: var(--primary-text);
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.close-modal-btn {
+    background: none;
+    border: none;
+    color: var(--secondary-text);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: color 0.2s;
+}
+
+.close-modal-btn:hover {
+    color: var(--primary-text);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.product-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 24px;
+}
+
+.detail-section h4 {
+    color: var(--primary-text);
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.detail-section div {
+    color: var(--secondary-text);
+    line-height: 1.6;
+}
+
+.modal-footer {
+    padding: 24px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.action-btn:hover {
+    background: var(--accent-color-dark);
+}
+
+/* Responsive Design for Product Database */
+@media (max-width: 768px) {
+    .search-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-box {
+        min-width: auto;
+    }
+    
+    .filter-controls {
+        justify-content: center;
+    }
+    
+    .products-table {
+        font-size: 0.8rem;
+        min-width: auto;
+    }
+    
+    .products-table th,
+    .products-table td {
+        padding: 8px 6px;
+    }
+    
+    .product-details-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 20px;
+    }
+    
+    .products-table-container {
+        max-height: 60vh;
+        overflow-x: auto;
+    }
+}
+
 /* Responsive adjustments for manufacturer view */
 @media (max-width: 768px) {
     .manufacturer-content-wrapper {

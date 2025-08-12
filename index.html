@@ -150,7 +150,7 @@
                     <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
                      <div class="form-group">
                         <label for="asset-to-protect" data-translate-key="sidebar.assetToProtect">Was geschützt werden soll</label>
-                        <input type="text" id="asset-to-protect" data-translate-key-placeholder="placeholders.assetToProtect" placeholder="z.B. Haupteingang Stadion">
+                        <input type="text" id="asset-to-protect" placeholder="Bitte eintragen">
                     </div>
                     <div class="form-group slider-group">
                         <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
@@ -322,41 +322,102 @@
                             </button>
                         </div>
                         
-                        <div class="manufacturer-grid">
-                            <div class="manufacturer-card">
-                                <div class="card-icon">
-                                    <i class="fas fa-boxes"></i>
-                                </div>
-                                <h3 data-translate-key="manufacturer.products">Produkte</h3>
-                                <p data-translate-key="manufacturer.manageCatalog">Verwalten Sie Ihren Produktkatalog</p>
-                                <button class="card-button" data-translate-key="manufacturer.open">Öffnen</button>
+                        <!-- Product Database Section -->
+                        <div class="product-database-section">
+                            <div class="section-header">
+                                <h2>Produktdatenbank</h2>
+                                <p>Technische Daten und Spezifikationen aller verfügbaren Produkte</p>
                             </div>
                             
-                            <div class="manufacturer-card">
-                                <div class="card-icon">
-                                    <i class="fas fa-file-invoice"></i>
+                            <!-- Search and Filter Bar -->
+                            <div class="search-filter-bar">
+                                <div class="search-box">
+                                    <input type="text" id="product-search" placeholder="Produktname, Hersteller oder Typ eingeben...">
+                                    <button id="search-btn" class="search-btn">
+                                        <i class="fas fa-search"></i>
+                                    </button>
                                 </div>
-                                <h3 data-translate-key="manufacturer.quotations">Angebote</h3>
-                                <p data-translate-key="manufacturer.createQuotations">Erstellen und verwalten Sie Angebote</p>
-                                <button class="card-button" data-translate-key="manufacturer.open">Öffnen</button>
+                                
+                                <div class="filter-controls">
+                                    <select id="manufacturer-filter" class="filter-select">
+                                        <option value="">Alle Hersteller</option>
+                                    </select>
+                                    <select id="standard-filter" class="filter-select">
+                                        <option value="">Alle Standards</option>
+                                    </select>
+                                    <select id="vehicle-type-filter" class="filter-select">
+                                        <option value="">Alle Fahrzeugtypen</option>
+                                    </select>
+                                </div>
                             </div>
                             
-                            <div class="manufacturer-card">
-                                <div class="card-icon">
-                                    <i class="fas fa-users"></i>
+                            <!-- Products Table -->
+                            <div class="products-table-container">
+                                <div id="products-loading" class="loading-indicator">
+                                    Produkte werden geladen...
                                 </div>
-                                <h3 data-translate-key="manufacturer.customers">Kunden</h3>
-                                <p data-translate-key="manufacturer.manageContacts">Verwalten Sie Ihre Kundenkontakte</p>
-                                <button class="card-button" data-translate-key="manufacturer.open">Öffnen</button>
+                                
+                                <table id="products-table" class="products-table" style="display: none;">
+                                    <thead>
+                                        <tr>
+                                            <th>Hersteller</th>
+                                            <th>Typ</th>
+                                            <th>Standard</th>
+                                            <th>Fahrzeuggewicht (kg)</th>
+                                            <th>Fahrzeugtyp</th>
+                                            <th>Geschwindigkeit (km/h)</th>
+                                            <th>Anprallwinkel (°)</th>
+                                            <th>Penetration (m)</th>
+                                            <th>Trümmerdistanz (m)</th>
+                                            <th>Aktionen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-tbody">
+                                        <!-- Products will be dynamically loaded here -->
+                                    </tbody>
+                                </table>
+                                
+                                <div id="no-products" class="no-products-message" style="display: none;">
+                                    Keine Produkte gefunden
+                                </div>
                             </div>
                             
-                            <div class="manufacturer-card">
-                                <div class="card-icon">
-                                    <i class="fas fa-chart-line"></i>
+                            <!-- Product Details Modal -->
+                            <div id="product-modal" class="product-modal" style="display: none;">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h3 id="modal-product-name">Produktdetails</h3>
+                                        <button id="close-modal" class="close-modal-btn">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="product-details-grid">
+                                            <div class="detail-section">
+                                                <h4>Technische Spezifikationen</h4>
+                                                <div id="modal-technical-specs"></div>
+                                            </div>
+                                            <div class="detail-section">
+                                                <h4>Leistungsdaten</h4>
+                                                <div id="modal-performance-data"></div>
+                                            </div>
+                                            <div class="detail-section">
+                                                <h4>Zertifizierung</h4>
+                                                <div id="modal-certification"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button id="export-product" class="action-btn">
+                                            <i class="fas fa-download"></i>
+                                            <span>Daten exportieren</span>
+                                        </button>
+                                        <button id="print-product" class="action-btn">
+                                            <i class="fas fa-print"></i>
+                                            <span>Spezifikationen drucken</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <h3 data-translate-key="manufacturer.analytics">Analysen</h3>
-                                <p data-translate-key="manufacturer.businessAnalytics">Betriebs- und Verkaufsanalysen</p>
-                                <button class="card-button" data-translate-key="manufacturer.open">Öffnen</button>
                             </div>
                         </div>
                     </div>

@@ -578,7 +578,7 @@ const embeddedTranslations = {
             "analyzeAccess": "Analyze Access"
         },
         "placeholders": {
-            "assetToProtect": "e.g. Main entrance stadium"
+            "assetToProtect": "Please enter"
         },
 
     }
@@ -652,6 +652,11 @@ function initViewSwitcher() {
         });
         
         console.log('Manufacturer navigation tabs initialized');
+        
+        // Initialize product database functionality after translations are loaded
+        setTimeout(() => {
+            initProductDatabase();
+        }, 500);
     }, 100);
 }
 
@@ -866,6 +871,428 @@ function restoreMapState() {
 // Export function to prevent "unused" warning
 (window as any).restoreMapState = restoreMapState;
 
+// ===============================================
+// PRODUCT DATABASE FUNCTIONS
+// ===============================================
+
+/**
+ * Initialize the product database functionality
+ */
+function initProductDatabase() {
+    console.log('Initializing product database...');
+    
+    // Apply translations to product database elements first
+    translateProductDatabase();
+    
+    // Load product data
+    loadProductDatabase();
+    
+    // Initialize search and filter functionality
+    initProductSearchAndFilters();
+    
+    // Initialize modal functionality
+    initProductModal();
+}
+
+/**
+ * Load the product database from the JSON file
+ */
+async function loadProductDatabase() {
+    try {
+        const response = await fetch('/product-database.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const products = await response.json();
+        console.log('Product database loaded:', products.length, 'products');
+        
+        // Store products globally
+        (window as any).productDatabase = products;
+        
+        // Populate filters
+        populateProductFilters(products);
+        
+        // Display products
+        displayProducts(products);
+        
+        // Hide loading indicator
+        const loadingIndicator = document.getElementById('products-loading');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        // Show products table
+        const productsTable = document.getElementById('products-table');
+        if (productsTable) {
+            productsTable.style.display = 'table';
+        }
+        
+        // Re-apply translations to ensure all elements are properly translated
+        translateProductDatabase();
+        
+    } catch (error) {
+        console.error('Error loading product database:', error);
+        showNotification('Fehler beim Laden der Produktdatenbank', 'error');
+        
+        // Show error message
+        const noProducts = document.getElementById('no-products');
+        if (noProducts) {
+            noProducts.style.display = 'block';
+            noProducts.textContent = 'Fehler beim Laden der Produktdatenbank';
+        }
+    }
+}
+
+/**
+ * Populate the filter dropdowns with unique values from the product database
+ */
+function populateProductFilters(products: any[]) {
+    // Manufacturer filter
+    const manufacturerFilter = document.getElementById('manufacturer-filter') as HTMLSelectElement;
+    if (manufacturerFilter) {
+        const manufacturers = [...new Set(products.map(p => p.manufacturer).filter(Boolean))];
+        manufacturers.forEach(manufacturer => {
+            const option = document.createElement('option');
+            option.value = manufacturer;
+            option.textContent = manufacturer;
+            manufacturerFilter.appendChild(option);
+        });
+    }
+    
+    // Standard filter
+    const standardFilter = document.getElementById('standard-filter') as HTMLSelectElement;
+    if (standardFilter) {
+        const standards = [...new Set(products.map(p => p.standard).filter(Boolean))];
+        standards.forEach(standard => {
+            const option = document.createElement('option');
+            option.value = standard;
+            option.textContent = standard;
+            standardFilter.appendChild(option);
+        });
+    }
+    
+    // Vehicle type filter
+    const vehicleTypeFilter = document.getElementById('vehicle-type-filter') as HTMLSelectElement;
+    if (vehicleTypeFilter) {
+        const vehicleTypes = [...new Set(products.map(p => p.vehicleType).filter(Boolean))];
+        vehicleTypes.forEach(vehicleType => {
+            const option = document.createElement('option');
+            option.value = vehicleType;
+            option.textContent = vehicleType;
+            vehicleTypeFilter.appendChild(option);
+        });
+    }
+}
+
+/**
+ * Display products in the table
+ */
+function displayProducts(products: any[]) {
+    const tbody = document.getElementById('products-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (products.length === 0) {
+        const noProducts = document.getElementById('no-products');
+        if (noProducts) {
+            noProducts.style.display = 'block';
+        }
+        return;
+    }
+    
+    // Hide no products message
+    const noProducts = document.getElementById('no-products');
+    if (noProducts) {
+        noProducts.style.display = 'none';
+    }
+    
+    products.forEach((product, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${product.manufacturer || 'N/A'}</td>
+            <td>${product.type || 'N/A'}</td>
+            <td>${product.standard || 'N/A'}</td>
+            <td>${product.vehicleWeight || 'N/A'}</td>
+            <td>${product.vehicleType || 'N/A'}</td>
+            <td>${product.speed || 'N/A'}</td>
+            <td>${product.impactAngle || 'N/A'}</td>
+            <td>${product.penetration || 'N/A'}</td>
+            <td>${product.debrisDistance || 'N/A'}</td>
+            <td>
+                <button class="view-details-btn" data-product-index="${index}">
+                    Details anzeigen
+                </button>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    // Add click event listeners to view details buttons
+    const viewButtons = tbody.querySelectorAll('.view-details-btn');
+    viewButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const productIndex = parseInt(target.getAttribute('data-product-index') || '0');
+            showProductDetails(productIndex);
+        });
+    });
+}
+
+/**
+ * Initialize search and filter functionality
+ */
+function initProductSearchAndFilters() {
+    const searchInput = document.getElementById('product-search') as HTMLInputElement;
+    const searchBtn = document.getElementById('search-btn');
+    const manufacturerFilter = document.getElementById('manufacturer-filter') as HTMLSelectElement;
+    const standardFilter = document.getElementById('standard-filter') as HTMLSelectElement;
+    const vehicleTypeFilter = document.getElementById('vehicle-type-filter') as HTMLSelectElement;
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', filterProducts);
+    }
+    
+    if (searchBtn) {
+        searchBtn.addEventListener('click', filterProducts);
+    }
+    
+    if (manufacturerFilter) {
+        manufacturerFilter.addEventListener('change', filterProducts);
+    }
+    
+    if (standardFilter) {
+        standardFilter.addEventListener('change', filterProducts);
+    }
+    
+    if (vehicleTypeFilter) {
+        vehicleTypeFilter.addEventListener('change', filterProducts);
+    }
+}
+
+/**
+ * Filter products based on search input and filter selections
+ */
+function filterProducts() {
+    const products = (window as any).productDatabase || [];
+    const searchTerm = (document.getElementById('product-search') as HTMLInputElement)?.value.toLowerCase() || '';
+    const manufacturer = (document.getElementById('manufacturer-filter') as HTMLSelectElement)?.value || '';
+    const standard = (document.getElementById('standard-filter') as HTMLSelectElement)?.value || '';
+    const vehicleType = (document.getElementById('vehicle-type-filter') as HTMLSelectElement)?.value || '';
+    
+    const filteredProducts = products.filter((product: any) => {
+        const matchesSearch = !searchTerm || 
+            product.manufacturer?.toLowerCase().includes(searchTerm) ||
+            product.type?.toLowerCase().includes(searchTerm) ||
+            product.standard?.toLowerCase().includes(searchTerm);
+        
+        const matchesManufacturer = !manufacturer || product.manufacturer === manufacturer;
+        const matchesStandard = !standard || product.standard === standard;
+        const matchesVehicleType = !vehicleType || product.vehicleType === vehicleType;
+        
+        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType;
+    });
+    
+    displayProducts(filteredProducts);
+}
+
+/**
+ * Apply translations to product database elements
+ */
+function translateProductDatabase() {
+    console.log('Translating product database elements...');
+    
+    // Title and subtitle
+    const titleElement = document.querySelector('.section-header h2');
+    if (titleElement) {
+        titleElement.textContent = 'Produktdatenbank';
+    }
+    
+    const subtitleElement = document.querySelector('.section-header p');
+    if (subtitleElement) {
+        subtitleElement.textContent = 'Technische Daten und Spezifikationen aller verfügbaren Produkte';
+    }
+    
+    // Search placeholder
+    const searchInput = document.getElementById('product-search') as HTMLInputElement;
+    if (searchInput) {
+        searchInput.placeholder = 'Produktname, Hersteller oder Typ eingeben...';
+    }
+    
+    // Table headers
+    const tableHeaders = document.querySelectorAll('.products-table th');
+    if (tableHeaders.length >= 9) {
+        tableHeaders[0].textContent = 'Hersteller';
+        tableHeaders[1].textContent = 'Typ';
+        tableHeaders[2].textContent = 'Standard';
+        tableHeaders[3].textContent = 'Fahrzeuggewicht (kg)';
+        tableHeaders[4].textContent = 'Fahrzeugtyp';
+        tableHeaders[5].textContent = 'Geschwindigkeit (km/h)';
+        tableHeaders[6].textContent = 'Anprallwinkel (°)';
+        tableHeaders[7].textContent = 'Penetration (m)';
+        tableHeaders[8].textContent = 'Trümmerdistanz (m)';
+        tableHeaders[9].textContent = 'Aktionen';
+    }
+    
+    // Loading and no products messages
+    const loadingElement = document.getElementById('products-loading');
+    if (loadingElement) {
+        loadingElement.textContent = 'Produkte werden geladen...';
+    }
+    
+    const noProductsElement = document.getElementById('no-products');
+    if (noProductsElement) {
+        noProductsElement.textContent = 'Keine Produkte gefunden';
+    }
+    
+    // Modal elements
+    const modalTitle = document.getElementById('modal-product-name');
+    if (modalTitle) {
+        modalTitle.textContent = 'Produktdetails';
+    }
+    
+    const technicalSpecsElement = document.querySelector('#modal-technical-specs');
+    if (technicalSpecsElement && technicalSpecsElement.previousElementSibling) {
+        (technicalSpecsElement.previousElementSibling as HTMLElement).textContent = 'Technische Spezifikationen';
+    }
+    
+    const performanceDataElement = document.querySelector('#modal-performance-data');
+    if (performanceDataElement && performanceDataElement.previousElementSibling) {
+        (performanceDataElement.previousElementSibling as HTMLElement).textContent = 'Leistungsdaten';
+    }
+    
+    const certificationElement = document.querySelector('#modal-certification');
+    if (certificationElement && certificationElement.previousElementSibling) {
+        (certificationElement.previousElementSibling as HTMLElement).textContent = 'Zertifizierung';
+    }
+    
+    const exportBtn = document.getElementById('export-product');
+    if (exportBtn) {
+        const exportSpan = exportBtn.querySelector('span');
+        if (exportSpan) {
+            exportSpan.textContent = 'Daten exportieren';
+        }
+    }
+    
+    const printBtn = document.getElementById('print-product');
+    if (printBtn) {
+        const printSpan = printBtn.querySelector('span');
+        if (printSpan) {
+            printSpan.textContent = 'Spezifikationen drucken';
+        }
+    }
+    
+    console.log('Product database elements translated');
+}
+
+/**
+ * Initialize product modal functionality
+ */
+function initProductModal() {
+    const closeModalBtn = document.getElementById('close-modal');
+    const exportBtn = document.getElementById('export-product');
+    const printBtn = document.getElementById('print-product');
+    
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            const modal = document.getElementById('product-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportProductData);
+    }
+    
+    if (printBtn) {
+        printBtn.addEventListener('click', printProductSpecs);
+    }
+    
+    // Close modal when clicking outside
+    const modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+}
+
+/**
+ * Show product details in modal
+ */
+function showProductDetails(productIndex: number) {
+    const products = (window as any).productDatabase || [];
+    const product = products[productIndex];
+    
+    if (!product) return;
+    
+    // Update modal content
+    const modalProductName = document.getElementById('modal-product-name');
+    if (modalProductName) {
+        modalProductName.textContent = `${product.manufacturer} - ${product.type}`;
+    }
+    
+    // Technical specifications
+    const technicalSpecs = document.getElementById('modal-technical-specs');
+    if (technicalSpecs) {
+        technicalSpecs.innerHTML = `
+            <p><strong>Hersteller:</strong> ${product.manufacturer || 'N/A'}</p>
+            <p><strong>Typ:</strong> ${product.type || 'N/A'}</p>
+            <p><strong>Standard:</strong> ${product.standard || 'N/A'}</p>
+        `;
+    }
+    
+    // Performance data
+    const performanceData = document.getElementById('modal-performance-data');
+    if (performanceData) {
+        performanceData.innerHTML = `
+            <p><strong>Fahrzeuggewicht:</strong> ${product.vehicleWeight || 'N/A'} kg</p>
+            <p><strong>Fahrzeugtyp:</strong> ${product.vehicleType || 'N/A'}</p>
+            <p><strong>Geschwindigkeit:</strong> ${product.speed || 'N/A'} km/h</p>
+            <p><strong>Anprallwinkel:</strong> ${product.impactAngle || 'N/A'}°</p>
+            <p><strong>Penetration:</strong> ${product.penetration || 'N/A'} m</p>
+            <p><strong>Trümmerdistanz:</strong> ${product.debrisDistance || 'N/A'} m</p>
+        `;
+    }
+    
+    // Certification
+    const certification = document.getElementById('modal-certification');
+    if (certification) {
+        certification.innerHTML = `
+            <p><strong>Zertifizierungsstandard:</strong> ${product.standard || 'N/A'}</p>
+            <p><strong>Testbedingungen:</strong> ${product.vehicleWeight || 'N/A'} kg bei ${product.speed || 'N/A'} km/h</p>
+        `;
+    }
+    
+    // Show modal
+    const modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+/**
+ * Export product data
+ */
+function exportProductData() {
+    // Implementation for exporting product data
+    showNotification('Export-Funktionalität wird implementiert...', 'info');
+}
+
+/**
+ * Print product specifications
+ */
+function printProductSpecs() {
+    // Implementation for printing product specifications
+    showNotification('Druck-Funktionalität wird implementiert...', 'info');
+}
+
 // Helper function to show notifications
 function showNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') {
     // Remove existing notifications
@@ -950,7 +1377,9 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
         
         if (typeof text !== 'string') {
             console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
-            return key; // Return the key as a final fallback
+            // Return a more user-friendly fallback instead of the raw key
+            const fallbackText = getFallbackText(key);
+            return fallbackText || key;
         }
     }
     
@@ -964,53 +1393,133 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
 }
 
 /**
+ * Provides fallback text for missing translation keys
+ * @param key The missing translation key
+ * @returns A user-friendly fallback text or null
+ */
+function getFallbackText(key: string): string | null {
+    const fallbackMap: { [key: string]: string } = {
+        'sidebar.trafficData': 'Verkehrsdaten',
+        'sidebar.vehicleSelect': 'Fahrzeugauswahl',
+        'sidebar.accessRoads': 'Zufahrten',
+        'sidebar.curbs': 'Bordsteinkanten',
+        'sidebar.obstacles': 'Hindernisse',
+        'sidebar.protectionSelection': 'Schutzauswahl',
+        'sidebar.protectionPeriod': 'Schutzzeitraum',
+        'sidebar.protectionProducts': 'Schutzprodukte',
+        'sidebar.productProperty': 'Produkteigenschaft',
+        'sidebar.riskAssessment': 'Risikobewertung',
+        'sidebar.assetToProtect': 'Was geschützt werden soll',
+        'sidebar.securityRisk': 'Sicherheitsrisiko',
+        'sidebar.recommendedProductClass': 'Empfohlene Produktklasse',
+        'sidebar.low': 'niedrig',
+        'sidebar.high': 'hoch',
+        'nav.paramInput': 'Parameter',
+        'nav.markingArea': 'Sicherheitsbereich',
+        'nav.threatAnalysis': 'Gefahrenanalyse',
+        'nav.riskReport': 'Risikobericht',
+        'nav.productSelection': 'Produktauswahl',
+        'nav.projectDescription': 'Ausschreibung',
+        'header.planning': 'Planung',
+        'header.manufacturer': 'Hersteller'
+    };
+    
+    return fallbackMap[key] || null;
+}
+
+/**
  * Applies the current language's translations to all tagged DOM elements.
  */
 async function translateUI() {
+    console.log('Starting UI translation...');
+    
     if (!translations[currentLanguage]) {
+        console.warn(`No translations for language '${currentLanguage}', attempting to load...`);
         await loadTranslations();
+        
+        if (!translations[currentLanguage]) {
+            console.error(`Failed to load translations for language '${currentLanguage}'`);
+            return;
+        }
     }
+    
+    let translatedElements = 0;
+    let failedElements = 0;
     
     // First, translate all elements with data-translate-key
     document.querySelectorAll('[data-translate-key]').forEach(element => {
-        const key = element.getAttribute('data-translate-key')!;
-        const translatedText = t(key);
-        
-        if (element.hasAttribute('placeholder')) {
-             (element as HTMLInputElement).placeholder = translatedText;
-        } else if (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'text') {
-             (element as HTMLInputElement).value = translatedText;
-        }
-        else {
-            // Find the deepest text node if any, otherwise set textContent
-            const textNode = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
-            if (textNode) {
-                textNode.textContent = translatedText;
+        try {
+            const key = element.getAttribute('data-translate-key')!;
+            const translatedText = t(key);
+            
+            if (translatedText && translatedText !== key) {
+                if (element.hasAttribute('placeholder')) {
+                    (element as HTMLInputElement).placeholder = translatedText;
+                } else if (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'text') {
+                    (element as HTMLInputElement).value = translatedText;
+                } else {
+                    // Find the deepest text node if any, otherwise set textContent
+                    const textNode = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+                    if (textNode) {
+                        textNode.textContent = translatedText;
+                    } else {
+                        element.textContent = translatedText;
+                    }
+                }
+                translatedElements++;
             } else {
-                 element.textContent = translatedText;
+                console.warn(`Translation failed for key: ${key}`);
+                failedElements++;
             }
+        } catch (error) {
+            console.error(`Error translating element:`, error);
+            failedElements++;
         }
     });
 
     // Translate placeholders
     document.querySelectorAll('[data-translate-key-placeholder]').forEach(element => {
-        const key = element.getAttribute('data-translate-key-placeholder')!;
-        const translatedText = t(key);
-        (element as HTMLInputElement).placeholder = translatedText;
+        try {
+            const key = element.getAttribute('data-translate-key-placeholder')!;
+            const translatedText = t(key);
+            if (translatedText && translatedText !== key) {
+                (element as HTMLInputElement).placeholder = translatedText;
+                translatedElements++;
+            }
+        } catch (error) {
+            console.error(`Error translating placeholder:`, error);
+            failedElements++;
+        }
     });
 
     // Translate aria-labels
     document.querySelectorAll('[data-translate-key-aria]').forEach(element => {
-        const key = element.getAttribute('data-translate-key-aria')!;
-        const translatedText = t(key);
-        element.setAttribute('aria-label', translatedText);
+        try {
+            const key = element.getAttribute('data-translate-key-aria')!;
+            const translatedText = t(key);
+            if (translatedText && translatedText !== key) {
+                element.setAttribute('aria-label', translatedText);
+                translatedElements++;
+            }
+        } catch (error) {
+            console.error(`Error translating aria-label:`, error);
+            failedElements++;
+        }
     });
     
     // Translate tooltips
     document.querySelectorAll('[data-translate-key-tooltip]').forEach(element => {
-        const key = element.getAttribute('data-translate-key-tooltip')!;
-        const translatedText = t(key);
-        (element as HTMLElement).dataset.tooltip = translatedText;
+        try {
+            const key = element.getAttribute('data-translate-key-tooltip')!;
+            const translatedText = t(key);
+            if (translatedText && translatedText !== key) {
+                (element as HTMLElement).dataset.tooltip = translatedText;
+                translatedElements++;
+            }
+        } catch (error) {
+            console.error(`Error translating tooltip:`, error);
+            failedElements++;
+        }
     });
     
     // Special handling for buttons with icons
@@ -1019,20 +1528,34 @@ async function translateUI() {
        const textSpan = toggleDrawModeBtn.querySelector('span');
        if (textSpan) {
            const translatedText = isDrawingMode ? t('map.setWaypointsActive') : t('map.setWaypoints');
-           textSpan.textContent = translatedText;
+           if (translatedText && translatedText !== 'map.setWaypointsActive' && translatedText !== 'map.setWaypoints') {
+               textSpan.textContent = translatedText;
+               translatedElements++;
+           }
        }
     }
     
+    console.log(`UI translation completed: ${translatedElements} elements translated, ${failedElements} failed`);
+    
     // Force refresh of all text content that might have been missed
     setTimeout(() => {
+        let refreshCount = 0;
         document.querySelectorAll('[data-translate-key]').forEach(element => {
-            const key = element.getAttribute('data-translate-key')!;
-            const translatedText = t(key);
-            if (element.textContent !== translatedText) {
-                element.textContent = translatedText;
+            try {
+                const key = element.getAttribute('data-translate-key')!;
+                const translatedText = t(key);
+                if (translatedText && translatedText !== key && element.textContent !== translatedText) {
+                    element.textContent = translatedText;
+                    refreshCount++;
+                }
+            } catch (error) {
+                console.error(`Error in refresh translation:`, error);
             }
         });
-    }, 100);
+        if (refreshCount > 0) {
+            console.log(`Refreshed ${refreshCount} elements`);
+        }
+    }, 200); // Increased timeout for better reliability
 }
 
 /**
@@ -2297,28 +2820,49 @@ function downloadRiskReport() {
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOM Content Loaded - Starting initialization...');
+    
+    // Step 1: Initialize basic UI components
     initViewSwitcher();
     initOpenStreetMap();
     
-    await loadTranslations();
-
-    // Force immediate translation if translations are available
-    if (translations.de) {
-        currentLanguage = 'de';
-        await translateUI();
-        // Also translate chatbot immediately
-        translateChatbot();
-    } else {
-        // If still no translations, force use of embedded translations
-        console.warn('No translations loaded, forcing embedded translations');
+    // Step 2: Load translations with retry mechanism
+    let translationLoadAttempts = 0;
+    const maxAttempts = 3;
+    
+    while (translationLoadAttempts < maxAttempts && (!translations.de || !translations.en)) {
+        console.log(`Translation load attempt ${translationLoadAttempts + 1}/${maxAttempts}`);
+        await loadTranslations();
+        translationLoadAttempts++;
+        
+        if (translationLoadAttempts < maxAttempts && (!translations.de || !translations.en)) {
+            console.log('Waiting 500ms before retry...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+    
+    // Step 3: Ensure we have translations available
+    if (!translations.de || !translations.en) {
+        console.warn('Failed to load translations from file, using embedded translations');
         translations = embeddedTranslations;
-        currentLanguage = 'de';
-        await translateUI();
+    }
+    
+    // Step 4: Set language and translate UI
+    currentLanguage = 'de';
+    console.log('Translating UI...');
+    await translateUI();
+    
+    // Step 5: Additional translations
+    translateChatbot();
+    
+    // Step 6: Set saved language if different
+    const savedLang = localStorage.getItem('language') || 'de';
+    if (savedLang !== currentLanguage) {
+        console.log(`Setting saved language: ${savedLang}`);
+        await setLanguage(savedLang);
     }
 
-    const savedLang = localStorage.getItem('language') || 'de';
-    await setLanguage(savedLang);
-
+    // Step 7: Add event listeners
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.addEventListener('click', (event) => {
             const lang = (event.currentTarget as HTMLElement).dataset.lang;
@@ -2328,6 +2872,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
     
+    console.log('Initialization completed successfully');
+    
+    // Rest of the event listeners...
     const tooltip = document.getElementById('tooltip') as HTMLElement;
     const infoIcons = document.querySelectorAll('.info-icon');
     infoIcons.forEach(icon => {

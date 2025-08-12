@@ -24,8 +24,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/index-fUk0f4n5.js"></script>
-  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/index-apXMihEv.css">
+  <script type="module" crossorigin src="/Barricadix_MWP/assets/index-MqCNAdO9.js"></script>
+  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/index-CZhNtbTo.css">
 </head>
 <body>
     <div id="app-container">
@@ -36,21 +36,18 @@
             <div class="logo" aria-label="BarricadiX">
                 <img src="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg" class="logo-img" alt="BarricadiX Logo" />
             </div>
-            
-            <!-- Neue Ansichts-Buttons -->
             <div class="view-selector">
                 <button id="planning-view-btn" class="view-btn active" data-view="planning" data-translate-key="header.planning">Planung</button>
                 <button id="manufacturer-view-btn" class="view-btn" data-view="manufacturer" data-translate-key="header.manufacturer">Hersteller</button>
             </div>
-            
             <nav class="main-nav">
                 <ul>
-                    <li><a href="#" id="nav-param-input" class="active" aria-current="page" data-translate-key="nav.paramInput">Parametereingabe</a></li>
-                    <li><a href="#" id="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich markieren</a></li>
+                    <li><a href="#" id="nav-param-input" class="active" aria-current="page" data-translate-key="nav.paramInput">Parameter</a></li>
+                    <li><a href="#" id="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich</a></li>
                     <li><a href="#" id="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a></li>
                     <li><a href="#" id="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a></li>
                     <li><a href="#" id="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a></li>
-                    <li><a href="#" id="nav-project-description" data-translate-key="nav.projectDescription">Projektausschreibung</a></li>
+                    <li><a href="#" id="nav-project-description" data-translate-key="nav.projectDescription">Ausschreibung</a></li>
                     <li><a href="#" id="nav-publish-project" data-translate-key="nav.publishProject">Projektausschreibung veröffentlichen</a></li>
                 </ul>
             </nav>
@@ -154,7 +151,7 @@
                     <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
                      <div class="form-group">
                         <label for="asset-to-protect" data-translate-key="sidebar.assetToProtect">Was geschützt werden soll</label>
-                        <input type="text" id="asset-to-protect" data-translate-key-placeholder="placeholders.assetToProtect" placeholder="z.B. Haupteingang Stadion">
+                        <input type="text" id="asset-to-protect" placeholder="Bitte eintragen">
                     </div>
                     <div class="form-group slider-group">
                         <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
@@ -182,16 +179,18 @@
             <!-- =============================================== -->
             <!-- MAIN CONTENT -->
             <!-- =============================================== -->
-            <main class="main-content">
+            
+            <!-- Planning View -->
+            <main class="main-content" id="planning-view">
                 <div class="map-area">
                     <!-- Top tabs positioned over the map -->
                     <div class="map-tabs">
-                        <a href="#" id="tab-param-input" data-target="nav-param-input" class="active" data-translate-key="nav.paramInput">Parametereingabe</a>
-                        <a href="#" id="tab-marking-area" data-target="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich markieren</a>
+                        <a href="#" id="tab-param-input" data-target="nav-param-input" class="active" data-translate-key="nav.paramInput">Parameter</a>
+                        <a href="#" id="tab-marking-area" data-target="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich</a>
                         <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a>
                         <a href="#" id="tab-risk-report" data-target="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a>
                         <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a>
-                        <a href="#" id="tab-project-description" data-target="nav-project-description" data-translate-key="nav.projectDescription">Projektausschreibung</a>
+                        <a href="#" id="tab-project-description" data-target="nav-project-description" data-translate-key="nav.projectDescription">Ausschreibung</a>
                     </div>
                     <div class="map-toolbar">
                         <div class="search-bar">
@@ -237,6 +236,192 @@
                     
                     <!-- The loading overlay is a sibling to map/report to cover everything -->
                     <div class="report-loading-overlay view-hidden" data-translate-key="report.generating">Bericht wird erstellt...</div>
+                </div>
+            </main>
+
+            <!-- Manufacturer View -->
+            <main class="main-content" id="manufacturer-view" style="display: none;">
+                <!-- Manufacturer Navigation Tabs -->
+                <div class="manufacturer-tabs">
+                    <a href="#" id="manufacturer-products" class="manufacturer-tab active" data-translate-key="manufacturer.nav.products">Produkte</a>
+                    <a href="#" id="manufacturer-quotations" class="manufacturer-tab" data-translate-key="manufacturer.nav.quotations">Angebote</a>
+                    <a href="#" id="manufacturer-customers" class="manufacturer-tab" data-translate-key="manufacturer.nav.customers">Kunden</a>
+                    <a href="#" id="manufacturer-analytics" class="manufacturer-tab" data-translate-key="manufacturer.nav.analytics">Analysen</a>
+                    <a href="#" id="manufacturer-settings" class="manufacturer-tab" data-translate-key="manufacturer.nav.settings">Einstellungen</a>
+                </div>
+                
+                <div class="manufacturer-content-wrapper">
+                    <!-- Left Sidebar for Manufacturer View -->
+                    <aside class="manufacturer-sidebar">
+                        <section class="sidebar-section">
+                            <h3 data-translate-key="manufacturer.sidebar.productManagement">Produktverwaltung</h3>
+                            <div class="form-group">
+                                <label for="product-category" data-translate-key="manufacturer.sidebar.productCategory">Produktkategorie</label>
+                                <select id="product-category" name="product-category">
+                                    <option value="all" data-translate-key="manufacturer.sidebar.options.category.all">Alle Kategorien</option>
+                                    <option value="bollards" data-translate-key="manufacturer.sidebar.options.category.bollards">Poller</option>
+                                    <option value="barriers" data-translate-key="manufacturer.sidebar.options.category.barriers">Barrieren</option>
+                                    <option value="posts" data-translate-key="manufacturer.sidebar.options.category.posts">Pfosten</option>
+                                    <option value="ditches" data-translate-key="manufacturer.sidebar.options.category.ditches">Gräben</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-status" data-translate-key="manufacturer.sidebar.productStatus">Produktstatus</label>
+                                <select id="product-status" name="product-status">
+                                    <option value="all" data-translate-key="manufacturer.sidebar.options.status.all">Alle Status</option>
+                                    <option value="active" data-translate-key="manufacturer.sidebar.options.status.active">Aktiv</option>
+                                    <option value="inactive" data-translate-key="manufacturer.sidebar.options.status.inactive">Inaktiv</option>
+                                    <option value="draft" data-translate-key="manufacturer.sidebar.options.status.draft">Entwurf</option>
+                                </select>
+                            </div>
+                        </section>
+
+                        <section class="sidebar-section">
+                            <h3 data-translate-key="manufacturer.sidebar.customerManagement">Kundenverwaltung</h3>
+                            <div class="form-group">
+                                <label for="customer-type" data-translate-key="manufacturer.sidebar.customerType">Kundentyp</label>
+                                <select id="customer-type" name="customer-type">
+                                    <option value="all" data-translate-key="manufacturer.sidebar.options.customerType.all">Alle Typen</option>
+                                    <option value="private" data-translate-key="manufacturer.sidebar.options.customerType.private">Privat</option>
+                                    <option value="business" data-translate-key="manufacturer.sidebar.options.customerType.business">Geschäft</option>
+                                    <option value="government" data-translate-key="manufacturer.sidebar.options.customerType.government">Behörde</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="customer-region" data-translate-key="manufacturer.sidebar.customerRegion">Region</label>
+                                <select id="customer-region" name="customer-region">
+                                    <option value="all" data-translate-key="manufacturer.sidebar.options.region.all">Alle Regionen</option>
+                                    <option value="north" data-translate-key="manufacturer.sidebar.options.region.north">Nord</option>
+                                    <option value="south" data-translate-key="manufacturer.sidebar.options.region.south">Süd</option>
+                                    <option value="east" data-translate-key="manufacturer.sidebar.options.region.east">Ost</option>
+                                    <option value="west" data-translate-key="manufacturer.sidebar.options.region.west">West</option>
+                                </select>
+                            </div>
+                        </section>
+
+                        <section class="sidebar-section">
+                            <h3 data-translate-key="manufacturer.sidebar.analytics">Analysen</h3>
+                            <div class="form-group">
+                                <label for="date-range" data-translate-key="manufacturer.sidebar.dateRange">Zeitraum</label>
+                                <select id="date-range" name="date-range">
+                                    <option value="7days" data-translate-key="manufacturer.sidebar.options.dateRange.7days">Letzte 7 Tage</option>
+                                    <option value="30days" data-translate-key="manufacturer.sidebar.options.dateRange.30days">Letzte 30 Tage</option>
+                                    <option value="90days" data-translate-key="manufacturer.sidebar.options.dateRange.90days">Letzte 90 Tage</option>
+                                    <option value="1year" data-translate-key="manufacturer.sidebar.options.dateRange.1year">Letztes Jahr</option>
+                                </select>
+                            </div>
+                        </section>
+                    </aside>
+                    
+                    <!-- Main Content Area -->
+                    <div class="manufacturer-main-content">
+                        <div class="manufacturer-header">
+                            <h1 data-translate-key="manufacturer.title">Hersteller-Ansicht</h1>
+                            <p data-translate-key="manufacturer.subtitle">Verwalten Sie Ihren Produktkatalog und Kundenanfragen</p>
+                            <button id="close-manufacturer-view" class="close-manufacturer-btn" title="Zurück zur Planungs-Ansicht">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Product Database Section -->
+                        <div class="product-database-section">
+                            <div class="section-header">
+                                <h2>Produktdatenbank</h2>
+                                <p>Technische Daten und Spezifikationen aller verfügbaren Produkte</p>
+                            </div>
+                            
+                            <!-- Search and Filter Bar -->
+                            <div class="search-filter-bar">
+                                <div class="search-box">
+                                    <input type="text" id="product-search" placeholder="Produktname, Hersteller oder Typ eingeben...">
+                                    <button id="search-btn" class="search-btn">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="filter-controls">
+                                    <select id="manufacturer-filter" class="filter-select">
+                                        <option value="">Alle Hersteller</option>
+                                    </select>
+                                    <select id="standard-filter" class="filter-select">
+                                        <option value="">Alle Standards</option>
+                                    </select>
+                                    <select id="vehicle-type-filter" class="filter-select">
+                                        <option value="">Alle Fahrzeugtypen</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Products Table -->
+                            <div class="products-table-container">
+                                <div id="products-loading" class="loading-indicator">
+                                    Produkte werden geladen...
+                                </div>
+                                
+                                <table id="products-table" class="products-table" style="display: none;">
+                                    <thead>
+                                        <tr>
+                                            <th>Hersteller</th>
+                                            <th>Typ</th>
+                                            <th>Standard</th>
+                                            <th>Fahrzeuggewicht (kg)</th>
+                                            <th>Fahrzeugtyp</th>
+                                            <th>Geschwindigkeit (km/h)</th>
+                                            <th>Anprallwinkel (°)</th>
+                                            <th>Penetration (m)</th>
+                                            <th>Trümmerdistanz (m)</th>
+                                            <th>Aktionen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-tbody">
+                                        <!-- Products will be dynamically loaded here -->
+                                    </tbody>
+                                </table>
+                                
+                                <div id="no-products" class="no-products-message" style="display: none;">
+                                    Keine Produkte gefunden
+                                </div>
+                            </div>
+                            
+                            <!-- Product Details Modal -->
+                            <div id="product-modal" class="product-modal" style="display: none;">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h3 id="modal-product-name">Produktdetails</h3>
+                                        <button id="close-modal" class="close-modal-btn">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="product-details-grid">
+                                            <div class="detail-section">
+                                                <h4>Technische Spezifikationen</h4>
+                                                <div id="modal-technical-specs"></div>
+                                            </div>
+                                            <div class="detail-section">
+                                                <h4>Leistungsdaten</h4>
+                                                <div id="modal-performance-data"></div>
+                                            </div>
+                                            <div class="detail-section">
+                                                <h4>Zertifizierung</h4>
+                                                <div id="modal-certification"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button id="export-product" class="action-btn">
+                                            <i class="fas fa-download"></i>
+                                            <span>Daten exportieren</span>
+                                        </button>
+                                        <button id="print-product" class="action-btn">
+                                            <i class="fas fa-print"></i>
+                                            <span>Spezifikationen drucken</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
