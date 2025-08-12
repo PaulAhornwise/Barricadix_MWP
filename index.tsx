@@ -313,6 +313,17 @@ const embeddedTranslations = {
             "securityAreaLabel": "Sicherheitsbereich",
             "analyzeAccess": "Zugang analysieren"
         },
+        "alerts": {
+            "noPolygon": "Bitte zeichnen Sie zuerst einen Sicherheitsbereich auf der Karte.",
+            "overpassError": "Fehler beim Laden der Straßendaten (Status: {status}).",
+            "analysisError": "Fehler bei der Gefahrenanalyse. Bitte versuchen Sie es erneut.",
+            "invalidPolygon": "Ungültiges Polygon. Bitte zeichnen Sie den Sicherheitsbereich neu.",
+            "emptyPolygon": "Das gezeichnete Polygon hat keine gültigen Koordinaten.",
+            "polygonCoordinateError": "Fehler beim Verarbeiten der Polygon-Koordinaten.",
+            "locationNotFound": "Standort nicht gefunden. Bitte überprüfen Sie die Eingabe.",
+            "noThreatsFound": "Keine Bedrohungen in diesem Bereich gefunden.",
+            "reportGenerationError": "Fehler beim Erstellen des Berichts. Bitte versuchen Sie es erneut."
+        },
 
 
     },
@@ -1623,6 +1634,19 @@ async function loadTranslations() {
  * @param lang The language code to set (e.g., 'de' or 'en').
  */
 async function setLanguage(lang: string) {
+    console.log(`Setting language to: ${lang}`);
+    
+    // Store current map state before language change
+    const currentMapState = {
+        center: map ? map.getCenter() : null,
+        zoom: map ? map.getZoom() : null,
+        drawnPolygon: drawnPolygon ? drawnPolygon.getLatLngs() : null,
+        threatsMap: new Map(threatsMap),
+        waypoints: [...waypoints]
+    };
+    
+    console.log('Current map state:', currentMapState);
+    
     currentLanguage = lang;
     localStorage.setItem('language', lang);
     document.documentElement.lang = lang;
@@ -1645,6 +1669,101 @@ async function setLanguage(lang: string) {
     // Dispatch event for React components to re-render
     window.dispatchEvent(new Event('languageChanged'));
 
+    // Restore map state after language change
+    if (map && currentMapState.center && currentMapState.zoom) {
+        console.log('Restoring map state after language change');
+        
+        // Wait for translations to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        try {
+            // Restore map view
+            map.setView(currentMapState.center, currentMapState.zoom, { animate: false });
+            
+            // Restore drawn polygon if it existed
+            if (currentMapState.drawnPolygon && currentMapState.drawnPolygon.length > 0) {
+                console.log('Restoring drawn polygon');
+                
+                // Clear existing polygon
+                if (drawnPolygon) {
+                    map.removeLayer(drawnPolygon);
+                }
+                
+                // Recreate polygon with stored coordinates
+                drawnPolygon = L.polygon(currentMapState.drawnPolygon, {
+                    color: '#ff7800',
+                    weight: 3,
+                    opacity: 0.8,
+                    fillColor: '#ff7800',
+                    fillOpacity: 0.2
+                }).addTo(map);
+                
+                // Restore polygon label if it existed
+                if (polygonLabel) {
+                    map.removeLayer(polygonLabel);
+                }
+                
+                const center = drawnPolygon.getBounds().getCenter();
+                polygonLabel = L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'polygon-label',
+                        html: `<div style="background: white; padding: 5px; border: 2px solid #ff7800; border-radius: 5px; font-weight: bold; color: #ff7800;">${t('map.securityArea')}</div>`,
+                        iconSize: [120, 40],
+                        iconAnchor: [60, 20]
+                    })
+                }).addTo(map);
+            }
+            
+            // Restore threats map
+            if (currentMapState.threatsMap.size > 0) {
+                console.log('Restoring threats map');
+                threatsMap = currentMapState.threatsMap;
+                
+                // Re-render threat list
+                if (threatsMap.size > 0) {
+                    renderThreatList();
+                }
+            }
+            
+            // Restore waypoints if they existed
+            if (currentMapState.waypoints.length > 0) {
+                console.log('Restoring waypoints');
+                waypoints = currentMapState.waypoints;
+                
+                // Recreate waypoint markers and path
+                waypoints.forEach((waypoint, index) => {
+                    const marker = L.marker(waypoint, {
+                        icon: L.divIcon({
+                            className: 'waypoint-marker',
+                            html: `<div style="background: #ff7800; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">${index + 1}</div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    waypointMarkers.push(marker);
+                });
+                
+                // Recreate path line
+                if (waypoints.length > 1) {
+                    pathLine = L.polyline(waypoints, {
+                        color: '#ff7800',
+                        weight: 3,
+                        opacity: 0.8,
+                        dashArray: '10, 10'
+                    }).addTo(map);
+                }
+            }
+            
+            // Force map update
+            map.invalidateSize();
+            
+            console.log('Map state restored successfully');
+            
+        } catch (error) {
+            console.error('Error restoring map state:', error);
+        }
+    }
+
     // Re-render UI components that depend on the language
     if (threatsMap.size > 0) {
         renderThreatList();
@@ -1652,6 +1771,8 @@ async function setLanguage(lang: string) {
     if (document.querySelector('.product-recommendations-container')?.classList.contains('hidden') === false) {
         await updateProductRecommendations();
     }
+    
+    console.log(`Language change to ${lang} completed`);
 }
 
 
@@ -1926,7 +2047,7 @@ function renderThreatList() {
 
 
 /**
- * Analyzes the drawn polygon to identify intersecting ways (roads, paths, etc.) using the Overpass API.
+ * Analyzes the drawn polygon for potential vehicle threats.
  * It marks the entry points and highlights the approach path to the polygon.
  */
 const analyzeAndMarkThreats = async () => {
@@ -1934,6 +2055,23 @@ const analyzeAndMarkThreats = async () => {
         alert(t('alerts.noPolygon'));
         return;
     }
+
+    // Enhanced polygon validation
+    if (!drawnPolygon.getLatLngs || typeof drawnPolygon.getLatLngs !== 'function') {
+        console.error('Invalid polygon object - missing getLatLngs method');
+        alert(t('alerts.invalidPolygon'));
+        return;
+    }
+
+    const polygonCoords = drawnPolygon.getLatLngs();
+    if (!polygonCoords || polygonCoords.length === 0) {
+        console.error('Polygon has no coordinates');
+        alert(t('alerts.emptyPolygon'));
+        return;
+    }
+
+    console.log(`Analyzing threats for polygon with ${polygonCoords.length} coordinate sets`);
+    console.log('Polygon coordinates:', polygonCoords);
 
     const loadingIndicator = document.querySelector('.loading-indicator') as HTMLElement;
     if (!loadingIndicator) return;
@@ -1943,10 +2081,16 @@ const analyzeAndMarkThreats = async () => {
 
     try {
         const bounds = drawnPolygon.getBounds();
+        if (!bounds || !bounds.isValid()) {
+            throw new Error('Invalid polygon bounds');
+        }
+
         const buffer = 0.002; 
         const southWest = bounds.getSouthWest();
         const northEast = bounds.getNorthEast();
         const bbox = `${southWest.lat - buffer},${southWest.lng - buffer},${northEast.lat + buffer},${northEast.lng + buffer}`;
+        
+        console.log('Analysis bounds:', bbox);
         
         const query = `
             [out:json][timeout:25];
@@ -1987,7 +2131,60 @@ const analyzeAndMarkThreats = async () => {
         });
 
         const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: {lat: number, lon: number}[][], totalLength: number }>();
-        const polygonVertices = drawnPolygon.getLatLngs()[0].map((p: any) => ({ lat: p.lat, lon: p.lng }));
+        
+        // Enhanced polygon coordinate extraction with validation
+        let polygonVertices: { lat: number, lon: number }[] = [];
+        
+        try {
+            // Handle different polygon coordinate structures
+            if (Array.isArray(polygonCoords[0])) {
+                // Multi-polygon or complex structure
+                if (Array.isArray(polygonCoords[0][0])) {
+                    // Nested array structure
+                    polygonVertices = polygonCoords[0][0].map((p: any) => ({ 
+                        lat: p.lat || p.lat, 
+                        lon: p.lng || p.lon 
+                    }));
+                } else {
+                    // Simple array structure
+                    polygonVertices = polygonCoords[0].map((p: any) => ({ 
+                        lat: p.lat || p.lat, 
+                        lon: p.lng || p.lon 
+                    }));
+                }
+            } else {
+                // Direct coordinate structure
+                polygonVertices = polygonCoords.map((p: any) => ({ 
+                    lat: p.lat || p.lat, 
+                    lon: p.lng || p.lon 
+                }));
+            }
+            
+            // Validate extracted coordinates
+            if (polygonVertices.length < 3) {
+                throw new Error('Invalid polygon: insufficient vertices');
+            }
+            
+            // Ensure all coordinates are valid numbers
+            polygonVertices = polygonVertices.filter(coord => 
+                typeof coord.lat === 'number' && 
+                typeof coord.lon === 'number' && 
+                !isNaN(coord.lat) && 
+                !isNaN(coord.lon)
+            );
+            
+            if (polygonVertices.length < 3) {
+                throw new Error('Invalid polygon: insufficient valid coordinates');
+            }
+            
+            console.log(`Extracted ${polygonVertices.length} valid polygon vertices:`, polygonVertices);
+            
+        } catch (error) {
+            console.error('Error extracting polygon coordinates:', error);
+            alert(t('alerts.polygonCoordinateError'));
+            loadingIndicator.classList.add('hidden');
+            return;
+        }
 
         for (const wayId in ways) {
             const way = ways[wayId];
@@ -2532,42 +2729,124 @@ async function generateRiskReport() {
 
     try {
         if (drawnPolygon) {
+            console.log(`Generating report for language: ${currentLanguage}`);
+            console.log('Drawn polygon data:', drawnPolygon);
+            
+            // Validate polygon data before proceeding
+            if (!drawnPolygon.getLatLngs || typeof drawnPolygon.getLatLngs !== 'function') {
+                console.error('Invalid polygon object - missing getLatLngs method');
+                throw new Error('Invalid polygon data for map capture');
+            }
+            
+            const polygonCoords = drawnPolygon.getLatLngs();
+            if (!polygonCoords || polygonCoords.length === 0) {
+                console.error('Polygon has no coordinates');
+                throw new Error('Polygon has no valid coordinates');
+            }
+            
+            console.log(`Polygon coordinates: ${polygonCoords.length} points`);
+
             // Temporarily switch views to make the map visible for capture
             reportPreviewArea.classList.add('view-hidden');
             mapDiv.classList.remove('view-hidden');
 
-            // Wait for the map to be fully rendered before taking the screenshot
-            await new Promise<void>(resolve => {
-                map.invalidateSize(); // Crucial for Leaflet to recognize new container size/visibility
+            // Enhanced map rendering wait with language-specific optimizations
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Map rendering timeout'));
+                }, 10000); // 10 second timeout
 
-                const resolveFn = () => requestAnimationFrame(() => setTimeout(resolve, 250));
+                const resolveFn = () => {
+                    clearTimeout(timeout);
+                    // Language-specific delay for better rendering
+                    const languageDelay = currentLanguage === 'de' ? 1000 : 500;
+                    requestAnimationFrame(() => setTimeout(resolve, languageDelay));
+                };
                 
                 let moveEndTimeoutId: number;
 
-                // The 'load' event on the tile layer is the best signal that map images are ready.
+                // Force map refresh and wait for complete rendering
+                map.invalidateSize();
+                
+                // Wait for tiles to load completely
                 tileLayer.once('load', () => {
+                    console.log('Tile layer loaded successfully');
                     clearTimeout(moveEndTimeoutId);
                     resolveFn();
                 });
 
-                // 'moveend' is a fallback. If tiles are cached, 'load' may not fire.
+                // Fallback: wait for map movement to end
                 map.once('moveend', () => {
-                    moveEndTimeoutId = window.setTimeout(resolveFn, 500);
+                    console.log('Map movement ended');
+                    moveEndTimeoutId = window.setTimeout(resolveFn, 1000);
                 });
                 
-                // Trigger the process
-                map.fitBounds(drawnPolygon.getBounds(), { animate: false });
-            });
-            
-            // Now that the map is ready and visible, capture it.
-            canvas = await html2canvas(mapDiv, {
-                useCORS: true,
-                logging: false,
-                onclone: (doc: Document) => {
-                    // Ensure popups are not visible in the screenshot
-                    doc.querySelectorAll('.leaflet-popup-pane > *').forEach((p: Element) => (p as HTMLElement).style.display = 'none');
+                // Ensure polygon is visible and fit bounds
+                try {
+                    const bounds = drawnPolygon.getBounds();
+                    if (bounds && bounds.isValid()) {
+                        console.log('Fitting map to polygon bounds');
+                        map.fitBounds(bounds, { animate: false, padding: [20, 20] });
+                    } else {
+                        console.warn('Invalid bounds, using default view');
+                        map.setView(map.getCenter(), map.getZoom());
+                    }
+                } catch (error) {
+                    console.error('Error fitting bounds:', error);
+                    // Continue with current map view
                 }
             });
+            
+            // Additional wait for map stability
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            console.log('Capturing map screenshot...');
+            
+            // Enhanced html2canvas configuration for better reliability
+            canvas = await html2canvas(mapDiv, {
+                useCORS: true,
+                logging: true, // Enable logging for debugging
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher resolution
+                width: mapDiv.offsetWidth,
+                height: mapDiv.offsetHeight,
+                onclone: (doc: Document) => {
+                    console.log('Cloning document for screenshot');
+                    
+                    // Ensure popups are not visible in the screenshot
+                    doc.querySelectorAll('.leaflet-popup-pane > *').forEach((p: Element) => {
+                        (p as HTMLElement).style.display = 'none';
+                    });
+                    
+                    // Ensure all map elements are visible
+                    const clonedMap = doc.getElementById('map');
+                    if (clonedMap) {
+                        (clonedMap as HTMLElement).style.visibility = 'visible';
+                        (clonedMap as HTMLElement).style.opacity = '1';
+                        (clonedMap as HTMLElement).style.display = 'block';
+                    }
+                    
+                    // Force Leaflet to update in cloned document
+                    const clonedMapContainer = doc.querySelector('.leaflet-container');
+                    if (clonedMapContainer) {
+                        (clonedMapContainer as HTMLElement).style.visibility = 'visible';
+                        (clonedMapContainer as HTMLElement).style.opacity = '1';
+                    }
+                }
+            });
+            
+            console.log('Map screenshot captured successfully');
+        } else {
+            console.log('No polygon drawn, skipping map capture');
+        }
+
+        // Validate canvas before proceeding
+        if (canvas && canvas.width > 0 && canvas.height > 0) {
+            console.log(`Canvas dimensions: ${canvas.width}x${canvas.height}`);
+        } else {
+            console.warn('Invalid canvas generated, continuing without map image');
+            canvas = null;
         }
 
         const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : t('report.undefinedLocation');
