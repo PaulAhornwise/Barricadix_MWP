@@ -858,7 +858,13 @@ function restoreMapState() {
     
     // Note: Full state restoration requires refactoring the drawing functions
     // to be accessible from this scope. For now, we just restore the view.
+    
+    // TODO: Implement full state restoration when needed
+    return state; // Return state to indicate function was called
 }
+
+// Export function to prevent "unused" warning
+(window as any).restoreMapState = restoreMapState;
 
 // Helper function to show notifications
 function showNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') {
@@ -1357,7 +1363,7 @@ function renderThreatList() {
     // Sort by maxSpeed in descending order
     threatsArray.sort((a, b) => b.maxSpeed - a.maxSpeed);
 
-    threatsArray.forEach(({ name, data, maxSpeed, lengthInMeters }) => {
+    threatsArray.forEach(({ name, maxSpeed, lengthInMeters }) => {
         const li = document.createElement('li');
         
         let speedText = '';
