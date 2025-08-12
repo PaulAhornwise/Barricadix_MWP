@@ -24,8 +24,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/index-C6uQxOl0.js"></script>
-  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/index-Q-Spdno9.css">
+  <script type="module" crossorigin src="/Barricadix_MWP/assets/index-fUk0f4n5.js"></script>
+  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/index-apXMihEv.css">
 </head>
 <body>
     <div id="app-container">
@@ -36,13 +36,21 @@
             <div class="logo" aria-label="BarricadiX">
                 <img src="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg" class="logo-img" alt="BarricadiX Logo" />
             </div>
+            
+            <!-- Neue Ansichts-Buttons -->
+            <div class="view-selector">
+                <button id="planning-view-btn" class="view-btn active" data-view="planning" data-translate-key="header.planning">Planung</button>
+                <button id="manufacturer-view-btn" class="view-btn" data-view="manufacturer" data-translate-key="header.manufacturer">Hersteller</button>
+            </div>
+            
             <nav class="main-nav">
                 <ul>
                     <li><a href="#" id="nav-param-input" class="active" aria-current="page" data-translate-key="nav.paramInput">Parametereingabe</a></li>
                     <li><a href="#" id="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich markieren</a></li>
                     <li><a href="#" id="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a></li>
                     <li><a href="#" id="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a></li>
-                    <li><a href="#" id="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl & Projektausschreibung</a></li>
+                    <li><a href="#" id="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a></li>
+                    <li><a href="#" id="nav-project-description" data-translate-key="nav.projectDescription">Projektausschreibung</a></li>
                     <li><a href="#" id="nav-publish-project" data-translate-key="nav.publishProject">Projektausschreibung veröffentlichen</a></li>
                 </ul>
             </nav>
@@ -182,7 +190,8 @@
                         <a href="#" id="tab-marking-area" data-target="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich markieren</a>
                         <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a>
                         <a href="#" id="tab-risk-report" data-target="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a>
-                        <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl & Projektausschreibung</a>
+                        <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a>
+                        <a href="#" id="tab-project-description" data-target="nav-project-description" data-translate-key="nav.projectDescription">Projektausschreibung</a>
                     </div>
                     <div class="map-toolbar">
                         <div class="search-bar">

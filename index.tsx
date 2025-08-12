@@ -1,5 +1,3 @@
-
-
 /**
  * This script handles the interactivity for the HVM dashboard.
  * - Initializes a clean OpenStreetMap map using Leaflet.js.
@@ -52,6 +50,900 @@ let productDatabase: any[] = []; // To cache the product data
 let currentLanguage = 'de';
 let translations: any = {};
 
+// Embedded translations to avoid loading issues
+const embeddedTranslations = {
+    "de": {
+        "header": {
+            "planning": "Planung",
+            "manufacturer": "Hersteller"
+        },
+        "nav": {
+            "paramInput": "Parameter",
+            "markingArea": "Sicherheitsbereich",
+            "threatAnalysis": "Gefahrenanalyse",
+            "riskReport": "Risikobericht",
+            "productSelection": "Produktauswahl",
+            "projectDescription": "Ausschreibung",
+            "publishProject": "Projektausschreibung veröffentlichen"
+        },
+        "aria": {
+            "search": "Suche",
+            "email": "E-Mail",
+            "settings": "Einstellungen"
+        },
+        "user": {
+            "loggedIn": "Angemeldet: BarricadiX Admin"
+        },
+        "sidebar": {
+            "trafficData": "Verkehrsdaten",
+            "vehicleSelect": "Fahrzeugauswahl",
+            "accessRoads": "Zufahrten",
+            "curbs": "Bordsteinkanten",
+            "obstacles": "Hindernisse",
+            "protectionSelection": "Schutzauswahl",
+            "protectionPeriod": "Schutzzeitraum",
+            "protectionProducts": "Schutzprodukte",
+            "productProperty": "Produkteigenschaft",
+            "riskAssessment": "Risikobewertung",
+            "assetToProtect": "Was geschützt werden soll",
+            "securityRisk": "Sicherheitsrisiko",
+            "recommendedProductClass": "Empfohlene Produktklasse",
+            "low": "niedrig",
+            "high": "hoch",
+            "options": {
+                "vehicle": {
+                    "all": "alle",
+                    "motorcycle": "Motorrad",
+                    "car_light": "KFZ <3.5t",
+                    "truck_light": "LKW <7.5t",
+                    "truck_medium": "LKW <12t",
+                    "truck_heavy": "LKW <40t"
+                },
+                "access": {
+                    "all": "alle",
+                    "meadow": "Wiese",
+                    "forest_path": "Waldweg",
+                    "pedestrian_path": "Fußgängerweg",
+                    "one_way": "Einbahnstraße",
+                    "two_lane": "Zweispur",
+                    "three_lane": "Dreispur",
+                    "four_lane": "Vierspur"
+                },
+                "curbs": {
+                    "yes": "ja",
+                    "no": "nein"
+                },
+                "obstacles": {
+                    "none": "keine",
+                    "trees": "Bäume",
+                    "posts": "Pfosten",
+                    "bins": "Mülltonnen"
+                },
+                "period": {
+                    "permanent": "dauerhaft",
+                    "temporary": "temporär",
+                    "eventual": "eventuell"
+                },
+                "products": {
+                    "bollard": "Poller",
+                    "barrier": "Barriere",
+                    "post": "Pfosten",
+                    "ditch": "Graben"
+                },
+                "property": {
+                    "automatic_rigid": "aut./starr",
+                    "retractable": "versenkbar",
+                    "removable": "entfernbar"
+                }
+            }
+        },
+        "products": {
+            "resistanceMedium": "Widerstandsmedium",
+            "resistanceHigh": "Hoher Widerstand",
+            "resistanceLow": "Niedriger Widerstand"
+        },
+        "ai": {
+            "reportPrompt": "Erstellen Sie einen detaillierten Risikobericht basierend auf den gesammelten Daten.",
+            "chatbot": {
+                "title": "Zufahrtsschutz-Assistent",
+                "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
+                "assetQuestion": "Welche Schutzgüter möchten Sie absichern? Hinweis: Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
+                "inputPlaceholder": "Antwort eingeben...",
+                "sendButton": "Senden",
+                "stakeholderQuestion": "Wer sind die relevanten Stakeholder (Behörden, Veranstalter, Betreiber)?",
+                "restRiskQuestion": "Welches akzeptable Restrisiko gilt?",
+                "operationalQuestion": "Betriebsanforderungen (mehrfach wählbar)",
+                "threatQuestion": "Welche Art fahrzeuggestützter Bedrohung ist zu erwarten?",
+                "vehicleTypesQuestion": "Welche Fahrzeugtypen sind relevant?",
+                "accessCorridorsQuestion": "Wo könnten Fahrzeuge eindringen? (Karte markieren oder beschreiben)",
+                "speedQuestion": "Maximale Zufahrtsgeschwindigkeit (km/h)",
+                "angleQuestion": "Wahrscheinlicher Anprallwinkel (°)",
+                "groundQuestion": "Untergrund/Fundamente am Standort",
+                "riskMatrixQuestion": "Risikobewertung: Eintrittswahrscheinlichkeit & Schadensausmaß",
+                "completionMessage": "Danke! Alle erforderlichen Angaben sind vorhanden. Möchten Sie den normkonformen PDF-Plan erzeugen?"
+            }
+        },
+        "manufacturer": {
+            "title": "Hersteller-Ansicht",
+            "subtitle": "Verwalten Sie Ihren Produktkatalog und Kundenanfragen",
+            "products": "Produkte",
+            "quotations": "Angebote",
+            "customers": "Kunden",
+            "analytics": "Analysen",
+            "manageCatalog": "Verwalten Sie Ihren Produktkatalog",
+            "createQuotations": "Erstellen und verwalten Sie Angebote",
+            "manageContacts": "Verwalten Sie Ihre Kundenkontakte",
+            "businessAnalytics": "Betriebs- und Verkaufsanalysen",
+            "open": "Öffnen",
+            "nav": {
+                "products": "Produkte",
+                "quotations": "Angebote",
+                "customers": "Kunden",
+                "analytics": "Analysen",
+                "settings": "Einstellungen"
+            },
+            "sidebar": {
+                "productManagement": "Produktverwaltung",
+                "productCategory": "Produktkategorie",
+                "productStatus": "Produktstatus",
+                "customerManagement": "Kundenverwaltung",
+                "customerType": "Kundentyp",
+                "customerRegion": "Region",
+                "analytics": "Analysen",
+                "dateRange": "Zeitraum",
+                "options": {
+                    "category": {
+                        "all": "Alle Kategorien",
+                        "bollards": "Poller",
+                        "barriers": "Barrieren",
+                        "posts": "Pfosten",
+                        "ditches": "Gräben"
+                    },
+                    "status": {
+                        "all": "Alle Status",
+                        "active": "Aktiv",
+                        "inactive": "Inaktiv",
+                        "draft": "Entwurf"
+                    },
+                    "customerType": {
+                        "all": "Alle Typen",
+                        "private": "Privat",
+                        "business": "Geschäft",
+                        "government": "Behörde"
+                    },
+                    "region": {
+                        "all": "Alle Regionen",
+                        "north": "Nord",
+                        "south": "Süd",
+                        "east": "Ost",
+                        "west": "West"
+                    },
+                    "dateRange": {
+                        "7days": "Letzte 7 Tage",
+                        "30days": "Letzte 30 Tage",
+                        "90days": "Letzte 90 Tage",
+                        "1year": "Letztes Jahr"
+                    }
+                }
+            }
+        },
+        "report": {
+            "mainTitle": "Risikobewertung für Zufahrtsschutz",
+            "watermark": "VERTRAULICH",
+            "undefinedAsset": "Nicht definiertes Schutzgut",
+            "undefinedValue": "Nicht definierter Wert",
+            "noThreatAnalysis": "Keine Gefahrenanalyse verfügbar",
+            "generating": "Bericht wird generiert...",
+            "status": {
+                "draft": "Entwurf",
+                "final": "Final",
+                "approved": "Genehmigt"
+            },
+            "metadata": {
+                "date": "Datum",
+                "author": "Autor",
+                "version": "Version",
+                "classification": "Klassifizierung"
+            },
+            "sections": {
+                "purpose": {
+                    "title": "Zweck und Zielsetzung",
+                    "description": "Dieser Bericht dient der Bewertung der Sicherheitsrisiken für die zu schützenden Zufahrten und der Empfehlung geeigneter Schutzmaßnahmen."
+                },
+                "threatAnalysis": {
+                    "title": "Gefahrenanalyse",
+                    "description": "Analyse der identifizierten Bedrohungen und deren potenzielle Auswirkungen."
+                },
+                "riskAssessment": {
+                    "title": "Risikobewertung",
+                    "description": "Bewertung der identifizierten Risiken und deren Klassifizierung."
+                },
+                "recommendations": {
+                    "title": "Empfehlungen",
+                    "description": "Konkrete Handlungsempfehlungen für die Implementierung von Schutzmaßnahmen."
+                },
+                "vulnerabilities": {
+                    "title": "Schwachstellenanalyse",
+                    "description": "Identifizierung und Bewertung von Sicherheitsschwachstellen."
+                },
+                "hvmMeasures": {
+                    "title": "HVM-Schutzmaßnahmen",
+                    "description": "Spezifische Schutzmaßnahmen gegen High-Velocity Missile Angriffe."
+                },
+                "siteConsiderations": {
+                    "title": "Standortbetrachtungen",
+                    "description": "Besondere Aspekte des Standorts und der Umgebung."
+                },
+                "operationalImpact": {
+                    "title": "Betriebliche Auswirkungen",
+                    "description": "Auswirkungen der Schutzmaßnahmen auf den laufenden Betrieb."
+                }
+            },
+            "threatsTable": {
+                "title": "Identifizierte Bedrohungen",
+                "street": "Straße",
+                "distance": "Strecke",
+                "maxSpeed": "Max. erreichbare Geschw."
+            },
+            "identifiedCorridors": "{count} identifizierte Korridore",
+            "noChatGeometry": "keine Geometrie aus Chatbot übergeben",
+            "actions": {
+                "save": "Speichern",
+                "print": "Drucken",
+                "export": "Exportieren",
+                "share": "Teilen"
+            }
+        },
+        "threats": {
+            "title": "Gefahrenanalyse",
+            "speed": "Geschwindigkeit",
+            "analysisFailed": "Gefahrenanalyse fehlgeschlagen",
+            "noCrossingWaysBoundary": "Keine kreuzenden Wege an der Grenze gefunden",
+            "popupHeader": "Gefahreninformationen",
+            "loading": "Lade Gefahrenanalyse..."
+        },
+        "map": {
+            "createReport": "Bericht erstellen",
+            "downloadReport": "Bericht herunterladen",
+            "searchPlaceholder": "Paderborn, Domplatz",
+            "searchButton": "Suchen",
+            "setWaypoints": "Wegpunkte setzen",
+            "setWaypointsActive": "Zeichnen aktiv",
+            "reset": "Zurücksetzen",
+            "securityAreaLabel": "Sicherheitsbereich",
+            "analyzeAccess": "Zugang analysieren"
+        },
+
+
+    },
+    "en": {
+        "header": {
+            "planning": "Planning",
+            "manufacturer": "Manufacturer"
+        },
+        "nav": {
+            "paramInput": "Parameters",
+            "markingArea": "Security Area",
+            "threatAnalysis": "Threat Analysis",
+            "riskReport": "Risk Report",
+            "productSelection": "Product Selection",
+            "projectDescription": "Specification",
+            "publishProject": "Publish Project Specification"
+        },
+        "aria": {
+            "search": "Search",
+            "email": "Email",
+            "settings": "Settings"
+        },
+        "user": {
+            "loggedIn": "Logged in: BarricadiX Admin"
+        },
+        "sidebar": {
+            "trafficData": "Traffic Data",
+            "vehicleSelect": "Vehicle Selection",
+            "accessRoads": "Access Roads",
+            "curbs": "Curbs",
+            "obstacles": "Obstacles",
+            "protectionSelection": "Protection Selection",
+            "protectionPeriod": "Protection Period",
+            "protectionProducts": "Protection Products",
+            "productProperty": "Product Property",
+            "riskAssessment": "Risk Assessment",
+            "assetToProtect": "What to Protect",
+            "securityRisk": "Security Risk",
+            "recommendedProductClass": "Recommended Product Class",
+            "low": "low",
+            "high": "high",
+            "options": {
+                "vehicle": {
+                    "all": "all",
+                    "motorcycle": "Motorcycle",
+                    "car_light": "Car <3.5t",
+                    "truck_light": "Truck <7.5t",
+                    "truck_medium": "Truck <12t",
+                    "truck_heavy": "Truck <40t"
+                },
+                "access": {
+                    "all": "all",
+                    "meadow": "Meadow",
+                    "forest_path": "Forest Path",
+                    "pedestrian_path": "Pedestrian Path",
+                    "one_way": "One Way",
+                    "two_lane": "Two Lane",
+                    "three_lane": "Three Lane",
+                    "four_lane": "Four Lane"
+                },
+                "curbs": {
+                    "yes": "yes",
+                    "no": "no"
+                },
+                "obstacles": {
+                    "none": "none",
+                    "trees": "Trees",
+                    "posts": "Posts",
+                    "bins": "Bins"
+                },
+                "period": {
+                    "permanent": "permanent",
+                    "temporary": "temporary",
+                    "eventual": "eventual"
+                },
+                "products": {
+                    "bollard": "Bollard",
+                    "barrier": "Barrier",
+                    "post": "Post",
+                    "ditch": "Ditch"
+                },
+                "property": {
+                    "automatic_rigid": "auto/rigid",
+                    "retractable": "retractable",
+                    "removable": "removable"
+                }
+            }
+        },
+        "products": {
+            "resistanceMedium": "Resistance Medium",
+            "resistanceHigh": "High Resistance",
+            "resistanceLow": "Low Resistance"
+        },
+        "ai": {
+            "reportPrompt": "Create a detailed risk report based on the collected data.",
+            "chatbot": {
+                "title": "Access Protection Assistant",
+                "welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
+                "assetQuestion": "Which protective assets would you like to secure? Note: Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
+                "inputPlaceholder": "Enter answer...",
+                "sendButton": "Send",
+                "stakeholderQuestion": "Who are the relevant stakeholders (authorities, organizers, operators)?",
+                "restRiskQuestion": "What acceptable residual risk applies?",
+                "operationalQuestion": "Operational requirements (multiple choice)",
+                "threatQuestion": "What type of vehicle-based threat is expected?",
+                "vehicleTypesQuestion": "Which vehicle types are relevant?",
+                "accessCorridorsQuestion": "Where could vehicles penetrate? (Mark on map or describe)",
+                "speedQuestion": "Maximum access speed (km/h)",
+                "angleQuestion": "Probable impact angle (°)",
+                "groundQuestion": "Ground/foundations at the site",
+                "riskMatrixQuestion": "Risk assessment: probability of occurrence & extent of damage",
+                "completionMessage": "Thank you! All required information is available. Would you like to generate the standards-compliant PDF plan?"
+            }
+        },
+        "manufacturer": {
+            "title": "Manufacturer View",
+            "subtitle": "Manage your product catalog and customer inquiries",
+            "products": "Products",
+            "quotations": "Quotations",
+            "customers": "Customers",
+            "analytics": "Analytics",
+            "manageCatalog": "Manage your product catalog",
+            "createQuotations": "Create and manage quotations",
+            "manageContacts": "Manage your customer contacts",
+            "businessAnalytics": "Business and sales analytics",
+            "open": "Open",
+            "nav": {
+                "products": "Products",
+                "quotations": "Quotations",
+                "customers": "Customers",
+                "analytics": "Analytics",
+                "settings": "Settings"
+            },
+            "sidebar": {
+                "productManagement": "Product Management",
+                "productCategory": "Product Category",
+                "productStatus": "Product Status",
+                "customerManagement": "Customer Management",
+                "customerType": "Customer Type",
+                "customerRegion": "Region",
+                "analytics": "Analytics",
+                "dateRange": "Date Range",
+                "options": {
+                    "category": {
+                        "all": "All Categories",
+                        "bollards": "Bollards",
+                        "barriers": "Barriers",
+                        "posts": "Posts",
+                        "ditches": "Ditches"
+                    },
+                    "status": {
+                        "all": "All Status",
+                        "active": "Active",
+                        "inactive": "Inactive",
+                        "draft": "Draft"
+                    },
+                    "customerType": {
+                        "all": "All Types",
+                        "private": "Private",
+                        "business": "Business",
+                        "government": "Government"
+                    },
+                    "region": {
+                        "all": "All Regions",
+                        "north": "North",
+                        "south": "South",
+                        "east": "East",
+                        "west": "West"
+                    },
+                    "dateRange": {
+                        "7days": "Last 7 Days",
+                        "30days": "Last 30 Days",
+                        "90days": "Last 90 Days",
+                        "1year": "Last Year"
+                    }
+                }
+            }
+        },
+        "report": {
+            "mainTitle": "Risk Assessment for Access Protection",
+            "watermark": "CONFIDENTIAL",
+            "undefinedAsset": "Undefined asset",
+            "undefinedValue": "Undefined value",
+            "noThreatAnalysis": "No threat analysis available",
+            "generating": "Generating report...",
+            "identifiedCorridors": "{count} identified corridors",
+            "noChatGeometry": "no geometry from chatbot",
+            "status": {
+                "draft": "Draft",
+                "final": "Final",
+                "approved": "Approved"
+            },
+            "metadata": {
+                "date": "Date",
+                "author": "Author",
+                "version": "Version",
+                "classification": "Classification"
+            },
+            "sections": {
+                "purpose": {
+                    "title": "Purpose and Objectives",
+                    "description": "This report serves to assess security risks for the access routes to be protected and to recommend appropriate protective measures."
+                },
+                "threatAnalysis": {
+                    "title": "Threat Analysis",
+                    "description": "Analysis of identified threats and their potential impacts."
+                },
+                "riskAssessment": {
+                    "title": "Risk Assessment",
+                    "description": "Assessment of identified risks and their classification."
+                },
+                "recommendations": {
+                    "title": "Recommendations",
+                    "description": "Concrete action recommendations for implementing protective measures."
+                },
+                "vulnerabilities": {
+                    "title": "Vulnerability Analysis",
+                    "description": "Identification and assessment of security vulnerabilities."
+                },
+                "hvmMeasures": {
+                    "title": "HVM Protection Measures",
+                    "description": "Specific protection measures against High-Velocity Missile attacks."
+                },
+                "siteConsiderations": {
+                    "title": "Site Considerations",
+                    "description": "Special aspects of the site and environment."
+                },
+                "operationalImpact": {
+                    "title": "Operational Impact",
+                    "description": "Impact of protection measures on ongoing operations."
+                }
+            },
+            "threatsTable": {
+                "title": "Identified Threats",
+                "street": "Street",
+                "distance": "Distance",
+                "maxSpeed": "Max. achievable speed"
+            },
+            "actions": {
+                "save": "Save",
+                "print": "Print",
+                "export": "Export",
+                "share": "Share"
+            }
+        },
+        "threats": {
+            "title": "Threat Analysis",
+            "speed": "Speed",
+            "analysisFailed": "Threat analysis failed",
+            "noCrossingWaysBoundary": "No crossing ways found at boundary",
+            "popupHeader": "Threat Information",
+            "loading": "Loading threat analysis..."
+        },
+        "map": {
+            "createReport": "Create Report",
+            "downloadReport": "Download Report",
+            "searchPlaceholder": "Paderborn, Domplatz",
+            "searchButton": "Search",
+            "setWaypoints": "Set Waypoints",
+            "setWaypointsActive": "Drawing Active",
+            "reset": "Reset",
+            "securityAreaLabel": "Security Area",
+            "analyzeAccess": "Analyze Access"
+        },
+        "placeholders": {
+            "assetToProtect": "e.g. Main entrance stadium"
+        },
+
+    }
+};
+
+
+// ===============================================
+// VIEW SWITCHER FUNCTIONS
+// ===============================================
+
+function initViewSwitcher() {
+    console.log('Initializing view switcher...');
+    
+    // Wait a bit for DOM to be ready
+    setTimeout(() => {
+        const planningBtn = document.getElementById('planning-view-btn');
+        const manufacturerBtn = document.getElementById('manufacturer-view-btn');
+        const closeManufacturerBtn = document.getElementById('close-manufacturer-view');
+        
+        console.log('Planning button:', planningBtn);
+        console.log('Manufacturer button:', manufacturerBtn);
+        console.log('Close manufacturer button:', closeManufacturerBtn);
+        
+        if (planningBtn && manufacturerBtn) {
+            planningBtn.addEventListener('click', () => {
+                console.log('Planning button clicked');
+                switchToPlanningView();
+            });
+            
+            manufacturerBtn.addEventListener('click', () => {
+                console.log('Manufacturer button clicked');
+                switchToManufacturerView();
+            });
+            
+            console.log('View switcher initialized successfully');
+        } else {
+            console.error('View switcher buttons not found!');
+        }
+        
+        if (closeManufacturerBtn) {
+            closeManufacturerBtn.addEventListener('click', () => {
+                console.log('Close manufacturer button clicked');
+                switchToPlanningView();
+            });
+            console.log('Close manufacturer button initialized');
+        } else {
+            console.error('Close manufacturer button not found!');
+        }
+        
+        // Initialize manufacturer navigation tabs
+        const manufacturerTabs = document.querySelectorAll('.manufacturer-tab');
+        manufacturerTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = e.target as HTMLElement;
+                
+                // Remove active class from all tabs
+                manufacturerTabs.forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                targetTab.classList.add('active');
+                
+                // Handle tab-specific content (can be expanded later)
+                const tabId = targetTab.id;
+                console.log('Manufacturer tab clicked:', tabId);
+                
+                // Show notification for now
+                const tabName = targetTab.textContent || 'Tab';
+                showNotification(`${tabName} wird geladen...`, 'info');
+            });
+        });
+        
+        console.log('Manufacturer navigation tabs initialized');
+    }, 100);
+}
+
+// Function to switch to planning view
+function switchToPlanningView() {
+    const planningBtn = document.getElementById('planning-view-btn');
+    const manufacturerBtn = document.getElementById('manufacturer-view-btn');
+    
+    if (planningBtn && manufacturerBtn) {
+        planningBtn.classList.add('active');
+        manufacturerBtn.classList.remove('active');
+    }
+    
+    // Show planning view content
+    showPlanningView();
+}
+
+// Function to switch to manufacturer view
+function switchToManufacturerView() {
+    const planningBtn = document.getElementById('planning-view-btn');
+    const manufacturerBtn = document.getElementById('manufacturer-view-btn');
+    
+    if (planningBtn && manufacturerBtn) {
+        manufacturerBtn.classList.add('active');
+        planningBtn.classList.remove('active');
+    }
+    
+    // Show manufacturer view content
+    showManufacturerView();
+}
+
+// Function to show planning view
+function showPlanningView() {
+    console.log('Switching to planning view...');
+    
+    // Hide manufacturer view completely
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (manufacturerView) {
+        (manufacturerView as HTMLElement).style.display = 'none';
+        console.log('Manufacturer view hidden');
+    }
+    
+    // Show planning view
+    const planningView = document.getElementById('planning-view');
+    if (planningView) {
+        (planningView as HTMLElement).style.display = 'block';
+        console.log('Planning view shown');
+    }
+    
+    // Restore all planning view elements
+    restorePlanningViewElements();
+    
+    // Explicitly restore map container and elements
+    const mapContainer = document.getElementById('map');
+    const mapArea = document.getElementById('map-area');
+    const sidebar = document.getElementById('sidebar');
+    const mapTabs = document.getElementById('map-tabs');
+    const mapToolbar = document.getElementById('map-toolbar');
+    const chatbotRoot = document.getElementById('chatbot-react-root');
+    
+    if (mapContainer) {
+        mapContainer.style.display = 'block';
+        mapContainer.style.visibility = 'visible';
+        mapContainer.style.opacity = '1';
+        console.log('Map container restored');
+    }
+    
+    if (mapArea) {
+        mapArea.style.display = 'block';
+        mapArea.style.visibility = 'visible';
+        mapArea.style.opacity = '1';
+        console.log('Map area restored');
+    }
+    
+    if (sidebar) {
+        sidebar.style.display = 'block';
+        sidebar.style.visibility = 'visible';
+        sidebar.style.opacity = '1';
+        console.log('Sidebar restored');
+    }
+    
+    if (mapTabs) {
+        mapTabs.style.display = 'block';
+        mapTabs.style.visibility = 'visible';
+        mapTabs.style.opacity = '1';
+        console.log('Map tabs restored');
+    }
+    
+    if (mapToolbar) {
+        mapToolbar.style.display = 'block';
+        mapToolbar.style.visibility = 'visible';
+        mapToolbar.style.opacity = '1';
+        console.log('Map toolbar restored');
+    }
+    
+    if (chatbotRoot) {
+        chatbotRoot.style.display = 'block';
+        chatbotRoot.style.visibility = 'visible';
+        chatbotRoot.style.opacity = '1';
+        console.log('Chatbot root restored');
+    }
+    
+    // Force map to update and restore state
+    if (map) {
+        console.log('Map object found, restoring...');
+        
+        // Restore map view if we have saved state
+        if ((window as any).savedMapState) {
+            const savedState = (window as any).savedMapState;
+            map.setView(savedState.center, savedState.zoom);
+            console.log('Restored map view to:', savedState.center, 'zoom:', savedState.zoom);
+        }
+        
+        // Force map to update multiple times to ensure proper rendering
+        map.invalidateSize();
+        
+        // Multiple delays to ensure map is properly rendered
+        setTimeout(() => {
+            map.invalidateSize();
+            console.log('Map invalidated after 100ms');
+        }, 100);
+        
+        setTimeout(() => {
+            map.invalidateSize();
+            console.log('Map invalidated after 300ms');
+        }, 300);
+        
+        setTimeout(() => {
+            map.invalidateSize();
+            console.log('Map invalidated after 500ms');
+        }, 500);
+        
+        // Force a complete map refresh
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                // Trigger a resize event to force Leaflet to recalculate
+                window.dispatchEvent(new Event('resize'));
+                console.log('Map refresh triggered');
+            }
+        }, 800);
+    } else {
+        console.error('Map object not found!');
+    }
+    
+    // Restore chatbot state if it was open
+    if ((window as any).savedChatbotState && (window as any).savedChatbotState.open) {
+        console.log('Restoring chatbot state...');
+        // Trigger chatbot to open if it was previously open
+        const chatbotButton = document.querySelector('#chatbot-react-root [aria-label="Zufahrtsschutz-Assistent öffnen"]');
+        if (chatbotButton) {
+            (chatbotButton as HTMLElement).click();
+            console.log('Chatbot button clicked');
+        }
+    }
+    
+    showNotification('Planungs-Ansicht aktiviert - Alle Funktionen wiederhergestellt', 'success');
+    console.log('Planning view switch completed');
+}
+
+// Function to show manufacturer view
+function showManufacturerView() {
+    // Save current map state before switching
+    if (map) {
+        (window as any).savedMapState = {
+            center: map.getCenter(),
+            zoom: map.getZoom(),
+            waypoints: waypoints,
+            drawnPolygon: drawnPolygon ? drawnPolygon.getLatLngs()[0] : null,
+            waypointMarkers: waypointMarkers.length > 0,
+            pathLine: pathLine !== null
+        };
+    }
+    
+    // Save chatbot state
+    const chatbotPanel = document.querySelector('#chatbot-react-root aside[aria-label="Zufahrtsschutz-Assistent Panel"]');
+    (window as any).savedChatbotState = {
+        open: chatbotPanel && !chatbotPanel.classList.contains('hidden')
+    };
+    
+    // Hide planning view completely
+    const planningView = document.getElementById('planning-view');
+    if (planningView) {
+        (planningView as HTMLElement).style.display = 'none';
+    }
+    
+    // Show manufacturer view as full page
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (manufacturerView) {
+        (manufacturerView as HTMLElement).style.display = 'block';
+        (manufacturerView as HTMLElement).style.position = 'relative';
+        (manufacturerView as HTMLElement).style.width = '100%';
+        (manufacturerView as HTMLElement).style.height = '100%';
+        (manufacturerView as HTMLElement).style.zIndex = 'auto';
+        (manufacturerView as HTMLElement).style.backgroundColor = 'transparent';
+    }
+    
+    // Hide sidebar completely for manufacturer view
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) (sidebar as HTMLElement).style.display = 'none';
+    
+    // Hide map area completely for manufacturer view
+    const mapArea = document.getElementById('map-area');
+    if (mapArea) {
+        mapArea.style.display = 'none';
+        mapArea.style.visibility = 'hidden';
+        mapArea.style.opacity = '0';
+    }
+    
+    // Hide map container completely for manufacturer view
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.style.display = 'none';
+        mapContainer.style.visibility = 'hidden';
+        mapContainer.style.opacity = '0';
+    }
+    
+    // Hide map tabs and toolbar for manufacturer view
+    const mapTabs = document.getElementById('map-tabs');
+    const mapToolbar = document.getElementById('map-toolbar');
+    if (mapTabs) mapTabs.style.display = 'none';
+    if (mapToolbar) mapToolbar.style.display = 'none';
+    
+    // Translate manufacturer view after showing it
+    setTimeout(() => {
+        translateManufacturerView();
+    }, 50);
+    
+    showNotification('Hersteller-Ansicht aktiviert', 'success');
+}
+
+// Function to restore map state
+function restoreMapState() {
+    if (!(window as any).savedMapState) return;
+    
+    const state = (window as any).savedMapState;
+    
+    // For now, just restore the map view and zoom
+    // The complex state restoration can be implemented later
+    console.log('Restoring map state:', state);
+    
+    // Note: Full state restoration requires refactoring the drawing functions
+    // to be accessible from this scope. For now, we just restore the view.
+}
+
+// Helper function to show notifications
+function showNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') {
+    // Remove existing notifications
+    const existingNotifications = document.querySelectorAll('.custom-notification');
+    existingNotifications.forEach(n => n.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = `custom-notification custom-notification-${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-message">${message}</span>
+            <button class="notification-close">&times;</button>
+        </div>
+    `;
+    
+    // Style the notification
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'info' ? '#2563eb' : type === 'success' ? '#22c55e' : type === 'warning' ? '#f59e0b' : '#ef4444'};
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        font-family: 'Open Sans', sans-serif;
+        font-size: 14px;
+        line-height: 1.4;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Add close button functionality
+    const closeBtn = notification.querySelector('.notification-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => notification.remove());
+    }
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
 
 // ===============================================
 // I18n & TRANSLATION FUNCTIONS
@@ -74,16 +966,24 @@ function getProperty(obj: any, path: string) {
  * @returns The translated string.
  */
 function t(key: string, replacements?: { [key: string]: string | number }): string {
+    if (!translations[currentLanguage]) {
+        console.warn(`No translations loaded for language: ${currentLanguage}`);
+        return key;
+    }
+    
     let text = getProperty(translations[currentLanguage], key);
+    
     if (typeof text !== 'string') {
         console.warn(`Translation key not found for language '${currentLanguage}': ${key}`);
         return key; // Return the key as a fallback
     }
+    
     if (replacements) {
         for (const placeholder in replacements) {
             text = text.replace(`{${placeholder}}`, String(replacements[placeholder]));
         }
     }
+    
     return text;
 }
 
@@ -95,9 +995,11 @@ async function translateUI() {
         await loadTranslations();
     }
     
+    // First, translate all elements with data-translate-key
     document.querySelectorAll('[data-translate-key]').forEach(element => {
         const key = element.getAttribute('data-translate-key')!;
         const translatedText = t(key);
+        
         if (element.hasAttribute('placeholder')) {
              (element as HTMLInputElement).placeholder = translatedText;
         } else if (element.tagName === 'INPUT' && (element as HTMLInputElement).type === 'text') {
@@ -114,19 +1016,25 @@ async function translateUI() {
         }
     });
 
-     document.querySelectorAll('[data-translate-key-placeholder]').forEach(element => {
+    // Translate placeholders
+    document.querySelectorAll('[data-translate-key-placeholder]').forEach(element => {
         const key = element.getAttribute('data-translate-key-placeholder')!;
-        (element as HTMLInputElement).placeholder = t(key);
+        const translatedText = t(key);
+        (element as HTMLInputElement).placeholder = translatedText;
     });
 
+    // Translate aria-labels
     document.querySelectorAll('[data-translate-key-aria]').forEach(element => {
         const key = element.getAttribute('data-translate-key-aria')!;
-        element.setAttribute('aria-label', t(key));
+        const translatedText = t(key);
+        element.setAttribute('aria-label', translatedText);
     });
     
+    // Translate tooltips
     document.querySelectorAll('[data-translate-key-tooltip]').forEach(element => {
         const key = element.getAttribute('data-translate-key-tooltip')!;
-        (element as HTMLElement).dataset.tooltip = t(key);
+        const translatedText = t(key);
+        (element as HTMLElement).dataset.tooltip = translatedText;
     });
     
     // Special handling for buttons with icons
@@ -134,9 +1042,21 @@ async function translateUI() {
     if (toggleDrawModeBtn) {
        const textSpan = toggleDrawModeBtn.querySelector('span');
        if (textSpan) {
-           textSpan.textContent = isDrawingMode ? t('map.setWaypointsActive') : t('map.setWaypoints');
+           const translatedText = isDrawingMode ? t('map.setWaypointsActive') : t('map.setWaypoints');
+           textSpan.textContent = translatedText;
        }
     }
+    
+    // Force refresh of all text content that might have been missed
+    setTimeout(() => {
+        document.querySelectorAll('[data-translate-key]').forEach(element => {
+            const key = element.getAttribute('data-translate-key')!;
+            const translatedText = t(key);
+            if (element.textContent !== translatedText) {
+                element.textContent = translatedText;
+            }
+        });
+    }, 100);
 }
 
 /**
@@ -148,7 +1068,21 @@ async function loadTranslations() {
         if (!response.ok) throw new Error('Failed to load translations file.');
         translations = await response.json();
     } catch (error) {
-        console.error("Could not load translations:", error);
+        console.error("Could not load translations from file:", error);
+        // Fallback: try to load from root path
+        try {
+            const fallbackResponse = await fetch('/translations.json');
+            if (fallbackResponse.ok) {
+                translations = await fallbackResponse.json();
+            }
+        } catch (fallbackError) {
+            console.error("Fallback translation loading also failed:", fallbackError);
+        }
+    }
+    
+    // If no translations loaded from file, use embedded translations
+    if (!translations.de && !translations.en) {
+        translations = embeddedTranslations;
     }
 }
 
@@ -166,6 +1100,18 @@ async function setLanguage(lang: string) {
     });
 
     await translateUI();
+
+    // Also translate manufacturer view if it's visible
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (manufacturerView && manufacturerView.style.display !== 'none') {
+        translateManufacturerView();
+    }
+    
+    // Always translate chatbot when language changes
+    translateChatbot();
+    
+    // Dispatch event for React components to re-render
+    window.dispatchEvent(new Event('languageChanged'));
 
     // Re-render UI components that depend on the language
     if (threatsMap.size > 0) {
@@ -381,18 +1327,29 @@ function renderThreatList() {
     const selectedWeight = vehicleSelect.value;
     const accelerationRange = getAccelerationRange(selectedWeight);
 
-    threatsMap.forEach((data, name) => {
-        if (data.entryPoints.length === 0) return;
-
-        const li = document.createElement('li');
+    const threatsArray = Array.from(threatsMap.entries()).map(([name, data]) => {
+        if (data.entryPoints.length === 0) return null;
+        
         const lengthInMeters = Math.round(data.totalLength);
+        let maxSpeed = 0;
+        
+        if (accelerationRange && lengthInMeters > 0) {
+            const [, maxAcc] = accelerationRange;
+            maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+        }
+        
+        return { name, data, maxSpeed, lengthInMeters };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+    // Sort by maxSpeed in descending order
+    threatsArray.sort((a, b) => b.maxSpeed - a.maxSpeed);
+
+    threatsArray.forEach(({ name, data, maxSpeed, lengthInMeters }) => {
+        const li = document.createElement('li');
         
         let speedText = '';
-        if (accelerationRange && lengthInMeters > 0) {
-            const [minAcc, maxAcc] = accelerationRange;
-            const minSpeed = Math.round(calculateVelocity(minAcc, lengthInMeters));
-            const maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
-            speedText = ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
+        if (maxSpeed > 0) {
+            speedText = ` | ${t('threats.speed')}: ${maxSpeed} km/h`;
         }
 
         li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
@@ -460,11 +1417,19 @@ const analyzeAndMarkThreats = async () => {
         `;
         const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(t('alerts.overpassError', { status: response.status }));
+        let data;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(t('alerts.overpassError', { status: response.status }));
+            }
+            data = await response.json();
+        } catch (error) {
+            console.error('Overpass API error:', error);
+            alert(t('alerts.analysisError'));
+            loadingIndicator.classList.add('hidden');
+            return;
         }
-        const data = await response.json();
 
         const nodes: { [id: number]: { lat: number, lon: number } } = {};
         const ways: { [id: number]: { name: string, nodes: number[], id: number } } = {};
@@ -662,7 +1627,7 @@ async function getAIReportSections(context: any): Promise<any> {
             penetration: context.penetration,
             debrisDistance: context.debrisDistance,
             language: currentLanguage === 'de' ? 'German' : 'English'
-        });
+        }) + `\n\nIMPORTANT: Generate the report in ${currentLanguage === 'de' ? 'German' : 'English'} language only. All text must be in ${currentLanguage === 'de' ? 'German' : 'English'}.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -685,7 +1650,10 @@ async function getAIReportSections(context: any): Promise<any> {
         });
         
         const jsonText = (response.text || '').trim();
-        return JSON.parse(jsonText);
+        const aiSections = JSON.parse(jsonText);
+        
+        // KI-Text nachträglich übersetzen, falls er in der falschen Sprache ist
+        return translateAISections(aiSections);
 
     } catch (error) {
         console.error("Fehler bei der Gemini-API-Anfrage für den Bericht:", error);
@@ -694,35 +1662,216 @@ async function getAIReportSections(context: any): Promise<any> {
     }
 }
 
+/**
+ * Übersetzt KI-generierte Berichtsabschnitte in die gewählte Sprache
+ * @param aiSections - Die von der KI generierten Berichtsabschnitte
+ * @returns Übersetzte Berichtsabschnitte
+ */
+function translateAISections(aiSections: any): any {
+    // Prüfe, ob der Text bereits in der richtigen Sprache ist
+    const isGerman = currentLanguage === 'de';
+    const sampleText = aiSections.purpose || aiSections.threatAnalysis || '';
+    
+    // Einfache Erkennung der Sprache (Deutsch vs. Englisch)
+    const germanWords = ['der', 'die', 'das', 'und', 'für', 'von', 'mit', 'bei', 'auf', 'in', 'an', 'zu', 'zur', 'zum'];
+    const englishWords = ['the', 'and', 'for', 'of', 'with', 'at', 'on', 'in', 'to', 'from', 'by', 'as', 'is', 'are'];
+    
+    const germanCount = germanWords.filter(word => sampleText.toLowerCase().includes(word)).length;
+    const englishCount = englishWords.filter(word => sampleText.toLowerCase().includes(word)).length;
+    
+    const textIsGerman = germanCount > englishCount;
+    const needsTranslation = (isGerman && !textIsGerman) || (!isGerman && textIsGerman);
+    
+    if (!needsTranslation) {
+        console.log('AI text is already in correct language, no translation needed');
+        return aiSections;
+    }
+    
+    console.log('AI text needs translation. Current language:', currentLanguage, 'Text language:', textIsGerman ? 'German' : 'English');
+    
+    // Übersetze alle Abschnitte
+    const translatedSections: any = {};
+    
+    for (const [key, text] of Object.entries(aiSections)) {
+        if (typeof text === 'string') {
+            translatedSections[key] = translateAIText(text, isGerman);
+        } else {
+            translatedSections[key] = text;
+        }
+    }
+    
+    return translatedSections;
+}
+
+/**
+ * Übersetzt einen einzelnen KI-Text in die gewählte Sprache
+ * @param text - Der zu übersetzende Text
+ * @param targetGerman - Zielsprache ist Deutsch
+ * @returns Übersetzter Text
+ */
+function translateAIText(text: string, targetGerman: boolean): string {
+    if (targetGerman) {
+        // Übersetze von Englisch nach Deutsch
+        return text
+            .replace(/\bThis report\b/gi, 'Dieser Bericht')
+            .replace(/\baims to\b/gi, 'zielt darauf ab')
+            .replace(/\bidentify\b/gi, 'zu identifizieren')
+            .replace(/\bassess\b/gi, 'zu bewerten')
+            .replace(/\bmitigate\b/gi, 'zu mindern')
+            .replace(/\bpotential\b/gi, 'potenzielle')
+            .replace(/\brisks\b/gi, 'Risiken')
+            .replace(/\bassets\b/gi, 'Schutzgüter')
+            .replace(/\bensuring\b/gi, 'um sicherzustellen')
+            .replace(/\bbusiness continuity\b/gi, 'Geschäftskontinuität')
+            .replace(/\bstrategic\b/gi, 'strategische')
+            .replace(/\bsecurity\b/gi, 'Sicherheits')
+            .replace(/\binvestments\b/gi, 'Investitionen')
+            .replace(/\bThe primary threat\b/gi, 'Die primäre Bedrohung')
+            .replace(/\bis\b/gi, 'ist')
+            .replace(/\buse of vehicles\b/gi, 'die Nutzung von Fahrzeugen')
+            .replace(/\bas\b/gi, 'als')
+            .replace(/\bweapon\b/gi, 'Waffe')
+            .replace(/\bPotential\b/gi, 'Potenzielle')
+            .replace(/\badversaries\b/gi, 'Gegner')
+            .replace(/\binclude\b/gi, 'umfassen')
+            .replace(/\bstate-sponsored\b/gi, 'staatsgestützte')
+            .replace(/\bterrorist\b/gi, 'terroristische')
+            .replace(/\binsider threats\b/gi, 'Innentäter-Bedrohungen')
+            .replace(/\bmalicious software\b/gi, 'schädliche Software')
+            .replace(/\bdistributed denial\b/gi, 'verteilte Verweigerung')
+            .replace(/\battacks\b/gi, 'Angriffe')
+            .replace(/\bGiven\b/gi, 'Angesichts')
+            .replace(/\bglobal\b/gi, 'globaler')
+            .replace(/\btrends\b/gi, 'Trends')
+            .replace(/\band\b/gi, 'und')
+            .replace(/\bthe\b/gi, 'der')
+            .replace(/\bof\b/gi, 'von')
+            .replace(/\bto\b/gi, 'zu')
+            .replace(/\bin\b/gi, 'in')
+            .replace(/\bon\b/gi, 'auf')
+            .replace(/\bat\b/gi, 'bei')
+            .replace(/\bwith\b/gi, 'mit')
+            .replace(/\bfor\b/gi, 'für')
+            .replace(/\bfrom\b/gi, 'von')
+            .replace(/\bby\b/gi, 'durch')
+            .replace(/\bas\b/gi, 'als')
+            .replace(/\bis\b/gi, 'ist')
+            .replace(/\bare\b/gi, 'sind')
+            .replace(/\bwas\b/gi, 'war')
+            .replace(/\bwere\b/gi, 'waren')
+            .replace(/\bwill\b/gi, 'wird')
+            .replace(/\bwould\b/gi, 'würde')
+            .replace(/\bcould\b/gi, 'könnte')
+            .replace(/\bshould\b/gi, 'sollte')
+            .replace(/\bmay\b/gi, 'kann')
+            .replace(/\bmight\b/gi, 'könnte')
+            .replace(/\bcan\b/gi, 'kann');
+    } else {
+        // Übersetze von Deutsch nach Englisch
+        return text
+            .replace(/\bDieser Bericht\b/gi, 'This report')
+            .replace(/\bzielt darauf ab\b/gi, 'aims to')
+            .replace(/\bzu identifizieren\b/gi, 'identify')
+            .replace(/\bzu bewerten\b/gi, 'assess')
+            .replace(/\bzu mindern\b/gi, 'mitigate')
+            .replace(/\bpotenzielle\b/gi, 'potential')
+            .replace(/\bRisiken\b/gi, 'risks')
+            .replace(/\bSchutzgüter\b/gi, 'assets')
+            .replace(/\bum sicherzustellen\b/gi, 'ensuring')
+            .replace(/\bGeschäftskontinuität\b/gi, 'business continuity')
+            .replace(/\bstrategische\b/gi, 'strategic')
+            .replace(/\bSicherheits\b/gi, 'security')
+            .replace(/\bInvestitionen\b/gi, 'investments')
+            .replace(/\bDie primäre Bedrohung\b/gi, 'The primary threat')
+            .replace(/\bist\b/gi, 'is')
+            .replace(/\bdie Nutzung von Fahrzeugen\b/gi, 'use of vehicles')
+            .replace(/\bals\b/gi, 'as')
+            .replace(/\bWaffe\b/gi, 'weapon')
+            .replace(/\bPotenzielle\b/gi, 'Potential')
+            .replace(/\bGegner\b/gi, 'adversaries')
+            .replace(/\bumfassen\b/gi, 'include')
+            .replace(/\bstaatsgestützte\b/gi, 'state-sponsored')
+            .replace(/\bterroristische\b/gi, 'terrorist')
+            .replace(/\bInnentäter-Bedrohungen\b/gi, 'insider threats')
+            .replace(/\bschädliche Software\b/gi, 'malicious software')
+            .replace(/\bverteilte Verweigerung\b/gi, 'distributed denial')
+            .replace(/\bAngriffe\b/gi, 'attacks')
+            .replace(/\bAngesichts\b/gi, 'Given')
+            .replace(/\bglobaler\b/gi, 'global')
+            .replace(/\bTrends\b/gi, 'trends')
+            .replace(/\bund\b/gi, 'and')
+            .replace(/\bder\b/gi, 'the')
+            .replace(/\bvon\b/gi, 'of')
+            .replace(/\bzu\b/gi, 'to')
+            .replace(/\bin\b/gi, 'in')
+            .replace(/\bauf\b/gi, 'on')
+            .replace(/\bbei\b/gi, 'at')
+            .replace(/\bmit\b/gi, 'with')
+            .replace(/\bfür\b/gi, 'for')
+            .replace(/\bdurch\b/gi, 'by')
+            .replace(/\bist\b/gi, 'is')
+            .replace(/\bsind\b/gi, 'are')
+            .replace(/\bwar\b/gi, 'was')
+            .replace(/\bwaren\b/gi, 'were')
+            .replace(/\bwird\b/gi, 'will')
+            .replace(/\bwürde\b/gi, 'would')
+            .replace(/\bkönnte\b/gi, 'could')
+            .replace(/\bsollte\b/gi, 'should')
+            .replace(/\bkann\b/gi, 'may');
+    }
+}
+
 function buildReportFromStateFallback(context: any) {
     try {
         const ps = (window as any).planningState || {};
-        const schutzgueter = ps.schutzgüter?.join(', ') || context.assetToProtect || 'nicht spezifiziert';
-        const bedrohung = ps.risiko?.bedrohung?.art || 'unbekannt';
-        const vKmh = ps.risiko?.dynamik?.v_kmh || context.estimatedSpeedKmH || 'n. a.';
-        const untergrund = ps.risiko?.site?.untergrund || 'unbekannt';
-        const restrisiko = ps.restrisiko?.klasse || context.securityLevel || 'n. a.';
+        const schutzgueter = ps.schutzgüter?.join(', ') || context.assetToProtect || t('report.undefinedAsset');
+        const bedrohung = ps.risiko?.bedrohung?.art || t('report.undefinedValue');
+        const vKmh = ps.risiko?.dynamik?.v_kmh || context.estimatedSpeedKmH || t('report.undefinedValue');
+        const untergrund = ps.risiko?.site?.untergrund || t('report.undefinedValue');
+        const restrisiko = ps.restrisiko?.klasse || context.securityLevel || t('report.undefinedValue');
         const corridors = (ps.risiko?.site?.anfahrkorridore && ps.risiko.site.anfahrkorridore.length>0)
-            ? `${ps.risiko.site.anfahrkorridore.length} identifizierte Korridore`
-            : 'keine Geometrie aus Chatbot übergeben';
+            ? t('report.identifiedCorridors', { count: ps.risiko.site.anfahrkorridore.length })
+            : t('report.noChatGeometry');
 
-        return {
-            purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414‑2 / ISO 22343‑2).`,
-            threatAnalysis: `Bedrohungsannahme: ${bedrohung}. Aus der Karten-/Chat-Analyse ergibt sich eine Zufahrtsgeschwindigkeit von ca. ${vKmh} km/h. Anfahrkorridore laut Chat: ${corridors}.`,
-            vulnerabilities: `Untergrund/Fundamente: ${untergrund}. Restrisiko (Chat/Slider): ${restrisiko}. Kritische Zufahrtswinkel bzw. Engstellen sind bei der Maßnahmendefinition zu berücksichtigen.`,
-            hvmMeasures: `Empfohlene Maßnahmen orientieren sich an der erwarteten Geschwindigkeit und den Schutzzielen. Für ${schutzgueter} mit Geschwindigkeit ~${vKmh} km/h sind FSB mit entsprechendem Leistungsniveau, geprüften Fundamenten und Berücksichtigung des Anprallwinkels anzusetzen.`,
-            siteConsiderations: `Betriebliche Rahmenbedingungen (z. B. Feuerwehrzufahrt, Fluchtwege) aus Chat sollten in die Detailplanung einfließen. Untergrund: ${untergrund}.`,
-            operationalImpact: `Maßnahmen sind so auszulegen, dass Betrieb, Rettungswege und Gestaltung berücksichtigt sind; temporäre Anpassungen (Events) werden unterstützt.`
-        };
+        if (currentLanguage === 'de') {
+            return {
+                purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414‑2 / ISO 22343‑2).`,
+                threatAnalysis: `Bedrohungsannahme: ${bedrohung}. Aus der Karten-/Chat-Analyse ergibt sich eine Zufahrtsgeschwindigkeit von ca. ${vKmh} km/h. Anfahrkorridore laut Chat: ${corridors}.`,
+                vulnerabilities: `Untergrund/Fundamente: ${untergrund}. Restrisiko (Chat/Slider): ${restrisiko}. Kritische Zufahrtswinkel bzw. Engstellen sind bei der Maßnahmendefinition zu berücksichtigen.`,
+                hvmMeasures: `Empfohlene Maßnahmen orientieren sich an der erwarteten Geschwindigkeit und den Schutzzielen. Für ${schutzgueter} mit Geschwindigkeit ~${vKmh} km/h sind FSB mit entsprechendem Leistungsniveau, geprüften Fundamenten und Berücksichtigung des Anprallwinkels anzusetzen.`,
+                siteConsiderations: `Betriebliche Rahmenbedingungen (z. B. Feuerwehrzufahrt, Fluchtwege) aus Chat sollten in die Detailplanung einfließen. Untergrund: ${untergrund}.`,
+                operationalImpact: `Maßnahmen sind so auszulegen, dass Betrieb, Rettungswege und Gestaltung berücksichtigt sind; temporäre Anpassungen (Events) werden unterstützt.`
+            };
+        } else {
+            return {
+                purpose: `Protection objective: Securing ${schutzgueter} at location ${context.locationName}. The assistant provided additional inputs (standard reference DIN SPEC 91414‑2 / ISO 22343‑2).`,
+                threatAnalysis: `Threat assumption: ${bedrohung}. From the map/chat analysis, an access speed of approximately ${vKmh} km/h results. Access corridors according to chat: ${corridors}.`,
+                vulnerabilities: `Ground/foundations: ${untergrund}. Residual risk (Chat/Slider): ${restrisiko}. Critical impact angles or bottlenecks must be considered in measure definition.`,
+                hvmMeasures: `Recommended measures are oriented to expected speed and protection objectives. For ${schutzgueter} with speed ~${vKmh} km/h, FSB with corresponding performance level, tested foundations and consideration of impact angle should be applied.`,
+                siteConsiderations: `Operational framework conditions (e.g., fire brigade access, escape routes) from chat should flow into detailed planning. Ground: ${untergrund}.`,
+                operationalImpact: `Measures are designed so that operations, rescue routes and design are considered; temporary adaptations (events) are supported.`
+            };
+        }
     } catch {
-        return {
-            purpose: `Schutzziel und Rahmenbedingungen für ${context.locationName}.`,
-            threatAnalysis: `Zusammenfassung der Gefahren basierend auf Karten-/Chat-Eingaben.`,
-            vulnerabilities: `Allgemeine Schwachstellen am Standort.`,
-            hvmMeasures: `Empfohlene HVM‑Maßnahmen gemäß Annahmen.`,
-            siteConsiderations: `Standortspezifische Hinweise.`,
-            operationalImpact: `Betriebliche Auswirkungen und Gestaltung.`
-        };
+        if (currentLanguage === 'de') {
+            return {
+                purpose: `Schutzziel und Rahmenbedingungen für ${context.locationName}.`,
+                threatAnalysis: `Zusammenfassung der Gefahren basierend auf Karten-/Chat-Eingaben.`,
+                vulnerabilities: `Allgemeine Schwachstellen am Standort.`,
+                hvmMeasures: `Empfohlene HVM‑Maßnahmen gemäß Annahmen.`,
+                siteConsiderations: `Standortspezifische Hinweise.`,
+                operationalImpact: `Betriebliche Auswirkungen und Gestaltung.`
+            };
+        } else {
+            return {
+                purpose: `Protection objective and framework conditions for ${context.locationName}.`,
+                threatAnalysis: `Summary of hazards based on map/chat inputs.`,
+                vulnerabilities: `General vulnerabilities at the site.`,
+                hvmMeasures: `Recommended HVM measures according to assumptions.`,
+                siteConsiderations: `Site-specific notes.`,
+                operationalImpact: `Operational impacts and design.`
+            };
+        }
     }
 }
 
@@ -884,7 +2033,50 @@ async function generateRiskReport() {
         const assetInput = document.getElementById('asset-to-protect') as HTMLInputElement;
         const assetToProtect = assetInput.value.trim() || t('report.undefinedAsset');
         
-        const threatList = threatsMap.size > 0 ? Array.from(threatsMap.keys()).join(', ') : t('report.noThreatAnalysis');
+        // Generate threat list in table format
+        let threatList = t('report.noThreatAnalysis');
+        if (threatsMap.size > 0) {
+            const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+            const selectedWeight = vehicleSelect.value;
+            const accelerationRange = getAccelerationRange(selectedWeight);
+            
+            const threatsArray = Array.from(threatsMap.entries()).map(([name, data]) => {
+                const lengthInMeters = Math.round(data.totalLength);
+                let maxSpeed = 0;
+                
+                if (accelerationRange && lengthInMeters > 0) {
+                    const [, maxAcc] = accelerationRange;
+                    maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+                }
+                
+                return { name, lengthInMeters, maxSpeed };
+            });
+            
+            // Sort by maxSpeed in descending order
+            threatsArray.sort((a, b) => b.maxSpeed - a.maxSpeed);
+            
+            // Create table format
+            threatList = `
+                <table style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0; font-weight: bold;">
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.street')}</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.distance')}</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.maxSpeed')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${threatsArray.map(threat => `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.name}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.lengthInMeters} m</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.maxSpeed} km/h</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
 
         // --- Gather all context for the AI ---
         const securityRiskSlider = document.getElementById('security-risk-slider') as HTMLInputElement;
@@ -1086,8 +2278,24 @@ function downloadRiskReport() {
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
 document.addEventListener('DOMContentLoaded', async () => {
+    initViewSwitcher();
     initOpenStreetMap();
+    
     await loadTranslations();
+
+    // Force immediate translation if translations are available
+    if (translations.de) {
+        currentLanguage = 'de';
+        await translateUI();
+        // Also translate chatbot immediately
+        translateChatbot();
+    } else {
+        // If still no translations, force use of embedded translations
+        console.warn('No translations loaded, forcing embedded translations');
+        translations = embeddedTranslations;
+        currentLanguage = 'de';
+        await translateUI();
+    }
 
     const savedLang = localStorage.getItem('language') || 'de';
     await setLanguage(savedLang);
@@ -1135,7 +2343,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const { lat, lon, display_name } = data[0];
                 map.setView([lat, lon], 15);
                 if (searchMarker) map.removeLayer(searchMarker);
-                searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${display_name}</b>`).openPopup();
+                
+                // Remove existing search marker
+                if (searchMarker) {
+                    map.removeLayer(searchMarker);
+                    searchMarker = null;
+                }
+                
+                // Create new search marker with proper icon
+                const searchIcon = L.divIcon({
+                    className: 'search-marker',
+                    html: '<i class="fas fa-map-marker-alt" style="color: #dc2626; font-size: 20px;"></i>',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                });
+                
+                searchMarker = L.marker([lat, lon], { 
+                    icon: searchIcon,
+                    zIndexOffset: 1000 // Ensure it's above other markers
+                }).addTo(map);
+                
+                // Add popup and open it
+                searchMarker.bindPopup(`<b>${display_name}</b>`).openPopup();
+                
+                // Force map to update
+                map.invalidateSize();
             } else {
                 alert(t('alerts.locationNotFound'));
             }
@@ -1255,6 +2487,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (newTabId === 'nav-product-selection') {
             await updateProductRecommendations();
         }
+        if (newTabId === 'nav-project-description') {
+            // Handle project description tab
+            clearThreatAnalysis();
+            generatedPdf = null;
+        }
 
         toggleDrawModeBtn.classList.add('hidden');
         resetDrawingBtn.classList.add('hidden');
@@ -1348,4 +2585,164 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    initViewSwitcher();
+
 });
+
+// Function to debug current view state
+function debugViewState() {
+    console.log('=== DEBUG: Current View State ===');
+    
+    const elements = [
+        { id: 'planning-view', name: 'Planning View' },
+        { id: 'manufacturer-view', name: 'Manufacturer View' },
+        { id: 'map', name: 'Map Container' },
+        { id: 'chatbot-react-root', name: 'Chatbot Root' },
+        { selector: '.sidebar', name: 'Sidebar' },
+        { selector: '.map-area', name: 'Map Area' },
+        { selector: '.map-tabs', name: 'Map Tabs' },
+        { selector: '.map-toolbar', name: 'Map Toolbar' }
+    ];
+    
+    elements.forEach(({ id, selector, name }) => {
+        const element = selector ? document.querySelector(selector) : document.getElementById(id || '');
+        if (element) {
+            const computedStyle = window.getComputedStyle(element);
+            const htmlElement = element as HTMLElement;
+            console.log(`${name}:`, {
+                display: computedStyle.display,
+                visibility: computedStyle.visibility,
+                opacity: computedStyle.opacity,
+                visible: htmlElement.offsetWidth > 0 && htmlElement.offsetHeight > 0
+            });
+        } else {
+            console.log(`${name}: NOT FOUND`);
+        }
+    });
+    
+    console.log('Map object exists:', !!map);
+    if (map) {
+        console.log('Map center:', map.getCenter());
+        console.log('Map zoom:', map.getZoom());
+    }
+    
+    console.log('=== END DEBUG ===');
+}
+
+// Function to restore all planning view elements
+function restorePlanningViewElements() {
+    console.log('Restoring all planning view elements...');
+    
+    // List of all elements that need to be restored
+    const elementsToRestore = [
+        { selector: '.map-area', display: 'block' },
+        { selector: '#map', display: 'block', additionalStyles: { visibility: 'visible', opacity: '1' } },
+        { selector: '.map-tabs', display: 'flex' },
+        { selector: '.map-toolbar', display: 'flex' },
+        { selector: '.sidebar', display: 'block' },
+        { selector: '#floating-threats', display: 'none' }, // Hidden by default
+        { selector: '#report-preview-area', display: 'none' }, // Hidden by default
+        { selector: '.report-loading-overlay', display: 'none' } // Hidden by default
+    ];
+    
+    elementsToRestore.forEach(({ selector, display, additionalStyles }) => {
+        const element = document.querySelector(selector);
+        if (element) {
+            (element as HTMLElement).style.display = display;
+            if (additionalStyles) {
+                Object.entries(additionalStyles).forEach(([property, value]) => {
+                    (element as HTMLElement).style[property as any] = value;
+                });
+            }
+            console.log(`Restored ${selector} with display: ${display}`);
+        } else {
+            console.warn(`Element not found: ${selector}`);
+        }
+    });
+    
+    // Ensure chatbot root is visible
+    const chatbotRoot = document.getElementById('chatbot-react-root');
+    if (chatbotRoot) {
+        (chatbotRoot as HTMLElement).style.display = 'block';
+        (chatbotRoot as HTMLElement).style.visibility = 'visible';
+        console.log('Chatbot root restored');
+    }
+    
+    // Debug the state after restoration
+    setTimeout(() => {
+        debugViewState();
+    }, 100);
+}
+
+// Function to translate manufacturer view specifically
+function translateManufacturerView() {
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (!manufacturerView) {
+        return;
+    }
+    
+    // Translate all elements in manufacturer view
+    const elementsToTranslate = [
+        { selector: '[data-translate-key]', attribute: 'data-translate-key' },
+        { selector: '[data-translate-key-placeholder]', attribute: 'data-translate-key-placeholder' },
+        { selector: '[data-translate-key-aria]', attribute: 'data-translate-key-aria' },
+        { selector: '[data-translate-key-tooltip]', attribute: 'data-translate-key-tooltip' }
+    ];
+    
+    elementsToTranslate.forEach(({ selector, attribute }) => {
+        manufacturerView.querySelectorAll(selector).forEach(element => {
+            const key = element.getAttribute(attribute);
+            if (key) {
+                const translatedText = t(key);
+                
+                if (attribute === 'data-translate-key-placeholder') {
+                    (element as HTMLInputElement).placeholder = translatedText;
+                } else if (attribute === 'data-translate-key-aria') {
+                    element.setAttribute('aria-label', translatedText);
+                } else if (attribute === 'data-translate-key-tooltip') {
+                    (element as HTMLElement).dataset.tooltip = translatedText;
+                } else {
+                    // For data-translate-key, set text content
+                    element.textContent = translatedText;
+                }
+            }
+        });
+    });
+}
+
+// Function to translate chatbot specifically
+function translateChatbot() {
+    console.log('Translating chatbot for language:', currentLanguage);
+    
+    // Translate chatbot title
+    const chatbotTitle = document.querySelector('#chatbot-react-root h2');
+    if (chatbotTitle) {
+        chatbotTitle.textContent = t('ai.chatbot.title');
+    }
+    
+    // Translate welcome message
+    const welcomeMessage = document.querySelector('#chatbot-react-root .message:first-child .message-content');
+    if (welcomeMessage) {
+        welcomeMessage.textContent = t('ai.chatbot.welcome');
+    }
+    
+    // Translate asset question
+    const assetQuestion = document.querySelector('#chatbot-react-root .message:nth-child(2) .message-content');
+    if (assetQuestion) {
+        assetQuestion.textContent = t('ai.chatbot.assetQuestion');
+    }
+    
+    // Translate input placeholder
+    const inputField = document.querySelector('#chatbot-react-root input[type="text"]');
+    if (inputField) {
+        (inputField as HTMLInputElement).placeholder = t('ai.chatbot.inputPlaceholder');
+    }
+    
+    // Translate send button
+    const sendButton = document.querySelector('#chatbot-react-root button[type="submit"]');
+    if (sendButton) {
+        sendButton.textContent = t('ai.chatbot.sendButton');
+    }
+    
+    console.log('Chatbot translation completed');
+}
