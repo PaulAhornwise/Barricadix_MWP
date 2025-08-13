@@ -1115,87 +1115,11 @@ function filterProducts() {
 function translateProductDatabase() {
     console.log('Translating product database elements...');
     
-    // Title and subtitle
-    const titleElement = document.querySelector('.section-header h2');
-    if (titleElement) {
-        titleElement.textContent = 'Produktdatenbank';
-    }
+    // This function is now DEPRECATED since all elements use data-translate-key
+    // The translateManufacturerView() function handles all translations automatically
+    // We keep this function for backward compatibility but it does nothing
     
-    const subtitleElement = document.querySelector('.section-header p');
-    if (subtitleElement) {
-        subtitleElement.textContent = 'Technische Daten und Spezifikationen aller verfügbaren Produkte';
-    }
-    
-    // Search placeholder
-    const searchInput = document.getElementById('product-search') as HTMLInputElement;
-    if (searchInput) {
-        searchInput.placeholder = 'Produktname, Hersteller oder Typ eingeben...';
-    }
-    
-    // Table headers
-    const tableHeaders = document.querySelectorAll('.products-table th');
-    if (tableHeaders.length >= 9) {
-        tableHeaders[0].textContent = 'Hersteller';
-        tableHeaders[1].textContent = 'Typ';
-        tableHeaders[2].textContent = 'Standard';
-        tableHeaders[3].textContent = 'Fahrzeuggewicht (kg)';
-        tableHeaders[4].textContent = 'Fahrzeugtyp';
-        tableHeaders[5].textContent = 'Geschwindigkeit (km/h)';
-        tableHeaders[6].textContent = 'Anprallwinkel (°)';
-        tableHeaders[7].textContent = 'Penetration (m)';
-        tableHeaders[8].textContent = 'Trümmerdistanz (m)';
-        tableHeaders[9].textContent = 'Aktionen';
-    }
-    
-    // Loading and no products messages
-    const loadingElement = document.getElementById('products-loading');
-    if (loadingElement) {
-        loadingElement.textContent = 'Produkte werden geladen...';
-    }
-    
-    const noProductsElement = document.getElementById('no-products');
-    if (noProductsElement) {
-        noProductsElement.textContent = 'Keine Produkte gefunden';
-    }
-    
-    // Modal elements
-    const modalTitle = document.getElementById('modal-product-name');
-    if (modalTitle) {
-        modalTitle.textContent = 'Produktdetails';
-    }
-    
-    const technicalSpecsElement = document.querySelector('#modal-technical-specs');
-    if (technicalSpecsElement && technicalSpecsElement.previousElementSibling) {
-        (technicalSpecsElement.previousElementSibling as HTMLElement).textContent = 'Technische Spezifikationen';
-    }
-    
-    const performanceDataElement = document.querySelector('#modal-performance-data');
-    if (performanceDataElement && performanceDataElement.previousElementSibling) {
-        (performanceDataElement.previousElementSibling as HTMLElement).textContent = 'Leistungsdaten';
-    }
-    
-    const certificationElement = document.querySelector('#modal-certification');
-    if (certificationElement && certificationElement.previousElementSibling) {
-        (certificationElement.previousElementSibling as HTMLElement).textContent = 'Zertifizierung';
-    }
-    
-    const exportBtn = document.getElementById('export-product');
-    if (exportBtn) {
-        const exportSpan = exportBtn.querySelector('span');
-        if (exportSpan) {
-            exportSpan.textContent = 'Daten exportieren';
-        }
-    }
-    
-    const printBtn = document.getElementById('print-product');
-    if (printBtn) {
-        const printSpan = printBtn.querySelector('span');
-        if (printSpan) {
-            printSpan.textContent = 'Spezifikationen drucken';
-        }
-    }
-    
-    console.log('Product database elements translated');
+    console.log('Product database elements now use automatic translation via data-translate-key');
 }
 
 /**
