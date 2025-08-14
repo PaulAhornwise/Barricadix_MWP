@@ -142,6 +142,7 @@ const embeddedTranslations = {
             "resistanceHigh": "Hoher Widerstand",
             "resistanceLow": "Niedriger Widerstand"
         },
+
         "ai": {
             "reportPrompt": "Erstellen Sie einen detaillierten Risikobericht basierend auf den gesammelten Daten.",
             "chatbot": {
@@ -164,8 +165,8 @@ const embeddedTranslations = {
             }
         },
         "manufacturer": {
-            "title": "Hersteller-Ansicht",
-            "subtitle": "Verwalten Sie Ihren Produktkatalog und Kundenanfragen",
+            "title": "",
+            "subtitle": "",
             "products": "Produkte",
             "quotations": "Angebote",
             "customers": "Kunden",
@@ -223,7 +224,29 @@ const embeddedTranslations = {
                         "30days": "Letzte 30 Tage",
                         "90days": "Letzte 90 Tage",
                         "1year": "Letztes Jahr"
+                    },
+                    "manufacturer": {
+                        "all": "Alle Hersteller"
+                    },
+                    "standard": {
+                        "all": "Alle Standards"
+                    },
+                    "vehicleType": {
+                        "all": "Alle Fahrzeugtypen"
                     }
+                },
+                "productDatabase": {
+                    "technicalSpecs": {
+                        "standard": "Standard",
+                        "vehicleWeight": "Fahrzeuggewicht",
+                        "vehicleType": "Fahrzeugtyp",
+                        "speed": "Geschwindigkeit",
+                        "impactAngle": "Anprallwinkel",
+                        "penetration": "Penetration"
+                    },
+                    "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+                    "toggleToTable": "Tabellenansicht",
+                    "toggleToGrid": "Kachelansicht"
                 }
             }
         },
@@ -499,6 +522,19 @@ const embeddedTranslations = {
                         "90days": "Last 90 Days",
                         "1year": "Last Year"
                     }
+                },
+                "productDatabase": {
+                    "technicalSpecs": {
+                        "standard": "Standard",
+                        "vehicleWeight": "Vehicle Weight",
+                        "vehicleType": "Vehicle Type",
+                        "speed": "Speed",
+                        "impactAngle": "Impact Angle",
+                        "penetration": "Penetration"
+                    },
+                    "searchPlaceholder": "Enter product name, manufacturer or type...",
+                    "toggleToTable": "Table View",
+                    "toggleToGrid": "Grid View"
                 }
             }
         },
@@ -595,6 +631,9 @@ const embeddedTranslations = {
     }
 };
 
+// Set translations to use embedded translations by default
+translations = embeddedTranslations;
+
 
 // ===============================================
 // VIEW SWITCHER FUNCTIONS
@@ -607,11 +646,8 @@ function initViewSwitcher() {
     setTimeout(() => {
         const planningBtn = document.getElementById('planning-view-btn');
         const manufacturerBtn = document.getElementById('manufacturer-view-btn');
-        const closeManufacturerBtn = document.getElementById('close-manufacturer-view');
-        
         console.log('Planning button:', planningBtn);
         console.log('Manufacturer button:', manufacturerBtn);
-        console.log('Close manufacturer button:', closeManufacturerBtn);
         
         if (planningBtn && manufacturerBtn) {
             planningBtn.addEventListener('click', () => {
@@ -629,15 +665,7 @@ function initViewSwitcher() {
             console.error('View switcher buttons not found!');
         }
         
-        if (closeManufacturerBtn) {
-            closeManufacturerBtn.addEventListener('click', () => {
-                console.log('Close manufacturer button clicked');
-                switchToPlanningView();
-            });
-            console.log('Close manufacturer button initialized');
-        } else {
-            console.error('Close manufacturer button not found!');
-        }
+        // Close manufacturer button removed for cleaner design
         
         // Initialize manufacturer navigation tabs
         const manufacturerTabs = document.querySelectorAll('.manufacturer-tab');
@@ -925,7 +953,9 @@ async function loadProductDatabase() {
         populateProductFilters(products);
         
         // Display products
+        console.log('About to display products:', products.length);
         displayProducts(products);
+        console.log('Products display completed');
         
         // Hide loading indicator
         const loadingIndicator = document.getElementById('products-loading');
@@ -933,14 +963,17 @@ async function loadProductDatabase() {
             loadingIndicator.style.display = 'none';
         }
         
-        // Show products table
-        const productsTable = document.getElementById('products-table');
-        if (productsTable) {
-            productsTable.style.display = 'table';
-        }
-        
         // Re-apply translations to ensure all elements are properly translated
         translateProductDatabase();
+        
+        // Initialize view toggle after products are loaded
+        // This ensures the correct initial view is set
+        setTimeout(() => {
+            const toggleBtn = document.getElementById('toggle-view-btn');
+            if (toggleBtn) {
+                setView('grid'); // Set initial view to grid (Kachelansicht)
+            }
+        }, 100);
         
     } catch (error) {
         console.error('Error loading product database:', error);
@@ -1000,12 +1033,35 @@ function populateProductFilters(products: any[]) {
  * Display products in the table
  */
 function displayProducts(products: any[]) {
-    const tbody = document.getElementById('products-tbody');
-    if (!tbody) return;
+    console.log('displayProducts called with', products.length, 'products');
     
+    // Display in table view
+    console.log('Calling displayProductsTable...');
+    displayProductsTable(products);
+    
+    // Display in grid view
+    console.log('Calling displayProductsGrid...');
+    displayProductsGrid(products);
+    
+    console.log('displayProducts completed');
+}
+
+/**
+ * Display products in table format
+ */
+function displayProductsTable(products: any[]) {
+    console.log('displayProductsTable called with', products.length, 'products');
+    const tbody = document.getElementById('products-tbody');
+    if (!tbody) {
+        console.error('products-tbody not found');
+        return;
+    }
+    
+    console.log('Clearing tbody and adding', products.length, 'rows');
     tbody.innerHTML = '';
     
     if (products.length === 0) {
+        console.log('No products to display');
         const noProducts = document.getElementById('no-products');
         if (noProducts) {
             noProducts.style.display = 'block';
@@ -1041,6 +1097,8 @@ function displayProducts(products: any[]) {
         tbody.appendChild(row);
     });
     
+    console.log('Added', products.length, 'rows to table');
+    
     // Add click event listeners to view details buttons
     const viewButtons = tbody.querySelectorAll('.view-details-btn');
     viewButtons.forEach(button => {
@@ -1050,6 +1108,196 @@ function displayProducts(products: any[]) {
             showProductDetails(productIndex);
         });
     });
+}
+
+/**
+ * Display products in grid format
+ */
+function displayProductsGrid(products: any[]) {
+    const grid = document.getElementById('products-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    if (products.length === 0) {
+        const noProductsGrid = document.getElementById('no-products-grid');
+        if (noProductsGrid) {
+            noProductsGrid.style.display = 'block';
+        }
+        return;
+    }
+    
+    // Hide no products message
+    const noProductsGrid = document.getElementById('no-products-grid');
+    if (noProductsGrid) {
+        noProductsGrid.style.display = 'none';
+    }
+    
+    // Sort products: products with images first, then without images
+    const sortedProducts = sortProductsByImageAvailability(products);
+    
+    // Debug: Log first few products to see sorting
+    console.log('First 5 products after sorting:', sortedProducts.slice(0, 5).map(p => ({
+        type: p.type,
+        hasImage: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access',
+        validType: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
+    })));
+    
+    // Debug: Count products with and without valid types
+    const productsWithValidTypes = sortedProducts.filter(p => 
+        p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
+        p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
+    );
+    console.log(`Products with valid types: ${productsWithValidTypes.length}/${sortedProducts.length}`);
+    
+    sortedProducts.forEach((product, index) => {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        
+        // Generate product image path based on product type
+        const productImage = generateProductImagePath(product);
+        
+        // Check if product has a valid type (could have an image)
+        const hasValidType = product.type && product.type.trim() !== '' && 
+                            product.type !== 'N/A' && product.type !== 'Manufacturer: ATG Access' && 
+                            !product.type.includes('Manufacturer:') && product.type.length > 2;
+        
+        // Add special class for first 20 products with valid types
+        if (hasValidType && index < 20) {
+            card.className = 'product-card product-card-priority';
+        }
+        
+
+        
+        card.innerHTML = `
+            <div class="product-card-image ${!hasValidType ? 'no-image' : ''}">
+                <img src="${productImage}" alt="${product.type || 'Produkt'}" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                     class="product-image">
+                <div class="product-image-placeholder" style="display: none;">
+                    <i class="fas fa-image"></i>
+                    <span>Kein Bild verfügbar</span>
+                </span>
+                </div>
+            </div>
+            <div class="product-card-content">
+                <div class="product-card-header">
+                    <div class="product-card-title">${product.type || 'N/A'}</div>
+                    <div class="product-card-manufacturer">${product.manufacturer || 'N/A'}</div>
+                </div>
+                <div class="product-card-specs">
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.standard')}</div>
+                        <div class="product-card-spec-value">${product.standard || 'N/A'}</div>
+                    </div>
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleWeight')}</div>
+                        <div class="product-card-spec-value">${product.vehicleWeight || 'N/A'} kg</div>
+                    </div>
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleType')}</div>
+                        <div class="product-card-spec-value">${product.vehicleType || 'N/A'}</div>
+                    </div>
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.speed')}</div>
+                        <div class="product-card-spec-value">${product.speed || 'N/A'} km/h</div>
+                    </div>
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.impactAngle')}</div>
+                        <div class="product-card-spec-value">${product.impactAngle || 'N/A'}°</div>
+                    </div>
+                    <div class="product-card-spec">
+                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.penetration')}</div>
+                        <div class="product-card-spec-value">${product.penetration || 'N/A'} m</div>
+                    </div>
+                </div>
+                <div class="product-card-actions">
+                    <button class="product-card-btn secondary" data-product-index="${index}">
+                        Details
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+    
+    // Add click event listeners to product cards
+    const productCards = grid.querySelectorAll('.product-card');
+    productCards.forEach(card => {
+        card.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('product-card-btn')) {
+                const productIndex = parseInt(target.getAttribute('data-product-index') || '0');
+                showProductDetails(productIndex);
+            }
+        });
+    });
+}
+
+/**
+ * Sort products by image availability - products with images first
+ */
+function sortProductsByImageAvailability(products: any[]): any[] {
+    console.log('Sorting products by image availability...');
+    
+    const sorted = [...products].sort((a, b) => {
+        // Check if product has a meaningful type that could have an image
+        const aHasImage = a.type && a.type.trim() !== '' && a.type !== 'N/A' && a.type !== 'Manufacturer: ATG Access';
+        const bHasImage = b.type && b.type.trim() !== '' && b.type !== 'N/A' && b.type !== 'Manufacturer: ATG Access';
+        
+        // Additional check: exclude products with very generic or invalid types
+        const aValidType = aHasImage && !a.type.includes('Manufacturer:') && a.type.length > 2;
+        const bValidType = bHasImage && !b.type.includes('Manufacturer:') && b.type.length > 2;
+        
+        if (aValidType && !bValidType) {
+            console.log(`Sorting: "${a.type}" (valid) before "${b.type}" (invalid)`);
+            return -1; // a has valid type, b doesn't
+        }
+        if (!aValidType && bValidType) {
+            console.log(`Sorting: "${b.type}" (valid) before "${a.type}" (invalid)`);
+            return 1;  // b has valid type, a doesn't
+        }
+        return 0; // both have valid types or both don't
+    });
+    
+    console.log('Sorting completed. First 10 products:');
+    sorted.slice(0, 10).forEach((p, i) => {
+        const isValid = p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
+                       p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2;
+        console.log(`${i + 1}. "${p.type}" - Valid: ${isValid}`);
+    });
+    
+    return sorted;
+}
+
+/**
+ * Generate product image path based on product type
+ */
+function generateProductImagePath(product: any): string {
+    if (!product.type || product.type === '') {
+        return '/Datenbank_Produktbilder/default_product_img01.jpg';
+    }
+    
+    // Clean product type for filename matching
+    let cleanType = product.type
+        .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special characters except spaces, hyphens, underscores
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .replace(/[_-]+/g, '_') // Replace multiple hyphens/underscores with single
+        .trim();
+    
+    // Try different image naming patterns
+    const imagePatterns = [
+        `${cleanType}_img01.jpg`,
+        `${cleanType}_img02.jpg`,
+        `${cleanType}_img03.jpg`,
+        `${cleanType}.jpg`,
+        `${cleanType}_01.jpg`,
+        `${cleanType}_02.jpg`
+    ];
+    
+    // Return the first pattern (we'll let the browser handle 404s)
+    return `/Datenbank_Produktbilder/${imagePatterns[0]}`;
 }
 
 /**
@@ -1081,6 +1329,107 @@ function initProductSearchAndFilters() {
     if (vehicleTypeFilter) {
         vehicleTypeFilter.addEventListener('change', filterProducts);
     }
+    
+    // Initialize view toggle functionality
+    initViewToggle();
+}
+
+/**
+ * Initialize view toggle functionality
+ */
+function initViewToggle() {
+    console.log('initViewToggle called');
+    const toggleBtn = document.getElementById('toggle-view-btn');
+    if (!toggleBtn) {
+        console.error('Toggle button not found in initViewToggle');
+        return;
+    }
+    
+    console.log('Toggle button found, adding click listener');
+    toggleBtn.addEventListener('click', toggleView);
+    
+    // Set initial view to grid (Kachelansicht)
+    console.log('Setting initial view to grid');
+    setView('grid');
+}
+
+/**
+ * Toggle between table and grid view
+ */
+function toggleView() {
+    console.log('toggleView called');
+    const toggleBtn = document.getElementById('toggle-view-btn');
+    if (!toggleBtn) {
+        console.error('Toggle button not found');
+        return;
+    }
+    
+    const currentView = toggleBtn.getAttribute('data-view');
+    console.log('Current view:', currentView);
+    const newView = currentView === 'table' ? 'grid' : 'table';
+    console.log('Switching to view:', newView);
+    
+    setView(newView);
+}
+
+/**
+ * Set the current view (table or grid)
+ */
+function setView(view: 'table' | 'grid') {
+    console.log('setView called with:', view);
+    const toggleBtn = document.getElementById('toggle-view-btn');
+    const tableContainer = document.getElementById('products-table-container');
+    const gridContainer = document.getElementById('products-grid-container');
+    
+    console.log('Elements found:', {
+        toggleBtn: !!toggleBtn,
+        tableContainer: !!tableContainer,
+        gridContainer: !!gridContainer
+    });
+    
+    if (!toggleBtn || !tableContainer || !gridContainer) {
+        console.error('Required elements not found');
+        return;
+    }
+    
+    // Update button state
+    toggleBtn.setAttribute('data-view', view);
+    console.log('Button data-view updated to:', view);
+    
+    // Update button text and icon
+    const buttonText = toggleBtn.querySelector('span');
+    const buttonIcon = toggleBtn.querySelector('i');
+    
+    if (view === 'grid') {
+        console.log('Switching to grid view');
+        // Show grid, hide table
+        tableContainer.style.display = 'none';
+        gridContainer.style.display = 'block';
+        
+        // Update button to show "back to table"
+        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToTable');
+        if (buttonIcon) buttonIcon.className = 'fas fa-table';
+    } else {
+        console.log('Switching to table view');
+        // Show table, hide grid
+        tableContainer.style.display = 'block';
+        gridContainer.style.display = 'none';
+        
+        // Ensure table is visible and has data
+        const productsTable = document.getElementById('products-table');
+        if (productsTable) {
+            productsTable.style.display = 'table';
+            console.log('Table display set to table');
+        }
+        
+        // Update button to show "back to grid"
+        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToGrid');
+        if (buttonIcon) buttonIcon.className = 'fas fa-th-large';
+        
+        console.log('Table view activated, table should be visible now');
+    }
+    
+    console.log('View switch completed');
 }
 
 /**
@@ -1115,87 +1464,11 @@ function filterProducts() {
 function translateProductDatabase() {
     console.log('Translating product database elements...');
     
-    // Title and subtitle
-    const titleElement = document.querySelector('.section-header h2');
-    if (titleElement) {
-        titleElement.textContent = 'Produktdatenbank';
-    }
+    // This function is now DEPRECATED since all elements use data-translate-key
+    // The translateManufacturerView() function handles all translations automatically
+    // We keep this function for backward compatibility but it does nothing
     
-    const subtitleElement = document.querySelector('.section-header p');
-    if (subtitleElement) {
-        subtitleElement.textContent = 'Technische Daten und Spezifikationen aller verfügbaren Produkte';
-    }
-    
-    // Search placeholder
-    const searchInput = document.getElementById('product-search') as HTMLInputElement;
-    if (searchInput) {
-        searchInput.placeholder = 'Produktname, Hersteller oder Typ eingeben...';
-    }
-    
-    // Table headers
-    const tableHeaders = document.querySelectorAll('.products-table th');
-    if (tableHeaders.length >= 9) {
-        tableHeaders[0].textContent = 'Hersteller';
-        tableHeaders[1].textContent = 'Typ';
-        tableHeaders[2].textContent = 'Standard';
-        tableHeaders[3].textContent = 'Fahrzeuggewicht (kg)';
-        tableHeaders[4].textContent = 'Fahrzeugtyp';
-        tableHeaders[5].textContent = 'Geschwindigkeit (km/h)';
-        tableHeaders[6].textContent = 'Anprallwinkel (°)';
-        tableHeaders[7].textContent = 'Penetration (m)';
-        tableHeaders[8].textContent = 'Trümmerdistanz (m)';
-        tableHeaders[9].textContent = 'Aktionen';
-    }
-    
-    // Loading and no products messages
-    const loadingElement = document.getElementById('products-loading');
-    if (loadingElement) {
-        loadingElement.textContent = 'Produkte werden geladen...';
-    }
-    
-    const noProductsElement = document.getElementById('no-products');
-    if (noProductsElement) {
-        noProductsElement.textContent = 'Keine Produkte gefunden';
-    }
-    
-    // Modal elements
-    const modalTitle = document.getElementById('modal-product-name');
-    if (modalTitle) {
-        modalTitle.textContent = 'Produktdetails';
-    }
-    
-    const technicalSpecsElement = document.querySelector('#modal-technical-specs');
-    if (technicalSpecsElement && technicalSpecsElement.previousElementSibling) {
-        (technicalSpecsElement.previousElementSibling as HTMLElement).textContent = 'Technische Spezifikationen';
-    }
-    
-    const performanceDataElement = document.querySelector('#modal-performance-data');
-    if (performanceDataElement && performanceDataElement.previousElementSibling) {
-        (performanceDataElement.previousElementSibling as HTMLElement).textContent = 'Leistungsdaten';
-    }
-    
-    const certificationElement = document.querySelector('#modal-certification');
-    if (certificationElement && certificationElement.previousElementSibling) {
-        (certificationElement.previousElementSibling as HTMLElement).textContent = 'Zertifizierung';
-    }
-    
-    const exportBtn = document.getElementById('export-product');
-    if (exportBtn) {
-        const exportSpan = exportBtn.querySelector('span');
-        if (exportSpan) {
-            exportSpan.textContent = 'Daten exportieren';
-        }
-    }
-    
-    const printBtn = document.getElementById('print-product');
-    if (printBtn) {
-        const printSpan = printBtn.querySelector('span');
-        if (printSpan) {
-            printSpan.textContent = 'Spezifikationen drucken';
-        }
-    }
-    
-    console.log('Product database elements translated');
+    console.log('Product database elements now use automatic translation via data-translate-key');
 }
 
 /**
@@ -1373,6 +1646,9 @@ function getProperty(obj: any, path: string) {
  * @returns The translated string.
  */
 function t(key: string, replacements?: { [key: string]: string | number }): string {
+    // Debug: Log which translations source is being used
+    console.log(`Translation request for key: ${key}, language: ${currentLanguage}`);
+    console.log(`Translations source:`, translations === embeddedTranslations ? 'embedded' : 'external');
     // Ensure we have translations available
     if (!translations || !translations[currentLanguage]) {
         console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
@@ -1400,6 +1676,7 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
         }
     }
     
+    console.log(`Translation result for ${key}:`, text);
     return text;
 }
 
@@ -2657,8 +2934,12 @@ async function updateProductRecommendations() {
     const pollerRecommendationEl = document.querySelector('#poller-category-header small');
     const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
     
-    if (pollerRecommendationEl) pollerRecommendationEl.textContent = t('products.resistanceHigh');
-    if (barrierRecommendationEl) barrierRecommendationEl.textContent = t('products.resistanceMedium');
+    if (pollerRecommendationEl) {
+        pollerRecommendationEl.textContent = t('products.resistanceHigh');
+    }
+    if (barrierRecommendationEl) {
+        barrierRecommendationEl.textContent = t('products.resistanceMedium');
+    }
 
     if (selectedWeight === 'alle') return;
     
@@ -3553,6 +3834,22 @@ function translateManufacturerView() {
             }
         });
     });
+    
+    // Re-render products if they are currently displayed to update technical data labels
+    const productsGrid = document.getElementById('products-grid');
+    const productsTable = document.getElementById('products-table');
+    
+    if (productsGrid && productsGrid.style.display !== 'none') {
+        // Grid view is active, re-render products to update technical data labels
+        console.log('Re-rendering products grid to update translations...');
+        // Reload products from the database to get fresh data
+        loadProductDatabase();
+    } else if (productsTable && productsTable.style.display !== 'none') {
+        // Table view is active, re-render table to update headers
+        console.log('Re-rendering products table to update translations...');
+        // Reload products from the database to get fresh data
+        loadProductDatabase();
+    }
 }
 
 // Function to translate chatbot specifically
@@ -3590,4 +3887,38 @@ function translateChatbot() {
     }
     
     console.log('Chatbot translation completed');
+}
+
+/**
+ * Helper function to get currently displayed products
+ * This function tries to extract products from the current display
+ */
+function getCurrentDisplayedProducts(): any[] {
+    // Try to get products from the current product database
+    try {
+        // If we have a global products variable, use it
+        if (typeof window !== 'undefined' && (window as any).products) {
+            return (window as any).products;
+        }
+        
+        // Try to get products from the current display by looking at existing cards
+        const productsGrid = document.getElementById('products-grid');
+        const productsTable = document.getElementById('products-table');
+        
+        if (productsGrid && productsGrid.children.length > 0) {
+            // Extract product data from existing grid cards
+            const productCards = productsGrid.querySelectorAll('.product-card');
+            if (productCards.length > 0) {
+                // We have products displayed, but we need to reload them from the source
+                // For now, return empty array to trigger a reload
+                return [];
+            }
+        }
+        
+        // Otherwise, try to reload from the JSON file
+        return [];
+    } catch (error) {
+        console.warn('Could not get current products:', error);
+        return [];
+    }
 }

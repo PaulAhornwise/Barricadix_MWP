@@ -314,25 +314,13 @@
                     
                     <!-- Main Content Area -->
                     <div class="manufacturer-main-content">
-                        <div class="manufacturer-header">
-                            <h1 data-translate-key="manufacturer.title">Hersteller-Ansicht</h1>
-                            <p data-translate-key="manufacturer.subtitle">Verwalten Sie Ihren Produktkatalog und Kundenanfragen</p>
-                            <button id="close-manufacturer-view" class="close-manufacturer-btn" title="Zurück zur Planungs-Ansicht">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        
                         <!-- Product Database Section -->
                         <div class="product-database-section">
-                            <div class="section-header">
-                                <h2>Produktdatenbank</h2>
-                                <p>Technische Daten und Spezifikationen aller verfügbaren Produkte</p>
-                            </div>
                             
                             <!-- Search and Filter Bar -->
                             <div class="search-filter-bar">
                                 <div class="search-box">
-                                    <input type="text" id="product-search" placeholder="Produktname, Hersteller oder Typ eingeben...">
+                                    <input type="text" id="product-search" data-translate-key-placeholder="manufacturer.productDatabase.searchPlaceholder" placeholder="Produktname, Hersteller oder Typ eingeben...">
                                     <button id="search-btn" class="search-btn">
                                         <i class="fas fa-search"></i>
                                     </button>
@@ -340,36 +328,43 @@
                                 
                                 <div class="filter-controls">
                                     <select id="manufacturer-filter" class="filter-select">
-                                        <option value="">Alle Hersteller</option>
+                                        <option value="" data-translate-key="manufacturer.sidebar.options.manufacturer.all">Alle Hersteller</option>
                                     </select>
                                     <select id="standard-filter" class="filter-select">
-                                        <option value="">Alle Standards</option>
+                                        <option value="" data-translate-key="manufacturer.sidebar.options.standard.all">Alle Standards</option>
                                     </select>
                                     <select id="vehicle-type-filter" class="filter-select">
-                                        <option value="">Alle Fahrzeugtypen</option>
+                                        <option value="" data-translate-key="manufacturer.sidebar.options.vehicleType.all">Alle Fahrzeugtypen</option>
                                     </select>
+                                </div>
+                                
+                                <div class="view-toggle">
+                                    <button id="toggle-view-btn" class="view-toggle-btn" data-view="grid" title="Zwischen Tabellen- und Kachelansicht wechseln">
+                                        <i class="fas fa-table"></i>
+                                        <span data-translate-key="manufacturer.productDatabase.toggleToTable">Tabellenansicht</span>
+                                    </button>
                                 </div>
                             </div>
                             
                             <!-- Products Table -->
-                            <div class="products-table-container">
-                                <div id="products-loading" class="loading-indicator">
+                            <div id="products-table-container" class="products-table-container">
+                                <div id="products-loading" class="loading-indicator" data-translate-key="manufacturer.productDatabase.loading">
                                     Produkte werden geladen...
                                 </div>
                                 
                                 <table id="products-table" class="products-table" style="display: none;">
                                     <thead>
                                         <tr>
-                                            <th>Hersteller</th>
-                                            <th>Typ</th>
-                                            <th>Standard</th>
-                                            <th>Fahrzeuggewicht (kg)</th>
-                                            <th>Fahrzeugtyp</th>
-                                            <th>Geschwindigkeit (km/h)</th>
-                                            <th>Anprallwinkel (°)</th>
-                                            <th>Penetration (m)</th>
-                                            <th>Trümmerdistanz (m)</th>
-                                            <th>Aktionen</th>
+                                            <th data-translate-key="manufacturer.productDatabase.manufacturer">Hersteller</th>
+                                            <th data-translate-key="manufacturer.productDatabase.type">Typ</th>
+                                            <th data-translate-key="manufacturer.productDatabase.standard">Standard</th>
+                                            <th data-translate-key="manufacturer.productDatabase.vehicleWeight">Fahrzeuggewicht (kg)</th>
+                                            <th data-translate-key="manufacturer.productDatabase.vehicleType">Fahrzeugtyp</th>
+                                            <th data-translate-key="manufacturer.productDatabase.speed">Geschwindigkeit (km/h)</th>
+                                            <th data-translate-key="manufacturer.productDatabase.impactAngle">Anprallwinkel (°)</th>
+                                            <th data-translate-key="manufacturer.productDatabase.penetration">Penetration (m)</th>
+                                            <th data-translate-key="manufacturer.productDatabase.debrisDistance">Trümmerdistanz (m)</th>
+                                            <th data-translate-key="manufacturer.productDatabase.actions">Aktionen</th>
                                         </tr>
                                     </thead>
                                     <tbody id="products-tbody">
@@ -377,7 +372,18 @@
                                     </tbody>
                                 </table>
                                 
-                                <div id="no-products" class="no-products-message" style="display: none;">
+                                <div id="no-products" class="no-products-message" style="display: none;" data-translate-key="manufacturer.productDatabase.noProducts">
+                                    Keine Produkte gefunden
+                                </div>
+                            </div>
+                            
+                            <!-- Products Grid View -->
+                            <div id="products-grid-container" class="products-grid-container" style="display: none;">
+                                <div id="products-grid" class="products-grid">
+                                    <!-- Products will be dynamically loaded here as cards -->
+                                </div>
+                                
+                                <div id="no-products-grid" class="no-products-message" style="display: none;" data-translate-key="manufacturer.productDatabase.noProducts">
                                     Keine Produkte gefunden
                                 </div>
                             </div>
@@ -386,7 +392,7 @@
                             <div id="product-modal" class="product-modal" style="display: none;">
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h3 id="modal-product-name">Produktdetails</h3>
+                                        <h3 id="modal-product-name" data-translate-key="manufacturer.productDatabase.modal.title">Produktdetails</h3>
                                         <button id="close-modal" class="close-modal-btn">
                                             <i class="fas fa-times"></i>
                                         </button>
@@ -394,15 +400,15 @@
                                     <div class="modal-body">
                                         <div class="product-details-grid">
                                             <div class="detail-section">
-                                                <h4>Technische Spezifikationen</h4>
+                                                <h4 data-translate-key="manufacturer.productDatabase.modal.technicalSpecs">Technische Spezifikationen</h4>
                                                 <div id="modal-technical-specs"></div>
                                             </div>
                                             <div class="detail-section">
-                                                <h4>Leistungsdaten</h4>
+                                                <h4 data-translate-key="manufacturer.productDatabase.modal.performanceData">Leistungsdaten</h4>
                                                 <div id="modal-performance-data"></div>
                                             </div>
                                             <div class="detail-section">
-                                                <h4>Zertifizierung</h4>
+                                                <h4 data-translate-key="manufacturer.productDatabase.modal.certification">Zertifizierung</h4>
                                                 <div id="modal-certification"></div>
                                             </div>
                                         </div>
@@ -410,11 +416,11 @@
                                     <div class="modal-footer">
                                         <button id="export-product" class="action-btn">
                                             <i class="fas fa-download"></i>
-                                            <span>Daten exportieren</span>
+                                            <span data-translate-key="manufacturer.productDatabase.modal.exportData">Daten exportieren</span>
                                         </button>
                                         <button id="print-product" class="action-btn">
                                             <i class="fas fa-print"></i>
-                                            <span>Spezifikationen drucken</span>
+                                            <span data-translate-key="manufacturer.productDatabase.modal.printSpecs">Spezifikationen drucken</span>
                                         </button>
                                     </div>
                                 </div>
