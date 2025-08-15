@@ -119,26 +119,27 @@ html, body {
     overflow-x: hidden; 
     max-width: 100vw;
     width: 100%;
-    overflow-y: visible;
+    overflow-y: hidden;
+    height: 100vh;
 }
 
 #app-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100vh;
     max-width: 100vw;
-    max-height: 100%;
+    max-height: 100vh;
     width: 100%;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: hidden;
 }
 
 .content-wrapper {
     display: flex;
     flex-grow: 1;
-    overflow: visible;
+    overflow: hidden;
     max-width: 100vw;
-    max-height: 100%;
+    max-height: calc(100vh - 64px);
     width: 100%;
 }
 
@@ -676,10 +677,11 @@ div.search-marker.leaflet-marker-icon {
     display: flex;
     gap: 0;
     padding: 0;
-    height: calc(100vh - 64px - 60px); /* Fixed height instead of min-height */
+    height: calc(100vh - 64px); /* Only subtract header height */
     max-width: 100vw;
-    max-height: calc(100vh - 64px - 60px);
+    max-height: calc(100vh - 64px);
     overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .manufacturer-sidebar {
@@ -690,7 +692,7 @@ div.search-marker.leaflet-marker-icon {
     border-radius: 12px;
     padding: 16px 16px 24px 16px;
     box-shadow: 0 2px 8px var(--shadow-color);
-    max-height: calc(100vh - 64px - 60px);
+    max-height: calc(100vh - 64px);
     overflow-y: auto !important;
     overflow-x: hidden;
 }
@@ -1339,7 +1341,7 @@ div.search-marker.leaflet-marker-icon {
 }
 
 .manufacturer-main-content .products-grid-container {
-    max-height: calc(100vh - 200px) !important;
+    max-height: calc(100vh - 180px) !important;
     overflow-y: auto !important;
 }
 
