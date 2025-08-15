@@ -165,8 +165,8 @@ const embeddedTranslations = {
             }
         },
         "manufacturer": {
-            "title": "",
-            "subtitle": "",
+            "title": "Herstelleransicht",
+            "subtitle": "Verwalten Sie Ihren Produktkatalog und Kundenanfragen",
             "products": "Produkte",
             "quotations": "Angebote",
             "customers": "Kunden",
@@ -236,17 +236,52 @@ const embeddedTranslations = {
                     }
                 },
                 "productDatabase": {
-                    "technicalSpecs": {
-                        "standard": "Standard",
-                        "vehicleWeight": "Fahrzeuggewicht",
-                        "vehicleType": "Fahrzeugtyp",
-                        "speed": "Geschwindigkeit",
-                        "impactAngle": "Anprallwinkel",
-                        "penetration": "Penetration"
+                    "title": "Produktdatenbank",
+                    "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
+                    "search": "Produktsuche",
+                    "searchPlaceholder": "Produktname, Hersteller, Standard oder Fahrzeugtyp eingeben...",
+                    "filterBy": "Filtern nach",
+                    "manufacturer": "Hersteller",
+                    "type": "Typ",
+                    "standard": "Standard",
+                    "vehicleWeight": "Fahrzeuggewicht (kg)",
+                    "vehicleType": "Fahrzeugtyp",
+                    "speed": "Geschwindigkeit (km/h)",
+                    "impactAngle": "Anprallwinkel (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Trümmerdistanz (m)",
+                    "actions": "Aktionen",
+                    "noProducts": "Keine Produkte gefunden",
+                    "loading": "Produkte werden geladen...",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "viewDetails": "Details anzeigen",
+                    "closeDetails": "Schließen",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken",
+                    "modal": {
+                        "title": "Produktdetails",
+                        "technicalSpecs": "Technische Spezifikationen",
+                        "performanceData": "Leistungsdaten",
+                        "certification": "Zertifizierung",
+                        "exportData": "Daten exportieren",
+                        "printSpecs": "Spezifikationen drucken"
                     },
-                    "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+                    "toggleToGrid": "Kachelansicht",
                     "toggleToTable": "Tabellenansicht",
-                    "toggleToGrid": "Kachelansicht"
+                    "table": {
+                        "manufacturer": "Hersteller",
+                        "type": "Typ",
+                        "standard": "Standard",
+                        "vehicleWeight": "Fahrzeuggewicht (kg)",
+                        "vehicleType": "Fahrzeugtyp",
+                        "speed": "Geschwindigkeit (km/h)",
+                        "impactAngle": "Anprallwinkel (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Trümmerdistanz (m)",
+                        "actions": "Aktionen"
+                    }
                 }
             }
         },
@@ -521,9 +556,64 @@ const embeddedTranslations = {
                         "30days": "Last 30 Days",
                         "90days": "Last 90 Days",
                         "1year": "Last Year"
+                    },
+                    "manufacturer": {
+                        "all": "All Manufacturers"
+                    },
+                    "standard": {
+                        "all": "All Standards"
+                    },
+                    "vehicleType": {
+                        "all": "All Vehicle Types"
                     }
                 },
                 "productDatabase": {
+                    "title": "Product Database",
+                    "subtitle": "Technical data and specifications of all available products",
+                    "search": "Product Search",
+                    "searchPlaceholder": "Enter product name, manufacturer, standard or vehicle type...",
+                    "filterBy": "Filter by",
+                    "manufacturer": "Manufacturer",
+                    "type": "Type",
+                    "standard": "Standard",
+                    "vehicleWeight": "Vehicle Weight (kg)",
+                    "vehicleType": "Vehicle Type",
+                    "speed": "Speed (km/h)",
+                    "impactAngle": "Impact Angle (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Debris Distance (m)",
+                    "actions": "Actions",
+                    "noProducts": "No products found",
+                    "loading": "Loading products...",
+                    "technicalSpecs": "Technical Specifications",
+                    "performanceData": "Performance Data",
+                    "certification": "Certification",
+                    "viewDetails": "View Details",
+                    "closeDetails": "Close",
+                    "exportData": "Export Data",
+                    "printSpecs": "Print Specifications",
+                    "modal": {
+                        "title": "Product Details",
+                        "technicalSpecs": "Technical Specifications",
+                        "performanceData": "Performance Data",
+                        "certification": "Certification",
+                        "exportData": "Export Data",
+                        "printSpecs": "Print Specifications"
+                    },
+                    "toggleToGrid": "Grid View",
+                    "toggleToTable": "Table View",
+                    "table": {
+                        "manufacturer": "Manufacturer",
+                        "type": "Type",
+                        "standard": "Standard",
+                        "vehicleWeight": "Vehicle Weight (kg)",
+                        "vehicleType": "Vehicle Type",
+                        "speed": "Speed (km/h)",
+                        "impactAngle": "Impact Angle (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Debris Distance (m)",
+                        "actions": "Actions"
+                    },
                     "technicalSpecs": {
                         "standard": "Standard",
                         "vehicleWeight": "Vehicle Weight",
@@ -531,10 +621,7 @@ const embeddedTranslations = {
                         "speed": "Speed",
                         "impactAngle": "Impact Angle",
                         "penetration": "Penetration"
-                    },
-                    "searchPlaceholder": "Enter product name, manufacturer or type...",
-                    "toggleToTable": "Table View",
-                    "toggleToGrid": "Grid View"
+                    }
                 }
             }
         },
@@ -1187,27 +1274,27 @@ function displayProductsGrid(products: any[]) {
                 </div>
                 <div class="product-card-specs">
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.standard')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.standard')}</div>
                         <div class="product-card-spec-value">${product.standard || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleWeight')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.vehicleWeight')}</div>
                         <div class="product-card-spec-value">${product.vehicleWeight || 'N/A'} kg</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleType')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.vehicleType')}</div>
                         <div class="product-card-spec-value">${product.vehicleType || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.speed')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.speed')}</div>
                         <div class="product-card-spec-value">${product.speed || 'N/A'} km/h</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.impactAngle')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.impactAngle')}</div>
                         <div class="product-card-spec-value">${product.impactAngle || 'N/A'}°</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.penetration')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.technicalSpecs.penetration')}</div>
                         <div class="product-card-spec-value">${product.penetration || 'N/A'} m</div>
                     </div>
                 </div>
@@ -1407,7 +1494,7 @@ function setView(view: 'table' | 'grid') {
         gridContainer.style.display = 'block';
         
         // Update button to show "back to table"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToTable');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToTable');
         if (buttonIcon) buttonIcon.className = 'fas fa-table';
     } else {
         console.log('Switching to table view');
@@ -1423,7 +1510,7 @@ function setView(view: 'table' | 'grid') {
         }
         
         // Update button to show "back to grid"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToGrid');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToGrid');
         if (buttonIcon) buttonIcon.className = 'fas fa-th-large';
         
         console.log('Table view activated, table should be visible now');
@@ -1649,6 +1736,11 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     // Debug: Log which translations source is being used
     console.log(`Translation request for key: ${key}, language: ${currentLanguage}`);
     console.log(`Translations source:`, translations === embeddedTranslations ? 'embedded' : 'external');
+    
+    // Debug: Log the structure of translations
+    console.log('Current translations structure:', translations);
+    console.log('Embedded translations structure:', embeddedTranslations);
+    
     // Ensure we have translations available
     if (!translations || !translations[currentLanguage]) {
         console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
@@ -1656,16 +1748,19 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     }
     
     let text = getProperty(translations[currentLanguage as keyof typeof translations], key);
+    console.log(`Text from main translations for key '${key}':`, text);
     
     // If still no text found, try embedded translations
     if (typeof text !== 'string') {
         console.warn(`Translation key not found in main translations for language '${currentLanguage}': ${key}`);
         text = getProperty(embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations], key);
+        console.log(`Text from embedded translations for key '${key}':`, text);
         
         if (typeof text !== 'string') {
             console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
             // Return a more user-friendly fallback instead of the raw key
             const fallbackText = getFallbackText(key);
+            console.log(`Fallback text for key '${key}':`, fallbackText);
             return fallbackText || key;
         }
     }
@@ -1676,7 +1771,7 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
         }
     }
     
-    console.log(`Translation result for ${key}:`, text);
+    console.log(`Final translation result for ${key}:`, text);
     return text;
 }
 
@@ -1859,51 +1954,19 @@ async function loadTranslations() {
             '../translations.json'
         ];
         
+        // Translation file loading disabled to avoid conflicts
+        console.log('Translation file loading disabled to avoid conflicts');
         let loaded = false;
-        for (const path of paths) {
-            try {
-                console.log(`Trying to load translations from: ${path}`);
-                const response = await fetch(path);
-                if (response.ok) {
-                    translations = await response.json();
-                    console.log(`Translations loaded successfully from: ${path}`);
-                    loaded = true;
-                    break;
-                }
-            } catch (pathError) {
-                console.log(`Failed to load from ${path}:`, pathError);
-            }
-        }
-        
-        if (!loaded) {
-            throw new Error('All translation file paths failed');
-        }
     } catch (error) {
         console.error("Could not load translations from any file path:", error);
         // Simplified fallback
-        try {
-            const fallbackResponse = await fetch('/translations.json');
-            if (fallbackResponse.ok) {
-                translations = await fallbackResponse.json();
-            }
-        } catch (fallbackError) {
-            console.error("Fallback translation loading also failed:", fallbackError);
-        }
+        // Fallback translation loading disabled to avoid conflicts
+        console.log('Fallback translation loading disabled to avoid conflicts');
     }
     
-    // If no translations loaded from file, use embedded translations
-    if (!translations.de && !translations.en) {
-        console.log('No translations loaded from file, using embedded translations');
-        translations = embeddedTranslations;
-    } else {
-        console.log('Translations loaded successfully from file');
-    }
-    
-    // Ensure we always have translations available
-    if (!translations.de || !translations.en) {
-        console.warn('Incomplete translations, falling back to embedded');
-        translations = embeddedTranslations;
-    }
+    // Always use embedded translations to avoid conflicts
+    console.log('Using embedded translations to avoid conflicts');
+    translations = embeddedTranslations;
 }
 
 /**
