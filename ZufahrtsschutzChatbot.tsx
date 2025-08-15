@@ -77,7 +77,7 @@ function t(key: string): string {
     de: {
       "ai.chatbot.title": "Zufahrtsschutz-Assistent",
       "ai.chatbot.welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
-      "ai.chatbot.assetQuestion": "Welche Schutzgüter möchten Sie absichern? Hinweis: Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
+      "ai.chatbot.assetQuestion": "Welche Schutzgüter möchten Sie absichern?",
       "ai.chatbot.inputPlaceholder": "Antwort eingeben...",
       "ai.chatbot.sendButton": "Senden",
       "ai.chatbot.stakeholderQuestion": "Wer sind die relevanten Stakeholder (Behörden, Veranstalter, Betreiber)?",
@@ -111,7 +111,7 @@ function t(key: string): string {
     en: {
       "ai.chatbot.title": "Access Protection Assistant",
       "ai.chatbot.welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
-      "ai.chatbot.assetQuestion": "Which protective assets would you like to secure? Note: Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
+      "ai.chatbot.assetQuestion": "Which protective assets would you like to secure?",
       "ai.chatbot.inputPlaceholder": "Enter answer...",
       "ai.chatbot.sendButton": "Send",
       "ai.chatbot.stakeholderQuestion": "Who are the relevant stakeholders (authorities, organizers, operators)?",
