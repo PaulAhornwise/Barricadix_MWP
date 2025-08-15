@@ -613,6 +613,17 @@ const embeddedTranslations = {
                         "penetration": "Penetration (m)",
                         "debrisDistance": "Debris Distance (m)",
                         "actions": "Actions"
+<<<<<<< HEAD
+=======
+                    },
+                    "technicalSpecs": {
+                        "standard": "Standard",
+                        "vehicleWeight": "Vehicle Weight",
+                        "vehicleType": "Vehicle Type",
+                        "speed": "Speed",
+                        "impactAngle": "Impact Angle",
+                        "penetration": "Penetration"
+>>>>>>> fef6196dc0e7d721b3a14649af48a779a58ae2cb
                     }
                 }
             }
