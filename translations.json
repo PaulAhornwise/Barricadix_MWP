@@ -500,6 +500,7 @@
       "securityAreaLabel": "Security Area",
       "securityArea": "Security Area"
     },
+
     "manufacturer": {
       "title": "Manufacturer View",
       "subtitle": "Manage your product catalog and customer inquiries",
@@ -621,6 +622,7 @@
         }
       }
     },
+
     "report": {
       "generating": "Generating report...",
       "mainTitle": "Reduced Initial Report – Vehicle Access Protection Concept for {locationName}",
@@ -785,9 +787,11 @@
           "certification": "Certification",
           "exportData": "Export Data",
           "printSpecs": "Print Specifications"
+
         },
         "toggleToGrid": "Grid View",
         "toggleToTable": "Table View"
+
       }
     }
   }
