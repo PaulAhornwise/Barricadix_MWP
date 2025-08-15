@@ -4118,6 +4118,7 @@ function translateChatbot() {
     console.log('Chatbot translation completed');
 }
 
+<<<<<<< HEAD
 // ===============================================
 // APPLICATION INITIALIZATION
 // ===============================================
@@ -4156,3 +4157,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
 });
 
+=======
+>>>>>>> 88652dcdb714a92efa98a13e7692e2b04a492623
