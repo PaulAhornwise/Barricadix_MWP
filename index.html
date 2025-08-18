@@ -24,16 +24,90 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-<link rel="stylesheet" href="/index.css">
+    <link rel="stylesheet" href="./index.css">
 </head>
 <body>
-    <div id="app-container">
+    <!-- =============================================== -->
+    <!-- WELCOME / AUTHENTICATION PAGE -->
+    <!-- =============================================== -->
+    <div id="welcome-screen" class="welcome-screen">
+        <div class="welcome-container">
+            <div class="welcome-header">
+                <img src="./Logo_BarricadiX_White.svg" class="welcome-logo" alt="BarricadiX Logo" />
+                <h1 class="welcome-title">Willkommen bei BarricadiX</h1>
+                <p class="welcome-subtitle">Professionelle Lösungen für Hostile Vehicle Mitigation</p>
+            </div>
+            
+            <div class="welcome-content">
+                <div class="auth-card">
+                    <div class="auth-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h2 class="auth-title">Sicherer Zugang</h2>
+                    <p class="auth-description">
+                        Bitte geben Sie Ihr Passwort ein, um auf das HVM-Dashboard zuzugreifen.
+                    </p>
+                    
+                    <form id="auth-form" class="auth-form">
+                        <div class="input-group">
+                            <label for="password-input" class="input-label">
+                                <i class="fas fa-lock"></i>
+                                Passwort
+                            </label>
+                            <input 
+                                type="password" 
+                                id="password-input" 
+                                class="password-input" 
+                                placeholder="Passwort eingeben..."
+                                required
+                            />
+                        </div>
+                        
+                        <button type="submit" class="auth-button" id="auth-submit">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Anmelden
+                        </button>
+                        
+                        <div id="auth-error" class="auth-error" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Falsches Passwort. Bitte versuchen Sie es erneut.
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="welcome-features">
+                    <div class="feature-item">
+                        <i class="fas fa-map-marked-alt"></i>
+                        <span>Interaktive Kartenplanung</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-shield-virus"></i>
+                        <span>Bedrohungsanalyse</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Automatische Berichtserstellung</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-industry"></i>
+                        <span>Herstellerverwaltung</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="welcome-footer">
+                <p>&copy; 2024 BarricadiX. Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none;">
         <!-- =============================================== -->
         <!-- HEADER -->
         <!-- =============================================== -->
         <header class="app-header">
             <div class="logo" aria-label="BarricadiX">
-                <img src="/Logo_BarricadiX_White.svg" class="logo-img" alt="BarricadiX Logo" />
+                <img src="./Logo_BarricadiX_White.svg" class="logo-img" alt="BarricadiX Logo" />
             </div>
             <div class="view-selector">
                 <button id="planning-view-btn" class="view-btn active" data-view="planning" data-translate-key="header.planning">Planung</button>
@@ -150,7 +224,7 @@
                     <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
                      <div class="form-group">
                         <label for="asset-to-protect" data-translate-key="sidebar.assetToProtect">Was geschützt werden soll</label>
-                        <input type="text" id="asset-to-protect" placeholder="Bitte eintragen">
+                        <input type="text" id="asset-to-protect" data-translate-key-placeholder="placeholders.assetToProtect" placeholder="Bitte eintragen">
                     </div>
                     <div class="form-group slider-group">
                         <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
@@ -320,7 +394,7 @@
                             <!-- Search and Filter Bar -->
                             <div class="search-filter-bar">
                                 <div class="search-box">
-                                    <input type="text" id="product-search" data-translate-key-placeholder="manufacturer.productDatabase.searchPlaceholder" placeholder="Produktname, Hersteller oder Typ eingeben...">
+                                    <input type="text" id="product-search" data-translate-key-placeholder="manufacturer.sidebar.productDatabase.searchPlaceholder" placeholder="Produktname, Hersteller oder Typ eingeben...">
                                     <button id="search-btn" class="search-btn">
                                         <i class="fas fa-search"></i>
                                     </button>
@@ -348,23 +422,23 @@
                             
                             <!-- Products Table -->
                             <div id="products-table-container" class="products-table-container">
-                                <div id="products-loading" class="loading-indicator" data-translate-key="manufacturer.productDatabase.loading">
+                                <div id="products-loading" class="loading-indicator" data-translate-key="manufacturer.sidebar.productDatabase.loading">
                                     Produkte werden geladen...
                                 </div>
                                 
                                 <table id="products-table" class="products-table" style="display: none;">
                                     <thead>
                                         <tr>
-                                            <th data-translate-key="manufacturer.productDatabase.manufacturer">Hersteller</th>
-                                            <th data-translate-key="manufacturer.productDatabase.type">Typ</th>
-                                            <th data-translate-key="manufacturer.productDatabase.standard">Standard</th>
-                                            <th data-translate-key="manufacturer.productDatabase.vehicleWeight">Fahrzeuggewicht (kg)</th>
-                                            <th data-translate-key="manufacturer.productDatabase.vehicleType">Fahrzeugtyp</th>
-                                            <th data-translate-key="manufacturer.productDatabase.speed">Geschwindigkeit (km/h)</th>
-                                            <th data-translate-key="manufacturer.productDatabase.impactAngle">Anprallwinkel (°)</th>
-                                            <th data-translate-key="manufacturer.productDatabase.penetration">Penetration (m)</th>
-                                            <th data-translate-key="manufacturer.productDatabase.debrisDistance">Trümmerdistanz (m)</th>
-                                            <th data-translate-key="manufacturer.productDatabase.actions">Aktionen</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.manufacturer">Hersteller</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.type">Typ</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.standard">Standard</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.vehicleWeight">Fahrzeuggewicht (kg)</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.vehicleType">Fahrzeugtyp</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.speed">Geschwindigkeit (km/h)</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.impactAngle">Anprallwinkel (°)</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.penetration">Penetration (m)</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.debrisDistance">Trümmerdistanz (m)</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.actions">Aktionen</th>
                                         </tr>
                                     </thead>
                                     <tbody id="products-tbody">
@@ -372,7 +446,7 @@
                                     </tbody>
                                 </table>
                                 
-                                <div id="no-products" class="no-products-message" style="display: none;" data-translate-key="manufacturer.productDatabase.noProducts">
+                                <div id="no-products" class="no-products-message" style="display: none;" data-translate-key="manufacturer.sidebar.productDatabase.noProducts">
                                     Keine Produkte gefunden
                                 </div>
                             </div>
@@ -383,7 +457,7 @@
                                     <!-- Products will be dynamically loaded here as cards -->
                                 </div>
                                 
-                                <div id="no-products-grid" class="no-products-message" style="display: none;" data-translate-key="manufacturer.productDatabase.noProducts">
+                                <div id="no-products-grid" class="no-products-message" style="display: none;" data-translate-key="manufacturer.sidebar.productDatabase.noProducts">
                                     Keine Produkte gefunden
                                 </div>
                             </div>
@@ -434,6 +508,6 @@
     <div id="tooltip" class="tooltip" role="tooltip"></div>
     <!-- Application Logic -->
     
-<script type="module" src="/index.tsx"></script>
+<script type="module" src="./index.tsx"></script>
 </body>
 </html>

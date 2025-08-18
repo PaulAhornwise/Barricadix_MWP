@@ -1,3 +1,241 @@
+/* =============================================== */
+/* WELCOME / AUTHENTICATION PAGE */
+/* =============================================== */
+.welcome-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #0b2f48 0%, #1e3a52 50%, #2a4a65 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    overflow: auto;
+}
+
+.welcome-container {
+    max-width: 900px;
+    width: 90%;
+    padding: 40px;
+    text-align: center;
+    color: #ffffff;
+}
+
+.welcome-header {
+    margin-bottom: 40px;
+}
+
+.welcome-logo {
+    height: 80px;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+.welcome-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    background: linear-gradient(45deg, #ffffff, #e0f2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.welcome-subtitle {
+    font-size: 1.2rem;
+    color: #b0d4f1;
+    margin: 0;
+}
+
+.welcome-content {
+    display: flex;
+    gap: 60px;
+    align-items: flex-start;
+    justify-content: center;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+}
+
+.auth-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 40px;
+    min-width: 320px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.auth-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+}
+
+.auth-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #ffffff;
+}
+
+.auth-description {
+    color: #b0d4f1;
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.auth-form {
+    text-align: left;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #ffffff;
+}
+
+.password-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 1rem;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+.password-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.password-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.auth-button {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+.auth-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+}
+
+.auth-button:active {
+    transform: translateY(0);
+}
+
+.auth-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fecaca;
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.welcome-features {
+    min-width: 300px;
+}
+
+.welcome-features .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0f2fe;
+}
+
+.welcome-features .feature-item:last-child {
+    border-bottom: none;
+}
+
+.welcome-features .feature-item i {
+    width: 40px;
+    height: 40px;
+    background: rgba(59, 130, 246, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #60a5fa;
+    font-size: 1.2rem;
+}
+
+.welcome-footer {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+}
+
+/* Responsive Design für Welcome Page */
+@media (max-width: 768px) {
+    .welcome-content {
+        flex-direction: column;
+        gap: 30px;
+    }
+    
+    .welcome-title {
+        font-size: 2rem;
+    }
+    
+    .auth-card {
+        min-width: auto;
+        padding: 30px;
+    }
+    
+    .welcome-container {
+        padding: 20px;
+    }
+}
+
 #chatbot-react-root.map-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1200; pointer-events: none; }
 #chatbot-react-root [aria-label="Zufahrtsschutz-Assistent öffnen"] {
   position: absolute; bottom: 20px; right: 80px; width: 56px; height: 56px;
@@ -119,26 +357,27 @@ html, body {
     overflow-x: hidden; 
     max-width: 100vw;
     width: 100%;
-    overflow-y: visible;
+    overflow-y: hidden;
+    height: 100vh;
 }
 
 #app-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100vh;
     max-width: 100vw;
-    max-height: 100%;
+    max-height: 100vh;
     width: 100%;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: hidden;
 }
 
 .content-wrapper {
     display: flex;
     flex-grow: 1;
-    overflow: visible;
+    overflow: hidden;
     max-width: 100vw;
-    max-height: 100%;
+    max-height: calc(100vh - 64px);
     width: 100%;
 }
 
@@ -676,10 +915,11 @@ div.search-marker.leaflet-marker-icon {
     display: flex;
     gap: 0;
     padding: 0;
-    height: calc(100vh - 64px - 60px); /* Fixed height instead of min-height */
+    height: calc(100vh - 64px); /* Only subtract header height */
     max-width: 100vw;
-    max-height: calc(100vh - 64px - 60px);
+    max-height: calc(100vh - 64px);
     overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .manufacturer-sidebar {
@@ -690,7 +930,7 @@ div.search-marker.leaflet-marker-icon {
     border-radius: 12px;
     padding: 16px 16px 24px 16px;
     box-shadow: 0 2px 8px var(--shadow-color);
-    max-height: calc(100vh - 64px - 60px);
+    max-height: calc(100vh - 64px);
     overflow-y: auto !important;
     overflow-x: hidden;
 }
@@ -1339,7 +1579,7 @@ div.search-marker.leaflet-marker-icon {
 }
 
 .manufacturer-main-content .products-grid-container {
-    max-height: calc(100vh - 200px) !important;
+    max-height: calc(100vh - 180px) !important;
     overflow-y: auto !important;
 }
 
