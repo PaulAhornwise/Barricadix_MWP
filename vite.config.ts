@@ -10,7 +10,14 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'docs',
       emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+        },
+      },
     },
+    publicDir: 'public',
+    assetsInclude: ['**/*.json'],
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
