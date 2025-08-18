@@ -4117,7 +4117,6 @@ function translateChatbot() {
     
     console.log('Chatbot translation completed');
 }
-
 // ===============================================
 // APPLICATION INITIALIZATION
 // ===============================================
@@ -4155,4 +4154,3 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing authentication...');
     initAuth();
 });
-
