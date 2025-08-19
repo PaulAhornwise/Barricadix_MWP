@@ -29,6 +29,191 @@ declare const L: any;
 declare const jsPDF: any;
 declare const html2canvas: any;
 
+// ===============================================
+// AUTHENTICATION SYSTEM
+// ===============================================
+
+const CORRECT_PASSWORD = '1919';
+const AUTH_SESSION_KEY = 'barricadix_authenticated';
+
+/**
+ * Initialize authentication system
+ */
+function initAuth() {
+    // Always show welcome screen first (for testing purposes)
+    // Check if user is already authenticated
+    // if (sessionStorage.getItem(AUTH_SESSION_KEY) === 'true') {
+    //     showMainApp();
+    //     return;
+    // }
+    
+    // Show welcome screen and set up auth form
+    showWelcomeScreen();
+    setupAuthForm();
+}
+
+/**
+ * Show the welcome screen
+ */
+function showWelcomeScreen() {
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const appContainer = document.getElementById('app-container');
+    
+    if (welcomeScreen && appContainer) {
+        welcomeScreen.style.display = 'flex';
+        appContainer.style.display = 'none';
+    }
+}
+
+/**
+ * Show the main application
+ */
+function showMainApp() {
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const appContainer = document.getElementById('app-container');
+    
+    if (welcomeScreen && appContainer) {
+        welcomeScreen.style.display = 'none';
+        appContainer.style.display = 'flex';
+        
+        // Initialize the main app only after authentication
+        initializeApp();
+        
+        // Force map to recalculate size after showing main app
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('Map size invalidated after showing main app');
+            }
+        }, 200);
+        
+        // Additional invalidation for safety
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('Map size invalidated - final check');
+            }
+        }, 500);
+    }
+}
+
+/**
+ * Set up authentication form event handlers
+ */
+function setupAuthForm() {
+    const authForm = document.getElementById('auth-form');
+    const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+    const authError = document.getElementById('auth-error');
+    const authButton = document.getElementById('auth-submit');
+    
+    if (!authForm || !passwordInput || !authError || !authButton) {
+        console.error('Auth form elements not found');
+        return;
+    }
+    
+    // Handle form submission
+    authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        attemptLogin(passwordInput.value);
+    });
+    
+    // Handle Enter key in password field
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            attemptLogin(passwordInput.value);
+        }
+    });
+    
+    // Clear error when user starts typing
+    passwordInput.addEventListener('input', () => {
+        hideAuthError();
+    });
+    
+    // Focus password input
+    passwordInput.focus();
+}
+
+/**
+ * Attempt to log in with provided password
+ */
+function attemptLogin(password: string) {
+    const authError = document.getElementById('auth-error');
+    const authButton = document.getElementById('auth-submit');
+    const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+    
+    if (!authError || !authButton || !passwordInput) return;
+    
+    // Disable form during authentication
+    authButton.style.opacity = '0.7';
+    authButton.style.pointerEvents = 'none';
+    passwordInput.disabled = true;
+    
+    // Simulate slight delay for better UX
+    setTimeout(() => {
+        if (password === CORRECT_PASSWORD) {
+            // Successful authentication
+            sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+            
+            // Add success animation
+            authButton.innerHTML = '<i class="fas fa-check"></i> Erfolgreich!';
+            authButton.style.background = 'linear-gradient(45deg, #10b981, #059669)';
+            
+            setTimeout(() => {
+                showMainApp();
+            }, 800);
+        } else {
+            // Failed authentication
+            showAuthError();
+            
+            // Re-enable form
+            authButton.style.opacity = '1';
+            authButton.style.pointerEvents = 'auto';
+            passwordInput.disabled = false;
+            passwordInput.value = '';
+            passwordInput.focus();
+            
+            // Reset button text
+            authButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Anmelden';
+        }
+    }, 500);
+}
+
+/**
+ * Show authentication error
+ */
+function showAuthError() {
+    const authError = document.getElementById('auth-error');
+    if (authError) {
+        authError.style.display = 'flex';
+        setTimeout(() => {
+            authError.style.display = 'none';
+        }, 3000);
+    }
+}
+
+/**
+ * Hide authentication error
+ */
+function hideAuthError() {
+    const authError = document.getElementById('auth-error');
+    if (authError) {
+        authError.style.display = 'none';
+    }
+}
+
+/**
+ * Logout function (can be called from anywhere in the app)
+ */
+function logout() {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    showWelcomeScreen();
+    setupAuthForm();
+}
+
+// Make logout available globally
+(window as any).logout = logout;
+
 // App state
 let map: any; // Module-scoped map object
 let tileLayer: any; // Module-scoped tile layer object
@@ -148,25 +333,41 @@ const embeddedTranslations = {
             "chatbot": {
                 "title": "Zufahrtsschutz-Assistent",
                 "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
-                "assetQuestion": "Welche Schutzgüter möchten Sie absichern? Hinweis: Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
+                "assetQuestion": "Welche Schutzgüter möchten Sie absichern?",
+                "assetOptions": "Menschenmenge,Gebäude,KRITIS-Prozess,Veranstaltungsfläche",
+                "assetPlaceholder": "z. B. Menschenmenge, Bühne",
+                "assetQuestionInfo": "Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
                 "inputPlaceholder": "Antwort eingeben...",
                 "sendButton": "Senden",
                 "stakeholderQuestion": "Wer sind die relevanten Stakeholder (Behörden, Veranstalter, Betreiber)?",
+                "stakeholderOptions": "Behörden,Veranstalter,Betreiber",
                 "restRiskQuestion": "Welches akzeptable Restrisiko gilt?",
+                "restRiskOptions": "niedrig,mittel,hoch",
+                "restRiskQuestionInfo": "Steuert Schutzklasse/Sicherungsgrad (DIN SPEC 91414-2)",
                 "operationalQuestion": "Betriebsanforderungen (mehrfach wählbar)",
+                "operationalOptions": "Feuerwehrzufahrt,Fluchtwege,Verkehrssicherheit,Betriebssicherheit",
                 "threatQuestion": "Welche Art fahrzeuggestützter Bedrohung ist zu erwarten?",
+                "threatOptions": "intentional,unbeabsichtigt,beides",
                 "vehicleTypesQuestion": "Welche Fahrzeugtypen sind relevant?",
+                "vehicleOptions": "PKW,Transporter,LKW,Bus",
                 "accessCorridorsQuestion": "Wo könnten Fahrzeuge eindringen? (Karte markieren oder beschreiben)",
+                "accessCorridorsPlaceholder": "Polyline/Polygon auswählen oder kurz beschreiben",
                 "speedQuestion": "Maximale Zufahrtsgeschwindigkeit (km/h)",
+                "speedQuestionInfo": "Pflichtparameter für FSB-Performance (ISO 22343-2/-1)",
                 "angleQuestion": "Wahrscheinlicher Anprallwinkel (°)",
+                "angleQuestionInfo": "Pflichtparameter für FSB-Performance (ISO 22343-2/-1)",
                 "groundQuestion": "Untergrund/Fundamente am Standort",
+                "groundOptions": "Asphalt,Beton,Pflaster,Erde,Unbekannt",
                 "riskMatrixQuestion": "Risikobewertung: Eintrittswahrscheinlichkeit & Schadensausmaß",
+                "riskMatrixOptions": "EW:niedrig|SA:gering,EW:niedrig|SA:mittel,EW:mittel|SA:mittel,EW:hoch|SA:schwer",
+                "riskMatrixQuestionInfo": "Erzeugt Sicherungsgrad & Schutzklasse (DIN SPEC 91414-2)",
+                "infoPrefix": "Hinweis: ",
                 "completionMessage": "Danke! Alle erforderlichen Angaben sind vorhanden. Möchten Sie den normkonformen PDF-Plan erzeugen?"
             }
         },
         "manufacturer": {
-            "title": "",
-            "subtitle": "",
+            "title": "Herstelleransicht",
+            "subtitle": "Verwalten Sie Ihren Produktkatalog und Kundenanfragen",
             "products": "Produkte",
             "quotations": "Angebote",
             "customers": "Kunden",
@@ -236,19 +437,58 @@ const embeddedTranslations = {
                     }
                 },
                 "productDatabase": {
-                    "technicalSpecs": {
-                        "standard": "Standard",
-                        "vehicleWeight": "Fahrzeuggewicht",
-                        "vehicleType": "Fahrzeugtyp",
-                        "speed": "Geschwindigkeit",
-                        "impactAngle": "Anprallwinkel",
-                        "penetration": "Penetration"
+                    "title": "Produktdatenbank",
+                    "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
+                    "search": "Produktsuche",
+                    "searchPlaceholder": "Produktname, Hersteller, Standard oder Fahrzeugtyp eingeben...",
+                    "filterBy": "Filtern nach",
+                    "manufacturer": "Hersteller",
+                    "type": "Typ",
+                    "standard": "Standard",
+                    "vehicleWeight": "Fahrzeuggewicht (kg)",
+                    "vehicleType": "Fahrzeugtyp",
+                    "speed": "Geschwindigkeit (km/h)",
+                    "impactAngle": "Anprallwinkel (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Trümmerdistanz (m)",
+                    "actions": "Aktionen",
+                    "noProducts": "Keine Produkte gefunden",
+                    "loading": "Produkte werden geladen...",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "viewDetails": "Details anzeigen",
+                    "closeDetails": "Schließen",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken",
+                    "modal": {
+                        "title": "Produktdetails",
+                        "technicalSpecs": "Technische Spezifikationen",
+                        "performanceData": "Leistungsdaten",
+                        "certification": "Zertifizierung",
+                        "exportData": "Daten exportieren",
+                        "printSpecs": "Spezifikationen drucken"
                     },
-                    "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+                    "toggleToGrid": "Kachelansicht",
                     "toggleToTable": "Tabellenansicht",
-                    "toggleToGrid": "Kachelansicht"
+                    "table": {
+                        "manufacturer": "Hersteller",
+                        "type": "Typ",
+                        "standard": "Standard",
+                        "vehicleWeight": "Fahrzeuggewicht (kg)",
+                        "vehicleType": "Fahrzeugtyp",
+                        "speed": "Geschwindigkeit (km/h)",
+                        "impactAngle": "Anprallwinkel (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Trümmerdistanz (m)",
+                        "actions": "Aktionen"
+                    }
                 }
             }
+        },
+        "tooltips": {
+            "securityRisk": "Informationen zum Sicherheitsrisiko.",
+            "productClass": "Informationen zur empfohlenen Produktklasse."
         },
         "report": {
             "mainTitle": "Risikobewertung für Zufahrtsschutz",
@@ -335,6 +575,9 @@ const embeddedTranslations = {
             "reset": "Zurücksetzen",
             "securityAreaLabel": "Sicherheitsbereich",
             "analyzeAccess": "Zugang analysieren"
+        },
+        "placeholders": {
+            "assetToProtect": "Bitte eintragen"
         },
         "alerts": {
             "noPolygon": "Bitte zeichnen Sie zuerst einen Sicherheitsbereich auf der Karte.",
@@ -445,19 +688,35 @@ const embeddedTranslations = {
             "chatbot": {
                 "title": "Access Protection Assistant",
                 "welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
-                "assetQuestion": "Which protective assets would you like to secure? Note: Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
+                "assetQuestion": "Which protective assets would you like to secure?",
+                "assetOptions": "Crowd,Building,KRITIS Process,Event Area",
+                "assetPlaceholder": "e.g. Crowd, Stage",
+                "assetQuestionInfo": "Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
                 "inputPlaceholder": "Enter answer...",
                 "sendButton": "Send",
                 "stakeholderQuestion": "Who are the relevant stakeholders (authorities, organizers, operators)?",
+                "stakeholderOptions": "Authorities,Organizers,Operators",
                 "restRiskQuestion": "What acceptable residual risk applies?",
+                "restRiskOptions": "low,medium,high",
+                "restRiskQuestionInfo": "Controls protection class/security level (DIN SPEC 91414-2)",
                 "operationalQuestion": "Operational requirements (multiple choice)",
+                "operationalOptions": "Fire brigade access,Escape routes,Traffic safety,Operational safety",
                 "threatQuestion": "What type of vehicle-based threat is expected?",
+                "threatOptions": "intentional,unintentional,both",
                 "vehicleTypesQuestion": "Which vehicle types are relevant?",
+                "vehicleOptions": "Car,Van,Truck,Bus",
                 "accessCorridorsQuestion": "Where could vehicles penetrate? (Mark on map or describe)",
+                "accessCorridorsPlaceholder": "Select polyline/polygon or describe briefly",
                 "speedQuestion": "Maximum access speed (km/h)",
+                "speedQuestionInfo": "Mandatory parameter for FSB performance (ISO 22343-2/-1)",
                 "angleQuestion": "Probable impact angle (°)",
+                "angleQuestionInfo": "Mandatory parameter for FSB performance (ISO 22343-2/-1)",
                 "groundQuestion": "Ground/foundations at the site",
+                "groundOptions": "Asphalt,Concrete,Paving,Earth,Unknown",
                 "riskMatrixQuestion": "Risk assessment: probability of occurrence & extent of damage",
+                "riskMatrixOptions": "Prob:low|Damage:minor,Prob:low|Damage:medium,Prob:medium|Damage:medium,Prob:high|Damage:severe",
+                "riskMatrixQuestionInfo": "Generates security level & protection class (DIN SPEC 91414-2)",
+                "infoPrefix": "Note: ",
                 "completionMessage": "Thank you! All required information is available. Would you like to generate the standards-compliant PDF plan?"
             }
         },
@@ -521,22 +780,70 @@ const embeddedTranslations = {
                         "30days": "Last 30 Days",
                         "90days": "Last 90 Days",
                         "1year": "Last Year"
+                    },
+                    "manufacturer": {
+                        "all": "All Manufacturers"
+                    },
+                    "standard": {
+                        "all": "All Standards"
+                    },
+                    "vehicleType": {
+                        "all": "All Vehicle Types"
                     }
                 },
                 "productDatabase": {
-                    "technicalSpecs": {
-                        "standard": "Standard",
-                        "vehicleWeight": "Vehicle Weight",
-                        "vehicleType": "Vehicle Type",
-                        "speed": "Speed",
-                        "impactAngle": "Impact Angle",
-                        "penetration": "Penetration"
+                    "title": "Product Database",
+                    "subtitle": "Technical data and specifications of all available products",
+                    "search": "Product Search",
+                    "searchPlaceholder": "Enter product name, manufacturer, standard or vehicle type...",
+                    "filterBy": "Filter by",
+                    "manufacturer": "Manufacturer",
+                    "type": "Type",
+                    "standard": "Standard",
+                    "vehicleWeight": "Vehicle Weight (kg)",
+                    "vehicleType": "Vehicle Type",
+                    "speed": "Speed (km/h)",
+                    "impactAngle": "Impact Angle (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Debris Distance (m)",
+                    "actions": "Actions",
+                    "noProducts": "No products found",
+                    "loading": "Loading products...",
+                    "technicalSpecs": "Technical Specifications",
+                    "performanceData": "Performance Data",
+                    "certification": "Certification",
+                    "viewDetails": "View Details",
+                    "closeDetails": "Close",
+                    "exportData": "Export Data",
+                    "printSpecs": "Print Specifications",
+                    "modal": {
+                        "title": "Product Details",
+                        "technicalSpecs": "Technical Specifications",
+                        "performanceData": "Performance Data",
+                        "certification": "Certification",
+                        "exportData": "Export Data",
+                        "printSpecs": "Print Specifications"
                     },
-                    "searchPlaceholder": "Enter product name, manufacturer or type...",
+                    "toggleToGrid": "Grid View",
                     "toggleToTable": "Table View",
-                    "toggleToGrid": "Grid View"
+                    "table": {
+                        "manufacturer": "Manufacturer",
+                        "type": "Type",
+                        "standard": "Standard",
+                        "vehicleWeight": "Vehicle Weight (kg)",
+                        "vehicleType": "Vehicle Type",
+                        "speed": "Speed (km/h)",
+                        "impactAngle": "Impact Angle (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Debris Distance (m)",
+                        "actions": "Actions"
+                    }
                 }
             }
+        },
+        "tooltips": {
+            "securityRisk": "Information about security risk.",
+            "productClass": "Information about recommended product class."
         },
         "report": {
             "mainTitle": "Risk Assessment for Access Protection",
@@ -746,7 +1053,7 @@ function showPlanningView() {
     }
     
     // Restore all planning view elements
-    restorePlanningViewElements();
+    // restorePlanningViewElements(); // Function moved to bottom
     
     // CRITICAL: Remove ALL view-hidden classes from map elements
     const mapElements = [
@@ -884,7 +1191,7 @@ function showManufacturerView() {
     
     // Translate manufacturer view after showing it
     setTimeout(() => {
-        translateManufacturerView();
+        translateUI(); // Use the main translation function
     }, 50);
     
     showNotification('Hersteller-Ansicht aktiviert', 'success');
@@ -938,7 +1245,7 @@ function initProductDatabase() {
  */
 async function loadProductDatabase() {
     try {
-        const response = await fetch('/product-database.json');
+        const response = await fetch(`${import.meta.env.BASE_URL}product-database.json`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -954,7 +1261,7 @@ async function loadProductDatabase() {
         
         // Display products
         console.log('About to display products:', products.length);
-        displayProducts(products);
+        await displayProducts(products);
         console.log('Products display completed');
         
         // Hide loading indicator
@@ -1032,7 +1339,7 @@ function populateProductFilters(products: any[]) {
 /**
  * Display products in the table
  */
-function displayProducts(products: any[]) {
+async function displayProducts(products: any[]) {
     console.log('displayProducts called with', products.length, 'products');
     
     // Display in table view
@@ -1041,7 +1348,7 @@ function displayProducts(products: any[]) {
     
     // Display in grid view
     console.log('Calling displayProductsGrid...');
-    displayProductsGrid(products);
+    await displayProductsGrid(products);
     
     console.log('displayProducts completed');
 }
@@ -1113,7 +1420,7 @@ function displayProductsTable(products: any[]) {
 /**
  * Display products in grid format
  */
-function displayProductsGrid(products: any[]) {
+async function displayProductsGrid(products: any[]) {
     const grid = document.getElementById('products-grid');
     if (!grid) return;
     
@@ -1133,22 +1440,20 @@ function displayProductsGrid(products: any[]) {
         noProductsGrid.style.display = 'none';
     }
     
-    // Sort products: products with images first, then without images
-    const sortedProducts = sortProductsByImageAvailability(products);
+    // Sort products: products with REAL images first, then without images
+    const sortedProducts = await sortProductsByImageAvailability(products);
     
     // Debug: Log first few products to see sorting
     console.log('First 5 products after sorting:', sortedProducts.slice(0, 5).map(p => ({
         type: p.type,
-        hasImage: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access',
-        validType: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
+        hasRealImage: p.hasRealImage,
+        manufacturer: p.manufacturer
     })));
     
-    // Debug: Count products with and without valid types
-    const productsWithValidTypes = sortedProducts.filter(p => 
-        p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
-        p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
-    );
-    console.log(`Products with valid types: ${productsWithValidTypes.length}/${sortedProducts.length}`);
+    // Debug: Count products with and without real images
+    const productsWithImages = sortedProducts.filter(p => p.hasRealImage);
+    const productsWithoutImages = sortedProducts.filter(p => !p.hasRealImage);
+    console.log(`Products WITH real images: ${productsWithImages.length}, WITHOUT real images: ${productsWithoutImages.length}, total: ${sortedProducts.length}`);
     
     sortedProducts.forEach((product, index) => {
         const card = document.createElement('div');
@@ -1157,10 +1462,8 @@ function displayProductsGrid(products: any[]) {
         // Generate product image path based on product type
         const productImage = generateProductImagePath(product);
         
-        // Check if product has a valid type (could have an image)
-        const hasValidType = product.type && product.type.trim() !== '' && 
-                            product.type !== 'N/A' && product.type !== 'Manufacturer: ATG Access' && 
-                            !product.type.includes('Manufacturer:') && product.type.length > 2;
+        // Check if product actually has a real image
+        const hasValidType = product.hasRealImage;
         
         // Add special class for first 20 products with valid types
         if (hasValidType && index < 20) {
@@ -1187,27 +1490,27 @@ function displayProductsGrid(products: any[]) {
                 </div>
                 <div class="product-card-specs">
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.standard')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.standard')}</div>
                         <div class="product-card-spec-value">${product.standard || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleWeight')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.vehicleWeight')}</div>
                         <div class="product-card-spec-value">${product.vehicleWeight || 'N/A'} kg</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleType')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.vehicleType')}</div>
                         <div class="product-card-spec-value">${product.vehicleType || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.speed')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.speed')}</div>
                         <div class="product-card-spec-value">${product.speed || 'N/A'} km/h</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.impactAngle')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.impactAngle')}</div>
                         <div class="product-card-spec-value">${product.impactAngle || 'N/A'}°</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.penetration')}</div>
+                        <div class="product-card-spec-label">${t('manufacturer.sidebar.productDatabase.penetration')}</div>
                         <div class="product-card-spec-value">${product.penetration || 'N/A'} m</div>
                     </div>
                 </div>
@@ -1236,47 +1539,72 @@ function displayProductsGrid(products: any[]) {
 }
 
 /**
- * Sort products by image availability - products with images first
+ * Sort products by ACTUAL image availability - products with real images first
  */
-function sortProductsByImageAvailability(products: any[]): any[] {
-    console.log('Sorting products by image availability...');
+async function sortProductsByImageAvailability(products: any[]): Promise<any[]> {
+    console.log('Sorting products by ACTUAL image availability...');
     
-    const sorted = [...products].sort((a, b) => {
-        // Check if product has a meaningful type that could have an image
-        const aHasImage = a.type && a.type.trim() !== '' && a.type !== 'N/A' && a.type !== 'Manufacturer: ATG Access';
-        const bHasImage = b.type && b.type.trim() !== '' && b.type !== 'N/A' && b.type !== 'Manufacturer: ATG Access';
-        
-        // Additional check: exclude products with very generic or invalid types
-        const aValidType = aHasImage && !a.type.includes('Manufacturer:') && a.type.length > 2;
-        const bValidType = bHasImage && !b.type.includes('Manufacturer:') && b.type.length > 2;
-        
-        if (aValidType && !bValidType) {
-            console.log(`Sorting: "${a.type}" (valid) before "${b.type}" (invalid)`);
-            return -1; // a has valid type, b doesn't
+    // Check actual image availability for all products
+    const productsWithImageStatus = await Promise.all(
+        products.map(async (product) => {
+            const imagePath = generateProductImagePath(product);
+            const hasRealImage = await checkImageExists(imagePath);
+            return {
+                ...product,
+                hasRealImage: hasRealImage
+            };
+        })
+    );
+    
+    // Sort by actual image availability: true (1) first, false (0) last
+    const sorted = productsWithImageStatus.sort((a, b) => {
+        if (a.hasRealImage && !b.hasRealImage) {
+            console.log(`Sorting: "${a.type}" (has real image) before "${b.type}" (no image)`);
+            return -1; // a has real image, b doesn't
         }
-        if (!aValidType && bValidType) {
-            console.log(`Sorting: "${b.type}" (valid) before "${a.type}" (invalid)`);
-            return 1;  // b has valid type, a doesn't
+        if (!a.hasRealImage && b.hasRealImage) {
+            console.log(`Sorting: "${b.type}" (has real image) before "${a.type}" (no image)`);
+            return 1;  // b has real image, a doesn't
         }
-        return 0; // both have valid types or both don't
+        return 0; // both have images or both don't
     });
     
-    console.log('Sorting completed. First 10 products:');
-    sorted.slice(0, 10).forEach((p, i) => {
-        const isValid = p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
-                       p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2;
-        console.log(`${i + 1}. "${p.type}" - Valid: ${isValid}`);
+    // Debug output
+    const withImages = sorted.filter(p => p.hasRealImage);
+    const withoutImages = sorted.filter(p => !p.hasRealImage);
+    console.log(`Sorting completed: ${withImages.length} products WITH images, ${withoutImages.length} products WITHOUT images`);
+    
+    console.log('First 5 products with images:');
+    withImages.slice(0, 5).forEach((p, i) => {
+        console.log(`${i + 1}. "${p.type}" - Has real image: true`);
     });
     
     return sorted;
 }
 
 /**
+ * Check if an image actually exists by trying to load it
+ */
+function checkImageExists(imagePath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = imagePath;
+        
+        // Timeout after 2 seconds to avoid hanging
+        setTimeout(() => resolve(false), 2000);
+    });
+}
+
+
+
+/**
  * Generate product image path based on product type
  */
 function generateProductImagePath(product: any): string {
     if (!product.type || product.type === '') {
-        return '/Datenbank_Produktbilder/default_product_img01.jpg';
+        return `${import.meta.env.BASE_URL}Datenbank_Produktbilder/default_product_img01.jpg`;
     }
     
     // Clean product type for filename matching
@@ -1297,7 +1625,7 @@ function generateProductImagePath(product: any): string {
     ];
     
     // Return the first pattern (we'll let the browser handle 404s)
-    return `/Datenbank_Produktbilder/${imagePatterns[0]}`;
+    return `${import.meta.env.BASE_URL}Datenbank_Produktbilder/${imagePatterns[0]}`;
 }
 
 /**
@@ -1407,7 +1735,7 @@ function setView(view: 'table' | 'grid') {
         gridContainer.style.display = 'block';
         
         // Update button to show "back to table"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToTable');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToTable');
         if (buttonIcon) buttonIcon.className = 'fas fa-table';
     } else {
         console.log('Switching to table view');
@@ -1423,7 +1751,7 @@ function setView(view: 'table' | 'grid') {
         }
         
         // Update button to show "back to grid"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToGrid');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToGrid');
         if (buttonIcon) buttonIcon.className = 'fas fa-th-large';
         
         console.log('Table view activated, table should be visible now');
@@ -1435,7 +1763,7 @@ function setView(view: 'table' | 'grid') {
 /**
  * Filter products based on search input and filter selections
  */
-function filterProducts() {
+async function filterProducts() {
     const products = (window as any).productDatabase || [];
     const searchTerm = (document.getElementById('product-search') as HTMLInputElement)?.value.toLowerCase() || '';
     const manufacturer = (document.getElementById('manufacturer-filter') as HTMLSelectElement)?.value || '';
@@ -1455,7 +1783,7 @@ function filterProducts() {
         return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType;
     });
     
-    displayProducts(filteredProducts);
+    await displayProducts(filteredProducts);
 }
 
 /**
@@ -1649,6 +1977,11 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     // Debug: Log which translations source is being used
     console.log(`Translation request for key: ${key}, language: ${currentLanguage}`);
     console.log(`Translations source:`, translations === embeddedTranslations ? 'embedded' : 'external');
+    
+    // Debug: Log the structure of translations
+    console.log('Current translations structure:', translations);
+    console.log('Embedded translations structure:', embeddedTranslations);
+    
     // Ensure we have translations available
     if (!translations || !translations[currentLanguage]) {
         console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
@@ -1656,16 +1989,19 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     }
     
     let text = getProperty(translations[currentLanguage as keyof typeof translations], key);
+    console.log(`Text from main translations for key '${key}':`, text);
     
     // If still no text found, try embedded translations
     if (typeof text !== 'string') {
         console.warn(`Translation key not found in main translations for language '${currentLanguage}': ${key}`);
         text = getProperty(embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations], key);
+        console.log(`Text from embedded translations for key '${key}':`, text);
         
         if (typeof text !== 'string') {
             console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
             // Return a more user-friendly fallback instead of the raw key
             const fallbackText = getFallbackText(key);
+            console.log(`Fallback text for key '${key}':`, fallbackText);
             return fallbackText || key;
         }
     }
@@ -1676,7 +2012,7 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
         }
     }
     
-    console.log(`Translation result for ${key}:`, text);
+    console.log(`Final translation result for ${key}:`, text);
     return text;
 }
 
@@ -1850,60 +2186,12 @@ async function translateUI() {
  * Fetches the translation data from the JSON file.
  */
 async function loadTranslations() {
-    try {
-        // Try multiple paths for GitHub Pages compatibility
-        const paths = [
-            `${import.meta.env.BASE_URL}translations.json`,
-            '/translations.json',
-            './translations.json',
-            '../translations.json'
-        ];
-        
-        let loaded = false;
-        for (const path of paths) {
-            try {
-                console.log(`Trying to load translations from: ${path}`);
-                const response = await fetch(path);
-                if (response.ok) {
-                    translations = await response.json();
-                    console.log(`Translations loaded successfully from: ${path}`);
-                    loaded = true;
-                    break;
-                }
-            } catch (pathError) {
-                console.log(`Failed to load from ${path}:`, pathError);
-            }
-        }
-        
-        if (!loaded) {
-            throw new Error('All translation file paths failed');
-        }
-    } catch (error) {
-        console.error("Could not load translations from any file path:", error);
-        // Simplified fallback
-        try {
-            const fallbackResponse = await fetch('/translations.json');
-            if (fallbackResponse.ok) {
-                translations = await fallbackResponse.json();
-            }
-        } catch (fallbackError) {
-            console.error("Fallback translation loading also failed:", fallbackError);
-        }
-    }
+    // Translation file loading disabled to avoid conflicts
+    console.log('Translation file loading disabled to avoid conflicts');
     
-    // If no translations loaded from file, use embedded translations
-    if (!translations.de && !translations.en) {
-        console.log('No translations loaded from file, using embedded translations');
+    // Always use embedded translations to avoid conflicts
+    console.log('Using embedded translations to avoid conflicts');
         translations = embeddedTranslations;
-    } else {
-        console.log('Translations loaded successfully from file');
-    }
-    
-    // Ensure we always have translations available
-    if (!translations.de || !translations.en) {
-        console.warn('Incomplete translations, falling back to embedded');
-        translations = embeddedTranslations;
-    }
 }
 
 /**
@@ -1937,7 +2225,7 @@ async function setLanguage(lang: string) {
     // Also translate manufacturer view if it's visible
     const manufacturerView = document.getElementById('manufacturer-view');
     if (manufacturerView && manufacturerView.style.display !== 'none') {
-        translateManufacturerView();
+        translateUI(); // Use the main translation function
     }
     
     // Always translate chatbot when language changes
@@ -2088,6 +2376,22 @@ function initOpenStreetMap(): void {
     tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+    
+    // Force map to calculate correct size after initialization
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated after initialization');
+        }
+    }, 100);
+    
+    // Additional invalidation after tiles load
+    tileLayer.once('load', () => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated after tiles loaded');
+        }
+    });
     
     console.log('Map initialized successfully');
 }
@@ -3379,8 +3683,9 @@ function downloadRiskReport() {
 // ===============================================
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded - Starting initialization...');
+// This initialization function will be called after authentication
+async function initializeApp() {
+    console.log('Initializing main application...');
     
     // Step 1: Initialize basic UI components
     initViewSwitcher();
@@ -3712,8 +4017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     initViewSwitcher();
-
-});
+}
 
 // Function to debug current view state
 function debugViewState() {
@@ -3840,16 +4144,128 @@ function translateManufacturerView() {
     const productsTable = document.getElementById('products-table');
     
     if (productsGrid && productsGrid.style.display !== 'none') {
-        // Grid view is active, re-render products to update technical data labels
-        console.log('Re-rendering products grid to update translations...');
-        // Reload products from the database to get fresh data
-        loadProductDatabase();
+        // Grid view is active, translate existing tiles
+        console.log('Translating product tiles technical data...');
+        translateProductTiles();
     } else if (productsTable && productsTable.style.display !== 'none') {
-        // Table view is active, re-render table to update headers
-        console.log('Re-rendering products table to update translations...');
-        // Reload products from the database to get fresh data
-        loadProductDatabase();
+        // Table view is active, translations are handled by data-translate-key attributes
+        console.log('Table view translations handled by translateUI()');
     }
+}
+
+/**
+ * Function to translate technical data labels in product tiles
+ */
+function translateProductTiles() {
+    const productsGrid = document.getElementById('products-grid');
+    if (!productsGrid) {
+        return;
+    }
+    
+    // Find all product cards in the grid
+    const productCards = productsGrid.querySelectorAll('.product-card');
+    
+    productCards.forEach(card => {
+        // Find all text content in the card and translate common technical terms
+        const textElements = card.querySelectorAll('.tech-spec-item, .tech-spec-label, .spec-label');
+        
+        textElements.forEach(element => {
+            let text = element.textContent || '';
+            
+            // Translate common technical specification labels
+            if (currentLanguage === 'en') {
+                // German to English
+                text = text
+                    .replace(/Fahrzeuggewicht \(kg\)/gi, t('manufacturer.sidebar.productDatabase.vehicleWeight'))
+                    .replace(/Fahrzeugtyp/gi, t('manufacturer.sidebar.productDatabase.vehicleType'))
+                    .replace(/Geschwindigkeit \(km\/h\)/gi, t('manufacturer.sidebar.productDatabase.speed'))
+                    .replace(/Aufprallwinkel \(°\)/gi, t('manufacturer.sidebar.productDatabase.impactAngle'))
+                    .replace(/Penetration \(m\)/gi, t('manufacturer.sidebar.productDatabase.penetration'))
+                    .replace(/Trümmerentfernung \(m\)/gi, t('manufacturer.sidebar.productDatabase.debrisDistance'))
+                    .replace(/Standard/gi, t('manufacturer.sidebar.productDatabase.standard'))
+                    .replace(/Hersteller/gi, t('manufacturer.sidebar.productDatabase.manufacturer'))
+                    .replace(/Typ/gi, t('manufacturer.sidebar.productDatabase.type'))
+                    .replace(/FAHRZEUGGEWICHT \(KG\)/gi, t('manufacturer.sidebar.productDatabase.vehicleWeight').toUpperCase())
+                    .replace(/FAHRZEUGTYP/gi, t('manufacturer.sidebar.productDatabase.vehicleType').toUpperCase())
+                    .replace(/GESCHWINDIGKEIT \(KM\/H\)/gi, t('manufacturer.sidebar.productDatabase.speed').toUpperCase())
+                    .replace(/AUFPRALLWINKEL \(°\)/gi, t('manufacturer.sidebar.productDatabase.impactAngle').toUpperCase())
+                    .replace(/PENETRATION \(M\)/gi, t('manufacturer.sidebar.productDatabase.penetration').toUpperCase())
+                    .replace(/STANDARD/gi, t('manufacturer.sidebar.productDatabase.standard').toUpperCase())
+                    .replace(/HERSTELLER/gi, t('manufacturer.sidebar.productDatabase.manufacturer').toUpperCase())
+                    .replace(/TYP/gi, t('manufacturer.sidebar.productDatabase.type').toUpperCase());
+            } else {
+                // English to German
+                text = text
+                    .replace(/Vehicle Weight \(kg\)/gi, 'Fahrzeuggewicht (kg)')
+                    .replace(/Vehicle Type/gi, 'Fahrzeugtyp')
+                    .replace(/Speed \(km\/h\)/gi, 'Geschwindigkeit (km/h)')
+                    .replace(/Impact Angle \(°\)/gi, 'Aufprallwinkel (°)')
+                    .replace(/Penetration \(m\)/gi, 'Penetration (m)')
+                    .replace(/Debris Distance \(m\)/gi, 'Trümmerentfernung (m)')
+                    .replace(/Standard/gi, 'Standard')
+                    .replace(/Manufacturer/gi, 'Hersteller')
+                    .replace(/Type/gi, 'Typ')
+                    .replace(/VEHICLE WEIGHT \(KG\)/gi, 'FAHRZEUGGEWICHT (KG)')
+                    .replace(/VEHICLE TYPE/gi, 'FAHRZEUGTYP')
+                    .replace(/SPEED \(KM\/H\)/gi, 'GESCHWINDIGKEIT (KM/H)')
+                    .replace(/IMPACT ANGLE \(°\)/gi, 'AUFPRALLWINKEL (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/MANUFACTURER/gi, 'HERSTELLER')
+                    .replace(/TYPE/gi, 'TYP');
+            }
+            
+            element.textContent = text;
+        });
+        
+        // Also check for any direct text nodes that might contain the labels
+        const walker = document.createTreeWalker(
+            card,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+        
+        const textNodes: Text[] = [];
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue && node.nodeValue.trim()) {
+                textNodes.push(node as Text);
+            }
+        }
+        
+        textNodes.forEach(textNode => {
+            let text = textNode.nodeValue || '';
+            
+            if (currentLanguage === 'en') {
+                // German to English
+                text = text
+                    .replace(/FAHRZEUGGEWICHT \(KG\)/gi, 'VEHICLE WEIGHT (KG)')
+                    .replace(/FAHRZEUGTYP/gi, 'VEHICLE TYPE')
+                    .replace(/GESCHWINDIGKEIT \(KM\/H\)/gi, 'SPEED (KM/H)')
+                    .replace(/AUFPRALLWINKEL \(°\)/gi, 'IMPACT ANGLE (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/HERSTELLER/gi, 'MANUFACTURER')
+                    .replace(/TYP/gi, 'TYPE');
+            } else {
+                // English to German
+                text = text
+                    .replace(/VEHICLE WEIGHT \(KG\)/gi, 'FAHRZEUGGEWICHT (KG)')
+                    .replace(/VEHICLE TYPE/gi, 'FAHRZEUGTYP')
+                    .replace(/SPEED \(KM\/H\)/gi, 'GESCHWINDIGKEIT (KM/H)')
+                    .replace(/IMPACT ANGLE \(°\)/gi, 'AUFPRALLWINKEL (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/MANUFACTURER/gi, 'HERSTELLER')
+                    .replace(/TYPE/gi, 'TYP');
+            }
+            
+            textNode.nodeValue = text;
+        });
+    });
+    
+    console.log('Product tiles translation completed for language:', currentLanguage);
 }
 
 // Function to translate chatbot specifically
@@ -3889,36 +4305,32 @@ function translateChatbot() {
     console.log('Chatbot translation completed');
 }
 
+// ===============================================
+// APPLICATION INITIALIZATION
+// ===============================================
+
+
+
 /**
- * Helper function to get currently displayed products
- * This function tries to extract products from the current display
+ * Setup logo click listener for logout functionality
  */
-function getCurrentDisplayedProducts(): any[] {
-    // Try to get products from the current product database
-    try {
-        // If we have a global products variable, use it
-        if (typeof window !== 'undefined' && (window as any).products) {
-            return (window as any).products;
-        }
-        
-        // Try to get products from the current display by looking at existing cards
-        const productsGrid = document.getElementById('products-grid');
-        const productsTable = document.getElementById('products-table');
-        
-        if (productsGrid && productsGrid.children.length > 0) {
-            // Extract product data from existing grid cards
-            const productCards = productsGrid.querySelectorAll('.product-card');
-            if (productCards.length > 0) {
-                // We have products displayed, but we need to reload them from the source
-                // For now, return empty array to trigger a reload
-                return [];
-            }
-        }
-        
-        // Otherwise, try to reload from the JSON file
-        return [];
-    } catch (error) {
-        console.warn('Could not get current products:', error);
-        return [];
-    }
+function setupLogoLogout() {
+    const logoElements = document.querySelectorAll('.logo-img, .welcome-logo');
+    logoElements.forEach(logo => {
+        logo.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Logo clicked - logging out...');
+            logout();
+        });
+        // Add pointer cursor to indicate clickability
+        (logo as HTMLElement).style.cursor = 'pointer';
+    });
 }
+
+// Initialize authentication system when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing authentication...');
+    initAuth();
+    setupLogoLogout();
+});
+
