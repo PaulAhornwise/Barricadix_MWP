@@ -84,12 +84,34 @@
     "vehicleType": "[N2A]",
     "speed": "80",
     "impactAngle": "90",
-    "penetration": "1.4",
+    "penetration": "3.8",
     "debrisDistance": "N/A"
   },
   {
     "manufacturer": "ATG Access",
-    "type": "SP400 SM80 Super Shallow 5 Bollard Array",
+    "type": "Manufacturer: ATG Access",
+    "standard": "IWA 14-1:2013",
+    "vehicleWeight": "7200",
+    "vehicleType": "[N2A]",
+    "speed": "64",
+    "impactAngle": "90",
+    "penetration": "1.3",
+    "debrisDistance": "N/A"
+  },
+  {
+    "manufacturer": "ATG Access",
+    "type": "Manufacturer: ATG Access",
+    "standard": "IWA 14-1:2013",
+    "vehicleWeight": "7200",
+    "vehicleType": "[N2A]",
+    "speed": "64",
+    "impactAngle": "90",
+    "penetration": "1.3",
+    "debrisDistance": "N/A"
+  },
+  {
+    "manufacturer": "ATG Access",
+    "type": "Manufacturer: ATG Access",
     "standard": "IWA 14-1:2013",
     "vehicleWeight": "7200",
     "vehicleType": "[N2A]",
@@ -111,35 +133,13 @@
   },
   {
     "manufacturer": "ATG Access",
-    "type": "Westminster Bi Direction Lo Socket Bollard Array",
-    "standard": "IWA 14-1:2013",
-    "vehicleWeight": "7200",
-    "vehicleType": "[N2A]",
-    "speed": "80",
-    "impactAngle": "90",
-    "penetration": "6.0",
-    "debrisDistance": "N/A"
-  },
-  {
-    "manufacturer": "ATG Access",
-    "type": "Westminster Bi Direction Lo Socket Bollard Array",
-    "standard": "IWA 14-1:2013",
-    "vehicleWeight": "7200",
-    "vehicleType": "[N2A]",
-    "speed": "64",
-    "impactAngle": "90",
-    "penetration": "1.3",
-    "debrisDistance": "N/A"
-  },
-  {
-    "manufacturer": "ATG Access",
     "type": "Manufacturer: ATG Access",
-    "standard": "IWA 14-1:2013",
-    "vehicleWeight": "7200",
-    "vehicleType": "[N2A]",
-    "speed": "64",
-    "impactAngle": "90",
-    "penetration": "1.3",
+    "standard": "",
+    "vehicleWeight": "N/A",
+    "vehicleType": "N/A",
+    "speed": "N/A",
+    "impactAngle": "N/A",
+    "penetration": "N/A",
     "debrisDistance": "N/A"
   },
   {
@@ -1783,7 +1783,7 @@
   },
   {
     "manufacturer": "Milford",
-    "type": "EAG05050 ‘TITAN II’ Shallow Mount Blocker",
+    "type": "EAG05050 'TITAN II' Shallow Mount Blocker",
     "standard": "IWA 14-1:2013",
     "vehicleWeight": "3500",
     "vehicleType": "[N1]",
@@ -1794,7 +1794,7 @@
   },
   {
     "manufacturer": "Eagle Automation Systems Limited",
-    "type": "EAG05050 ‘TITAN II’ Shallow Mount Blocker",
+    "type": "EAG05050 'TITAN II' Shallow Mount Blocker",
     "standard": "IWA 14-1:2013",
     "vehicleWeight": "7200",
     "vehicleType": "[N2A]",

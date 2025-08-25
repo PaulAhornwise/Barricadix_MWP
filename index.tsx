@@ -457,6 +457,9 @@ const embeddedTranslations = {
                     "technicalSpecs": "Technische Spezifikationen",
                     "performanceData": "Leistungsdaten",
                     "certification": "Zertifizierung",
+                    "certificationStandard": "Zertifizierungsstandard",
+                    "testConditions": "Testbedingungen",
+                    "atSpeed": "bei",
                     "viewDetails": "Details anzeigen",
                     "closeDetails": "Schließen",
                     "exportData": "Daten exportieren",
@@ -812,6 +815,9 @@ const embeddedTranslations = {
                     "technicalSpecs": "Technical Specifications",
                     "performanceData": "Performance Data",
                     "certification": "Certification",
+                    "certificationStandard": "Certification Standard",
+                    "testConditions": "Test Conditions",
+                    "atSpeed": "at",
                     "viewDetails": "View Details",
                     "closeDetails": "Close",
                     "exportData": "Export Data",
@@ -1038,6 +1044,9 @@ function switchToManufacturerView() {
 function showPlanningView() {
     console.log('Switching to planning view...');
     
+    // Clear any pinned product tooltips when switching views
+    clearProductTooltips();
+    
     // Hide manufacturer view completely
     const manufacturerView = document.getElementById('manufacturer-view');
     if (manufacturerView) {
@@ -1120,6 +1129,9 @@ function showPlanningView() {
 
 // Function to show manufacturer view
 function showManufacturerView() {
+    // Clear any pinned product tooltips when switching views
+    clearProductTooltips();
+    
     // Save current map state before switching
     if (map) {
         (window as any).savedMapState = {
@@ -1396,7 +1408,7 @@ function displayProductsTable(products: any[]) {
             <td>${product.debrisDistance || 'N/A'}</td>
             <td>
                 <button class="view-details-btn" data-product-index="${index}">
-                    Details anzeigen
+                    ${t('manufacturer.sidebar.productDatabase.viewDetails')}
                 </button>
             </td>
         `;
@@ -1516,7 +1528,7 @@ async function displayProductsGrid(products: any[]) {
                 </div>
                 <div class="product-card-actions">
                     <button class="product-card-btn secondary" data-product-index="${index}">
-                        Details
+                        ${t('manufacturer.sidebar.productDatabase.viewDetails')}
                     </button>
                 </div>
             </div>
@@ -1603,8 +1615,13 @@ function checkImageExists(imagePath: string): Promise<boolean> {
  * Generate product image path based on product type
  */
 function generateProductImagePath(product: any): string {
+    console.log('Generating image path for product:', product);
+    console.log('BASE_URL:', import.meta.env.BASE_URL);
+    
     if (!product.type || product.type === '') {
-        return `${import.meta.env.BASE_URL}Datenbank_Produktbilder/default_product_img01.jpg`;
+        const defaultPath = `${import.meta.env.BASE_URL}Datenbank_Produktbilder/default_product_img01.jpg`;
+        console.log('Using default image path:', defaultPath);
+        return defaultPath;
     }
     
     // Clean product type for filename matching
@@ -1613,6 +1630,9 @@ function generateProductImagePath(product: any): string {
         .replace(/\s+/g, '_') // Replace spaces with underscores
         .replace(/[_-]+/g, '_') // Replace multiple hyphens/underscores with single
         .trim();
+    
+    console.log('Original product type:', product.type);
+    console.log('Cleaned product type:', cleanType);
     
     // Try different image naming patterns
     const imagePatterns = [
@@ -1625,7 +1645,11 @@ function generateProductImagePath(product: any): string {
     ];
     
     // Return the first pattern (we'll let the browser handle 404s)
-    return `${import.meta.env.BASE_URL}Datenbank_Produktbilder/${imagePatterns[0]}`;
+    const finalPath = `${import.meta.env.BASE_URL}Datenbank_Produktbilder/${imagePatterns[0]}`;
+    console.log('Final image path:', finalPath);
+    console.log('Available patterns:', imagePatterns);
+    
+    return finalPath;
 }
 
 /**
@@ -1812,6 +1836,8 @@ function initProductModal() {
             const modal = document.getElementById('product-modal');
             if (modal) {
                 modal.style.display = 'none';
+                // Clear stored product index
+                (modal as any).currentProductIndex = undefined;
             }
         });
     }
@@ -1830,6 +1856,8 @@ function initProductModal() {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.style.display = 'none';
+                // Clear stored product index
+                (modal as any).currentProductIndex = undefined;
             }
         });
     }
@@ -1854,9 +1882,9 @@ function showProductDetails(productIndex: number) {
     const technicalSpecs = document.getElementById('modal-technical-specs');
     if (technicalSpecs) {
         technicalSpecs.innerHTML = `
-            <p><strong>Hersteller:</strong> ${product.manufacturer || 'N/A'}</p>
-            <p><strong>Typ:</strong> ${product.type || 'N/A'}</p>
-            <p><strong>Standard:</strong> ${product.standard || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.manufacturer')}:</strong> ${product.manufacturer || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.type')}:</strong> ${product.type || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.standard')}:</strong> ${product.standard || 'N/A'}</p>
         `;
     }
     
@@ -1864,12 +1892,12 @@ function showProductDetails(productIndex: number) {
     const performanceData = document.getElementById('modal-performance-data');
     if (performanceData) {
         performanceData.innerHTML = `
-            <p><strong>Fahrzeuggewicht:</strong> ${product.vehicleWeight || 'N/A'} kg</p>
-            <p><strong>Fahrzeugtyp:</strong> ${product.vehicleType || 'N/A'}</p>
-            <p><strong>Geschwindigkeit:</strong> ${product.speed || 'N/A'} km/h</p>
-            <p><strong>Anprallwinkel:</strong> ${product.impactAngle || 'N/A'}°</p>
-            <p><strong>Penetration:</strong> ${product.penetration || 'N/A'} m</p>
-            <p><strong>Trümmerdistanz:</strong> ${product.debrisDistance || 'N/A'} m</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.vehicleWeight')}:</strong> ${product.vehicleWeight || 'N/A'} kg</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.vehicleType')}:</strong> ${product.vehicleType || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.speed')}:</strong> ${product.speed || 'N/A'} km/h</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.impactAngle')}:</strong> ${product.impactAngle || 'N/A'}°</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.penetration')}:</strong> ${product.penetration || 'N/A'} m</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.debrisDistance')}:</strong> ${product.debrisDistance || 'N/A'} m</p>
         `;
     }
     
@@ -1877,8 +1905,8 @@ function showProductDetails(productIndex: number) {
     const certification = document.getElementById('modal-certification');
     if (certification) {
         certification.innerHTML = `
-            <p><strong>Zertifizierungsstandard:</strong> ${product.standard || 'N/A'}</p>
-            <p><strong>Testbedingungen:</strong> ${product.vehicleWeight || 'N/A'} kg bei ${product.speed || 'N/A'} km/h</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.certificationStandard')}:</strong> ${product.standard || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.testConditions')}:</strong> ${product.vehicleWeight || 'N/A'} kg ${t('manufacturer.sidebar.productDatabase.atSpeed')} ${product.speed || 'N/A'} km/h</p>
         `;
     }
     
@@ -1886,6 +1914,8 @@ function showProductDetails(productIndex: number) {
     const modal = document.getElementById('product-modal');
     if (modal) {
         modal.style.display = 'flex';
+        // Store current product index for language switching
+        (modal as any).currentProductIndex = productIndex;
     }
 }
 
@@ -2161,6 +2191,29 @@ async function translateUI() {
     
     console.log(`UI translation completed: ${translatedElements} elements translated, ${failedElements} failed`);
     
+    // Translate product tiles in manufacturer view
+    translateProductTiles();
+    
+    // Re-render product cards if manufacturer view is active
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (manufacturerView && manufacturerView.style.display !== 'none') {
+        const products = (window as any).productDatabase;
+        if (products && products.length > 0) {
+            console.log('Re-rendering product cards for language change');
+            displayProducts(products);
+        }
+        
+        // Re-render product modal if it's open
+        const modal = document.getElementById('product-modal');
+        if (modal && modal.style.display === 'block') {
+            const currentProductIndex = (modal as any).currentProductIndex;
+            if (currentProductIndex !== undefined) {
+                console.log('Re-rendering product modal for language change');
+                showProductDetails(currentProductIndex);
+            }
+        }
+    }
+    
     // Force refresh of all text content that might have been missed
     setTimeout(() => {
         let refreshCount = 0;
@@ -2419,6 +2472,9 @@ const clearThreatAnalysis = () => {
     }
     const floating = document.getElementById('floating-threats');
     if (floating) floating.classList.add('view-hidden');
+    
+    // Reset title to default
+    updateThreatListTitle(false);
     const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
     if (productRecommendationsContainer) {
         productRecommendationsContainer.classList.add('hidden');
@@ -2564,6 +2620,8 @@ function renderThreatList() {
     threatList.innerHTML = '';
 
     if (threatsMap.size === 0) {
+        // Reset title to default when no threats
+        updateThreatListTitle();
         return; // Nothing to render
     }
 
@@ -2591,12 +2649,14 @@ function renderThreatList() {
     threatsArray.forEach(({ name, maxSpeed, lengthInMeters }) => {
         const li = document.createElement('li');
         
-        let speedText = '';
+        // Format: Straßenname (Beschleunigungsstrecke / Endgeschwindigkeit)
+        let displayText = `${name} (${lengthInMeters} m`;
         if (maxSpeed > 0) {
-            speedText = ` | ${t('threats.speed')}: ${maxSpeed} km/h`;
+            displayText += ` / ${maxSpeed} km/h`;
         }
+        displayText += ')';
 
-        li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
+        li.textContent = displayText;
         li.setAttribute('role', 'button');
         li.setAttribute('tabindex', '0');
 
@@ -2624,8 +2684,26 @@ function renderThreatList() {
         li.textContent = t('threats.noCrossingWaysBoundary');
         threatList.appendChild(li);
     }
+    
+    // Update the title to show analysis format
+    updateThreatListTitle(true);
 }
 
+/**
+ * Updates the threat list title to show analysis format
+ */
+function updateThreatListTitle(showAnalysisFormat: boolean = false) {
+    const titleElement = document.querySelector('#floating-threats h4');
+    if (!titleElement) return;
+    
+    if (showAnalysisFormat) {
+        // Title format: "Gefahrenanalyse (Strecke / Endgeschw.)"
+        titleElement.textContent = `${t('threats.title')} (Strecke / Endgeschw.)`;
+    } else {
+        // Default title
+        titleElement.textContent = t('threats.title');
+    }
+}
 
 /**
  * Analyzes the drawn polygon for potential vehicle threats.
@@ -3214,7 +3292,7 @@ async function getReportLocationName(center: any): Promise<string> {
 }
 
 /**
- * Updates the product recommendation section based on vehicle selection.
+ * Updates the product recommendation section and map with interactive tooltips
  */
 async function updateProductRecommendations() {
     if (productDatabase.length === 0) {
@@ -3224,49 +3302,295 @@ async function updateProductRecommendations() {
             productDatabase = await response.json();
         } catch (error) {
             console.error(t('alerts.productDbError'), error);
-            const pollerRecommendationEl = document.querySelector('#poller-category-header small');
-            const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
-            if (pollerRecommendationEl) pollerRecommendationEl.textContent = t('products.dbError');
-            if (barrierRecommendationEl) barrierRecommendationEl.textContent = t('products.dbError');
             return;
         }
     }
     
+    // Show the map and threat analysis results for product selection
+    await initProductSelectionMap();
+}
+
+/**
+ * Initialize the product selection map with interactive tooltips
+ */
+async function initProductSelectionMap() {
+    console.log('Initializing product selection map with threat data');
+    
+    // Make sure the map is visible and properly sized
+    const mapDiv = document.getElementById('map');
+    if (!mapDiv || !map) {
+        console.error('Map not available for product selection');
+        return;
+    }
+    
+    mapDiv.classList.remove('view-hidden');
+    
+    // Invalidate map size to ensure proper display
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated for product selection');
+        }
+    }, 100);
+    
+    // If we have threat analysis data, show it on the map with interactive tooltips
+    if (threatsMap.size > 0) {
+        await addProductRecommendationTooltips();
+    } else {
+        console.log('No threat analysis data available for product selection');
+    }
+}
+
+/**
+ * Add interactive product recommendation tooltips to threat markers
+ */
+async function addProductRecommendationTooltips() {
+    console.log('Adding product recommendation tooltips to threat markers');
+    
+    // Clear existing tooltips first
+    clearProductTooltips();
+    
+    // Iterate through all threat markers and add interactive tooltips
+    threatMarkersMap.forEach((markers, streetName) => {
+        const threatData = threatsMap.get(streetName);
+        if (!threatData || !markers) return;
+        
+        markers.forEach((marker) => {
+            // Get the speed for this specific access point
+            const maxSpeed = calculateMaxSpeedForThreat(threatData);
+            
+            // Find suitable products for this speed requirement
+            const recommendedProducts = findProductsForSpeed(maxSpeed);
+            
+            if (recommendedProducts.length > 0) {
+                addInteractiveTooltip(marker, streetName, maxSpeed, recommendedProducts[0]);
+            }
+        });
+    });
+}
+
+/**
+ * Find products that can handle the required speed
+ */
+function findProductsForSpeed(requiredSpeed: number): any[] {
+    console.log('Finding products for required speed:', requiredSpeed);
+    console.log('Product database size:', productDatabase.length);
+    
+    if (!productDatabase || productDatabase.length === 0) {
+        console.log('No product database available');
+        return [];
+    }
+    
+    // Find products that have been tested at speeds higher than required
+    const suitableProducts = productDatabase.filter(product => {
+        const productSpeed = parseFloat(product.speed);
+        const isValid = !isNaN(productSpeed) && productSpeed >= requiredSpeed;
+        if (isValid) {
+            console.log(`Suitable product found: ${product.type} (${productSpeed} km/h >= ${requiredSpeed} km/h)`);
+        }
+        return isValid;
+    });
+    
+    console.log(`Found ${suitableProducts.length} suitable products`);
+    
+    // Sort by speed (highest first) to get the most suitable products
+    const sorted = suitableProducts.sort((a, b) => parseFloat(b.speed) - parseFloat(a.speed));
+    
+    if (sorted.length > 0) {
+        console.log('Best product selected:', sorted[0]);
+    }
+    
+    return sorted;
+}
+
+/**
+ * Add interactive tooltip to a marker
+ */
+function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number, product: any) {
+    let tooltipElement: HTMLElement | null = null;
+    let isPinned = false;
+    
+    // Add CSS class to marker for hover effects
+    const markerIcon = marker.getElement();
+    if (markerIcon) {
+        markerIcon.classList.add('has-tooltip');
+    }
+    
+    // Create tooltip content
+    const createTooltipContent = () => {
+        const productImage = generateProductImagePath(product);
+        console.log('Tooltip: Product image path generated:', productImage);
+        console.log('Tooltip: Product data:', product);
+        
+        return `
+            <div class="product-tooltip">
+                <div class="tooltip-header">
+                    <h4>${streetName}</h4>
+                    <span class="tooltip-close">×</span>
+                </div>
+                <div class="tooltip-content">
+                    <div class="product-image">
+                        <img src="${productImage}" alt="${product.type}" 
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="product-image-placeholder" style="display: none;">
+                            <i class="fas fa-image"></i>
+                        </div>
+                    </div>
+                    <div class="product-info">
+                        <h5>${product.type}</h5>
+                        <p><strong>Hersteller:</strong> ${product.manufacturer}</p>
+                        <p><strong>Getestete Geschw.:</strong> ${product.speed} km/h</p>
+                        <p><strong>Erforderlich:</strong> ${maxSpeed} km/h</p>
+                        <p><strong>Standard:</strong> ${product.standard}</p>
+                    </div>
+                </div>
+                <div class="tooltip-pin-indicator ${isPinned ? 'pinned' : ''}">
+                    <i class="fas fa-thumbtack"></i> ${isPinned ? 'Angepinnt' : 'Klicken zum Anpinnen'}
+                </div>
+            </div>
+        `;
+    };
+    
+    // Mouse enter event
+    marker.on('mouseover', (e: any) => {
+        if (isPinned) return; // Don't show hover tooltip if already pinned
+        
+        tooltipElement = document.createElement('div');
+        tooltipElement.className = 'leaflet-tooltip-pane';
+        tooltipElement.innerHTML = createTooltipContent();
+        
+        document.body.appendChild(tooltipElement);
+        
+        // Position tooltip near mouse
+        const updateTooltipPosition = (event: MouseEvent) => {
+            if (tooltipElement) {
+                tooltipElement.style.left = `${event.clientX + 10}px`;
+                tooltipElement.style.top = `${event.clientY - 10}px`;
+            }
+        };
+        
+        updateTooltipPosition(e.originalEvent);
+        
+        // Track mouse movement for tooltip positioning
+        document.addEventListener('mousemove', updateTooltipPosition);
+        
+        // Store the cleanup function
+        (tooltipElement as any).cleanup = () => {
+            document.removeEventListener('mousemove', updateTooltipPosition);
+        };
+    });
+    
+    // Mouse leave event
+    marker.on('mouseout', () => {
+        if (isPinned) return; // Don't hide if pinned
+        
+        if (tooltipElement) {
+            if ((tooltipElement as any).cleanup) {
+                (tooltipElement as any).cleanup();
+            }
+            document.body.removeChild(tooltipElement);
+            tooltipElement = null;
+        }
+    });
+    
+    // Click event for pinning/unpinning
+    marker.on('click', (e: any) => {
+        e.originalEvent.stopPropagation();
+        
+        if (isPinned) {
+            // Unpin the tooltip
+            isPinned = false;
+            if (tooltipElement) {
+                if ((tooltipElement as any).cleanup) {
+                    (tooltipElement as any).cleanup();
+                }
+                document.body.removeChild(tooltipElement);
+                tooltipElement = null;
+            }
+        } else {
+            // Pin the tooltip
+            isPinned = true;
+            
+            // Remove any existing hover tooltip
+            if (tooltipElement && !tooltipElement.classList.contains('pinned-tooltip')) {
+                if ((tooltipElement as any).cleanup) {
+                    (tooltipElement as any).cleanup();
+                }
+                document.body.removeChild(tooltipElement);
+            }
+            
+            // Create pinned tooltip
+            tooltipElement = document.createElement('div');
+            tooltipElement.className = 'leaflet-tooltip-pane pinned-tooltip';
+            tooltipElement.innerHTML = createTooltipContent();
+            
+            document.body.appendChild(tooltipElement);
+            
+            // Position tooltip at marker location
+            const containerPoint = map.latLngToContainerPoint(marker.getLatLng());
+            const mapContainer = map.getContainer();
+            const mapRect = mapContainer.getBoundingClientRect();
+            
+            tooltipElement.style.left = `${mapRect.left + containerPoint.x + 10}px`;
+            tooltipElement.style.top = `${mapRect.top + containerPoint.y - 10}px`;
+            
+            // Add close button functionality
+            const closeButton = tooltipElement.querySelector('.tooltip-close');
+            if (closeButton) {
+                closeButton.addEventListener('click', () => {
+                    isPinned = false;
+                    if (tooltipElement) {
+                        document.body.removeChild(tooltipElement);
+                        tooltipElement = null;
+                    }
+                });
+            }
+        }
+    });
+}
+
+/**
+ * Calculate maximum speed for a threat based on its data
+ */
+function calculateMaxSpeedForThreat(threatData: any): number {
+    if (!threatData.entryPoints || threatData.entryPoints.length === 0) return 0;
+    
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
     const selectedWeight = vehicleSelect.value;
+    const accelerationRange = getAccelerationRange(selectedWeight);
     
-    const pollerRecommendationEl = document.querySelector('#poller-category-header small');
-    const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
+    if (!accelerationRange) return 0;
     
-    if (pollerRecommendationEl) {
-        pollerRecommendationEl.textContent = t('products.resistanceHigh');
-    }
-    if (barrierRecommendationEl) {
-        barrierRecommendationEl.textContent = t('products.resistanceMedium');
-    }
-
-    if (selectedWeight === 'alle') return;
+    let maxSpeed = 0;
+    threatData.entryPoints.forEach(() => {
+        const speed = calculateVelocity(accelerationRange[1], threatData.totalLength);
+        if (speed > maxSpeed) {
+            maxSpeed = speed;
+        }
+    });
     
-    const pollerKeywords = ['bollard', 'poller'];
-    const barrierKeywords = ['barrier', 'barriere', 'gate'];
+    return Math.round(maxSpeed);
+}
 
-    const recommendedPoller = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight && p.type && pollerKeywords.some(kw => p.type.toLowerCase().includes(kw))
-    );
-    const recommendedBarrier = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight && p.type && barrierKeywords.some(kw => p.type.toLowerCase().includes(kw))
-    );
-
-    if (pollerRecommendationEl) {
-        pollerRecommendationEl.textContent = recommendedPoller 
-            ? `${t('products.recommendation')} ${recommendedPoller.type}` 
-            : t('products.noRecommendation');
-    }
-    if (barrierRecommendationEl) {
-        barrierRecommendationEl.textContent = recommendedBarrier
-            ? `${t('products.recommendation')} ${recommendedBarrier.type}`
-            : t('products.noRecommendation');
-    }
+/**
+ * Clear all existing product tooltips
+ */
+function clearProductTooltips() {
+    // Remove all pinned tooltips
+    const pinnedTooltips = document.querySelectorAll('.pinned-tooltip');
+    pinnedTooltips.forEach(tooltip => {
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
+    
+    // Remove any hover tooltips
+    const hoverTooltips = document.querySelectorAll('.leaflet-tooltip-pane:not(.pinned-tooltip)');
+    hoverTooltips.forEach(tooltip => {
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
 }
 
 function getSecurityLevelText(value: number): string {
@@ -3917,6 +4241,9 @@ async function initializeApp() {
         }
         if (newTabId === 'nav-product-selection') {
             await updateProductRecommendations();
+        } else {
+            // Clear product tooltips when leaving product selection or switching tabs
+            clearProductTooltips();
         }
         if (newTabId === 'nav-project-description') {
             // Handle project description tab
@@ -4060,7 +4387,7 @@ function debugViewState() {
 }
 
 // Function to restore all planning view elements
-function restorePlanningViewElements() {
+function _restorePlanningViewElements() {
     console.log('Restoring all planning view elements...');
     
     // List of all elements that need to be restored
@@ -4105,7 +4432,7 @@ function restorePlanningViewElements() {
 }
 
 // Function to translate manufacturer view specifically
-function translateManufacturerView() {
+function _translateManufacturerView() {
     const manufacturerView = document.getElementById('manufacturer-view');
     if (!manufacturerView) {
         return;
@@ -4167,7 +4494,7 @@ function translateProductTiles() {
     
     productCards.forEach(card => {
         // Find all text content in the card and translate common technical terms
-        const textElements = card.querySelectorAll('.tech-spec-item, .tech-spec-label, .spec-label');
+        const textElements = card.querySelectorAll('.product-card-spec-label, .tech-spec-item, .tech-spec-label, .spec-label');
         
         textElements.forEach(element => {
             let text = element.textContent || '';
@@ -4222,8 +4549,7 @@ function translateProductTiles() {
         const walker = document.createTreeWalker(
             card,
             NodeFilter.SHOW_TEXT,
-            null,
-            false
+            null
         );
         
         const textNodes: Text[] = [];
@@ -4304,27 +4630,6 @@ function translateChatbot() {
     
     console.log('Chatbot translation completed');
 }
-// ===============================================
-// APPLICATION INITIALIZATION
-// ===============================================
-
-// ===============================================
-// APPLICATION INITIALIZATION
-// ===============================================
-
-// ===============================================
-// APPLICATION INITIALIZATION
-// ===============================================
-
-// ===============================================
-// APPLICATION INITIALIZATION
-// ===============================================
-
-// ===============================================
-// APPLICATION INITIALIZATION
-// ===============================================
-
-
 
 // ===============================================
 // APPLICATION INITIALIZATION
@@ -4354,4 +4659,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLogoLogout();
 });
+
+
 
