@@ -475,12 +475,17 @@
           "speed": "Speed (km/h)",
           "impactAngle": "Impact Angle (°)",
           "penetration": "Penetration (m)",
+<<<<<<< HEAD
                       "debrisDistance": "Debris Distance (m)",
             "actions": "Actions",
             "material": "Material",
             "performance": "Performance",
             "dimensions": "Dimensions",
             "foundation": "Foundation",
+=======
+          "debrisDistance": "Debris Distance (m)",
+          "actions": "Actions",
+>>>>>>> a6e570b0fb8822a5ac40649923b974a1f8326956
           "noProducts": "No products found",
           "loading": "Loading products...",
           "technicalSpecs": "Technical Specifications",
