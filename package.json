@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --minify terser",
+    "postbuild": "xcopy /E /I /Y public\\images docs\\images && xcopy /Y public\\*.json docs\\",
     "preview": "vite preview",
     "deploy": "npm run build && git add docs && git commit -m 'deploy' || echo 'skip commit' && git push"
   },
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "terser": "^5.43.1",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   }

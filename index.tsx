@@ -29,6 +29,193 @@ declare const L: any;
 declare const jsPDF: any;
 declare const html2canvas: any;
 
+// ===============================================
+// AUTHENTICATION SYSTEM
+// ===============================================
+
+const CORRECT_PASSWORD = '1919';
+const AUTH_SESSION_KEY = 'barricadix_authenticated';
+
+/**
+ * Initialize authentication system
+ */
+function initAuth() {
+    // Always show welcome screen first (for testing purposes)
+    // Check if user is already authenticated
+    // if (sessionStorage.getItem(AUTH_SESSION_KEY) === 'true') {
+    //     showMainApp();
+    //     return;
+    // }
+    
+    // Show welcome screen and set up auth form
+    showWelcomeScreen();
+    setupAuthForm();
+}
+
+/**
+ * Show the welcome screen
+ */
+function showWelcomeScreen() {
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const appContainer = document.getElementById('app-container');
+    
+    if (welcomeScreen && appContainer) {
+        welcomeScreen.style.display = 'flex';
+        appContainer.style.display = 'none';
+    }
+}
+
+/**
+ * Show the main application
+ */
+function showMainApp() {
+    console.log('🎯 SHOW MAIN APP CALLED!');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const appContainer = document.getElementById('app-container');
+    
+    if (welcomeScreen && appContainer) {
+        console.log('🎯 Hiding welcome screen, showing app container...');
+        welcomeScreen.style.display = 'none';
+        appContainer.style.display = 'flex';
+        
+        // Initialize the main app only after authentication
+        initializeApp();
+        
+        // Force map to recalculate size after showing main app
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('Map size invalidated after showing main app');
+            }
+        }, 200);
+        
+        // Additional invalidation for safety
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('Map size invalidated - final check');
+            }
+        }, 500);
+    }
+}
+
+/**
+ * Set up authentication form event handlers
+ */
+function setupAuthForm() {
+    const authForm = document.getElementById('auth-form');
+    const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+    const authError = document.getElementById('auth-error');
+    const authButton = document.getElementById('auth-submit');
+    
+    if (!authForm || !passwordInput || !authError || !authButton) {
+        console.error('Auth form elements not found');
+        return;
+    }
+    
+    // Handle form submission
+    authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        attemptLogin(passwordInput.value);
+    });
+    
+    // Handle Enter key in password field
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            attemptLogin(passwordInput.value);
+        }
+    });
+    
+    // Clear error when user starts typing
+    passwordInput.addEventListener('input', () => {
+        hideAuthError();
+    });
+    
+    // Focus password input
+    passwordInput.focus();
+}
+
+/**
+ * Attempt to log in with provided password
+ */
+function attemptLogin(password: string) {
+    const authError = document.getElementById('auth-error');
+    const authButton = document.getElementById('auth-submit');
+    const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+    
+    if (!authError || !authButton || !passwordInput) return;
+    
+    // Disable form during authentication
+    authButton.style.opacity = '0.7';
+    authButton.style.pointerEvents = 'none';
+    passwordInput.disabled = true;
+    
+    // Simulate slight delay for better UX
+    setTimeout(() => {
+        if (password === CORRECT_PASSWORD) {
+            // Successful authentication
+            sessionStorage.setItem(AUTH_SESSION_KEY, 'true');
+            
+            // Add success animation
+            authButton.innerHTML = '<i class="fas fa-check"></i> Erfolgreich!';
+            authButton.style.background = 'linear-gradient(45deg, #10b981, #059669)';
+            
+            setTimeout(() => {
+                showMainApp();
+            }, 800);
+        } else {
+            // Failed authentication
+            showAuthError();
+            
+            // Re-enable form
+            authButton.style.opacity = '1';
+            authButton.style.pointerEvents = 'auto';
+            passwordInput.disabled = false;
+            passwordInput.value = '';
+            passwordInput.focus();
+            
+            // Reset button text
+            authButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Anmelden';
+        }
+    }, 500);
+}
+
+/**
+ * Show authentication error
+ */
+function showAuthError() {
+    const authError = document.getElementById('auth-error');
+    if (authError) {
+        authError.style.display = 'flex';
+        setTimeout(() => {
+            authError.style.display = 'none';
+        }, 3000);
+    }
+}
+
+/**
+ * Hide authentication error
+ */
+function hideAuthError() {
+    const authError = document.getElementById('auth-error');
+    if (authError) {
+        authError.style.display = 'none';
+    }
+}
+
+/**
+ * Logout function (can be called from anywhere in the app)
+ */
+function logout() {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    showWelcomeScreen();
+    setupAuthForm();
+}
+
+// Make logout available globally
+(window as any).logout = logout;
+
 // App state
 let map: any; // Module-scoped map object
 let tileLayer: any; // Module-scoped tile layer object
@@ -45,6 +232,7 @@ let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], to
 let generatedPdf: any = null; // To hold the generated PDF object
 let generatedPdfUrl: string | null = null; // Object URL for iframe preview
 let productDatabase: any[] = []; // To cache the product data
+let pinnedTooltips: Array<{element: HTMLElement, marker: any, latLng: any}> = []; // Track pinned tooltips for map movement
 
 // Internationalization (i18n) state
 let currentLanguage = 'de';
@@ -148,25 +336,41 @@ const embeddedTranslations = {
             "chatbot": {
                 "title": "Zufahrtsschutz-Assistent",
                 "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
-                "assetQuestion": "Welche Schutzgüter möchten Sie absichern? Hinweis: Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
+                "assetQuestion": "Welche Schutzgüter möchten Sie absichern?",
+                "assetOptions": "Menschenmenge,Gebäude,KRITIS-Prozess,Veranstaltungsfläche",
+                "assetPlaceholder": "z. B. Menschenmenge, Bühne",
+                "assetQuestionInfo": "Grundlage für Schutzziel & Schutzklasse (DIN SPEC 91414-2 / ISO 22343-2)",
                 "inputPlaceholder": "Antwort eingeben...",
                 "sendButton": "Senden",
                 "stakeholderQuestion": "Wer sind die relevanten Stakeholder (Behörden, Veranstalter, Betreiber)?",
+                "stakeholderOptions": "Behörden,Veranstalter,Betreiber",
                 "restRiskQuestion": "Welches akzeptable Restrisiko gilt?",
+                "restRiskOptions": "niedrig,mittel,hoch",
+                "restRiskQuestionInfo": "Steuert Schutzklasse/Sicherungsgrad (DIN SPEC 91414-2)",
                 "operationalQuestion": "Betriebsanforderungen (mehrfach wählbar)",
+                "operationalOptions": "Feuerwehrzufahrt,Fluchtwege,Verkehrssicherheit,Betriebssicherheit",
                 "threatQuestion": "Welche Art fahrzeuggestützter Bedrohung ist zu erwarten?",
+                "threatOptions": "intentional,unbeabsichtigt,beides",
                 "vehicleTypesQuestion": "Welche Fahrzeugtypen sind relevant?",
+                "vehicleOptions": "PKW,Transporter,LKW,Bus",
                 "accessCorridorsQuestion": "Wo könnten Fahrzeuge eindringen? (Karte markieren oder beschreiben)",
+                "accessCorridorsPlaceholder": "Polyline/Polygon auswählen oder kurz beschreiben",
                 "speedQuestion": "Maximale Zufahrtsgeschwindigkeit (km/h)",
+                "speedQuestionInfo": "Pflichtparameter für FSB-Performance (ISO 22343-2/-1)",
                 "angleQuestion": "Wahrscheinlicher Anprallwinkel (°)",
+                "angleQuestionInfo": "Pflichtparameter für FSB-Performance (ISO 22343-2/-1)",
                 "groundQuestion": "Untergrund/Fundamente am Standort",
+                "groundOptions": "Asphalt,Beton,Pflaster,Erde,Unbekannt",
                 "riskMatrixQuestion": "Risikobewertung: Eintrittswahrscheinlichkeit & Schadensausmaß",
+                "riskMatrixOptions": "EW:niedrig|SA:gering,EW:niedrig|SA:mittel,EW:mittel|SA:mittel,EW:hoch|SA:schwer",
+                "riskMatrixQuestionInfo": "Erzeugt Sicherungsgrad & Schutzklasse (DIN SPEC 91414-2)",
+                "infoPrefix": "Hinweis: ",
                 "completionMessage": "Danke! Alle erforderlichen Angaben sind vorhanden. Möchten Sie den normkonformen PDF-Plan erzeugen?"
             }
         },
         "manufacturer": {
-            "title": "",
-            "subtitle": "",
+            "title": "Herstelleransicht",
+            "subtitle": "Verwalten Sie Ihren Produktkatalog und Kundenanfragen",
             "products": "Produkte",
             "quotations": "Angebote",
             "customers": "Kunden",
@@ -236,19 +440,61 @@ const embeddedTranslations = {
                     }
                 },
                 "productDatabase": {
-                    "technicalSpecs": {
-                        "standard": "Standard",
-                        "vehicleWeight": "Fahrzeuggewicht",
-                        "vehicleType": "Fahrzeugtyp",
-                        "speed": "Geschwindigkeit",
-                        "impactAngle": "Anprallwinkel",
-                        "penetration": "Penetration"
+                    "title": "Produktdatenbank",
+                    "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
+                    "search": "Produktsuche",
+                    "searchPlaceholder": "Produktname, Hersteller, Standard oder Fahrzeugtyp eingeben...",
+                    "filterBy": "Filtern nach",
+                    "manufacturer": "Hersteller",
+                    "type": "Typ",
+                    "standard": "Standard",
+                    "vehicleWeight": "Fahrzeuggewicht (kg)",
+                    "vehicleType": "Fahrzeugtyp",
+                    "speed": "Geschwindigkeit (km/h)",
+                    "impactAngle": "Anprallwinkel (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Trümmerdistanz (m)",
+                    "actions": "Aktionen",
+                    "noProducts": "Keine Produkte gefunden",
+                    "loading": "Produkte werden geladen...",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "certificationStandard": "Zertifizierungsstandard",
+                    "testConditions": "Testbedingungen",
+                    "atSpeed": "bei",
+                    "viewDetails": "Details anzeigen",
+                    "closeDetails": "Schließen",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken",
+                    "modal": {
+                        "title": "Produktdetails",
+                        "technicalSpecs": "Technische Spezifikationen",
+                        "performanceData": "Leistungsdaten",
+                        "certification": "Zertifizierung",
+                        "exportData": "Daten exportieren",
+                        "printSpecs": "Spezifikationen drucken"
                     },
-                    "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+                    "toggleToGrid": "Kachelansicht",
                     "toggleToTable": "Tabellenansicht",
-                    "toggleToGrid": "Kachelansicht"
+                    "table": {
+                        "manufacturer": "Hersteller",
+                        "type": "Typ",
+                        "standard": "Standard",
+                        "vehicleWeight": "Fahrzeuggewicht (kg)",
+                        "vehicleType": "Fahrzeugtyp",
+                        "speed": "Geschwindigkeit (km/h)",
+                        "impactAngle": "Anprallwinkel (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Trümmerdistanz (m)",
+                        "actions": "Aktionen"
+                    }
                 }
             }
+        },
+        "tooltips": {
+            "securityRisk": "Informationen zum Sicherheitsrisiko.",
+            "productClass": "Informationen zur empfohlenen Produktklasse."
         },
         "report": {
             "mainTitle": "Risikobewertung für Zufahrtsschutz",
@@ -335,6 +581,9 @@ const embeddedTranslations = {
             "reset": "Zurücksetzen",
             "securityAreaLabel": "Sicherheitsbereich",
             "analyzeAccess": "Zugang analysieren"
+        },
+        "placeholders": {
+            "assetToProtect": "Bitte eintragen"
         },
         "alerts": {
             "noPolygon": "Bitte zeichnen Sie zuerst einen Sicherheitsbereich auf der Karte.",
@@ -445,19 +694,35 @@ const embeddedTranslations = {
             "chatbot": {
                 "title": "Access Protection Assistant",
                 "welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
-                "assetQuestion": "Which protective assets would you like to secure? Note: Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
+                "assetQuestion": "Which protective assets would you like to secure?",
+                "assetOptions": "Crowd,Building,KRITIS Process,Event Area",
+                "assetPlaceholder": "e.g. Crowd, Stage",
+                "assetQuestionInfo": "Basis for Protection Goal & Protection Class (DIN SPEC 91414-2 / ISO 22343-2)",
                 "inputPlaceholder": "Enter answer...",
                 "sendButton": "Send",
                 "stakeholderQuestion": "Who are the relevant stakeholders (authorities, organizers, operators)?",
+                "stakeholderOptions": "Authorities,Organizers,Operators",
                 "restRiskQuestion": "What acceptable residual risk applies?",
+                "restRiskOptions": "low,medium,high",
+                "restRiskQuestionInfo": "Controls protection class/security level (DIN SPEC 91414-2)",
                 "operationalQuestion": "Operational requirements (multiple choice)",
+                "operationalOptions": "Fire brigade access,Escape routes,Traffic safety,Operational safety",
                 "threatQuestion": "What type of vehicle-based threat is expected?",
+                "threatOptions": "intentional,unintentional,both",
                 "vehicleTypesQuestion": "Which vehicle types are relevant?",
+                "vehicleOptions": "Car,Van,Truck,Bus",
                 "accessCorridorsQuestion": "Where could vehicles penetrate? (Mark on map or describe)",
+                "accessCorridorsPlaceholder": "Select polyline/polygon or describe briefly",
                 "speedQuestion": "Maximum access speed (km/h)",
+                "speedQuestionInfo": "Mandatory parameter for FSB performance (ISO 22343-2/-1)",
                 "angleQuestion": "Probable impact angle (°)",
+                "angleQuestionInfo": "Mandatory parameter for FSB performance (ISO 22343-2/-1)",
                 "groundQuestion": "Ground/foundations at the site",
+                "groundOptions": "Asphalt,Concrete,Paving,Earth,Unknown",
                 "riskMatrixQuestion": "Risk assessment: probability of occurrence & extent of damage",
+                "riskMatrixOptions": "Prob:low|Damage:minor,Prob:low|Damage:medium,Prob:medium|Damage:medium,Prob:high|Damage:severe",
+                "riskMatrixQuestionInfo": "Generates security level & protection class (DIN SPEC 91414-2)",
+                "infoPrefix": "Note: ",
                 "completionMessage": "Thank you! All required information is available. Would you like to generate the standards-compliant PDF plan?"
             }
         },
@@ -521,22 +786,73 @@ const embeddedTranslations = {
                         "30days": "Last 30 Days",
                         "90days": "Last 90 Days",
                         "1year": "Last Year"
+                    },
+                    "manufacturer": {
+                        "all": "All Manufacturers"
+                    },
+                    "standard": {
+                        "all": "All Standards"
+                    },
+                    "vehicleType": {
+                        "all": "All Vehicle Types"
                     }
                 },
                 "productDatabase": {
-                    "technicalSpecs": {
-                        "standard": "Standard",
-                        "vehicleWeight": "Vehicle Weight",
-                        "vehicleType": "Vehicle Type",
-                        "speed": "Speed",
-                        "impactAngle": "Impact Angle",
-                        "penetration": "Penetration"
+                    "title": "Product Database",
+                    "subtitle": "Technical data and specifications of all available products",
+                    "search": "Product Search",
+                    "searchPlaceholder": "Enter product name, manufacturer, standard or vehicle type...",
+                    "filterBy": "Filter by",
+                    "manufacturer": "Manufacturer",
+                    "type": "Type",
+                    "standard": "Standard",
+                    "vehicleWeight": "Vehicle Weight (kg)",
+                    "vehicleType": "Vehicle Type",
+                    "speed": "Speed (km/h)",
+                    "impactAngle": "Impact Angle (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Debris Distance (m)",
+                    "actions": "Actions",
+                    "noProducts": "No products found",
+                    "loading": "Loading products...",
+                    "technicalSpecs": "Technical Specifications",
+                    "performanceData": "Performance Data",
+                    "certification": "Certification",
+                    "certificationStandard": "Certification Standard",
+                    "testConditions": "Test Conditions",
+                    "atSpeed": "at",
+                    "viewDetails": "View Details",
+                    "closeDetails": "Close",
+                    "exportData": "Export Data",
+                    "printSpecs": "Print Specifications",
+                    "modal": {
+                        "title": "Product Details",
+                        "technicalSpecs": "Technical Specifications",
+                        "performanceData": "Performance Data",
+                        "certification": "Certification",
+                        "exportData": "Export Data",
+                        "printSpecs": "Print Specifications"
                     },
-                    "searchPlaceholder": "Enter product name, manufacturer or type...",
+                    "toggleToGrid": "Grid View",
                     "toggleToTable": "Table View",
-                    "toggleToGrid": "Grid View"
+                    "table": {
+                        "manufacturer": "Manufacturer",
+                        "type": "Type",
+                        "standard": "Standard",
+                        "vehicleWeight": "Vehicle Weight (kg)",
+                        "vehicleType": "Vehicle Type",
+                        "speed": "Speed (km/h)",
+                        "impactAngle": "Impact Angle (°)",
+                        "penetration": "Penetration (m)",
+                        "debrisDistance": "Debris Distance (m)",
+                        "actions": "Actions"
+                    }
                 }
             }
+        },
+        "tooltips": {
+            "securityRisk": "Information about security risk.",
+            "productClass": "Information about recommended product class."
         },
         "report": {
             "mainTitle": "Risk Assessment for Access Protection",
@@ -694,6 +1010,7 @@ function initViewSwitcher() {
         
         // Initialize product database functionality after translations are loaded
         setTimeout(() => {
+            console.log('🔥 ABOUT TO CALL initProductDatabase from initViewSwitcher...');
             initProductDatabase();
         }, 500);
     }, 100);
@@ -715,6 +1032,7 @@ function switchToPlanningView() {
 
 // Function to switch to manufacturer view
 function switchToManufacturerView() {
+    console.log('🎯 SWITCHING TO MANUFACTURER VIEW...');
     const planningBtn = document.getElementById('planning-view-btn');
     const manufacturerBtn = document.getElementById('manufacturer-view-btn');
     
@@ -725,11 +1043,20 @@ function switchToManufacturerView() {
     
     // Show manufacturer view content
     showManufacturerView();
+    
+    // Initialize product database when switching to manufacturer view
+    console.log('🔥 INITIALIZING PRODUCT DATABASE FOR MANUFACTURER VIEW...');
+    setTimeout(() => {
+        initProductDatabase();
+    }, 100);
 }
 
 // Function to show planning view
 function showPlanningView() {
     console.log('Switching to planning view...');
+    
+    // Clear any pinned product tooltips when switching views
+    clearProductTooltips();
     
     // Hide manufacturer view completely
     const manufacturerView = document.getElementById('manufacturer-view');
@@ -746,7 +1073,7 @@ function showPlanningView() {
     }
     
     // Restore all planning view elements
-    restorePlanningViewElements();
+    // restorePlanningViewElements(); // Function moved to bottom
     
     // CRITICAL: Remove ALL view-hidden classes from map elements
     const mapElements = [
@@ -813,6 +1140,9 @@ function showPlanningView() {
 
 // Function to show manufacturer view
 function showManufacturerView() {
+    // Clear any pinned product tooltips when switching views
+    clearProductTooltips();
+    
     // Save current map state before switching
     if (map) {
         (window as any).savedMapState = {
@@ -884,7 +1214,7 @@ function showManufacturerView() {
     
     // Translate manufacturer view after showing it
     setTimeout(() => {
-        translateManufacturerView();
+        translateUI(); // Use the main translation function
     }, 50);
     
     showNotification('Hersteller-Ansicht aktiviert', 'success');
@@ -918,12 +1248,13 @@ function restoreMapState() {
  * Initialize the product database functionality
  */
 function initProductDatabase() {
-    console.log('Initializing product database...');
+    console.log('🚀 INITIALIZING PRODUCT DATABASE...');
     
     // Apply translations to product database elements first
     translateProductDatabase();
     
     // Load product data
+    console.log('🔍 About to call loadProductDatabase...');
     loadProductDatabase();
     
     // Initialize search and filter functionality
@@ -934,31 +1265,38 @@ function initProductDatabase() {
 }
 
 /**
- * Load the product database from the JSON file
+ * Load the product database from the JSON file with optimizations
  */
 async function loadProductDatabase() {
+    // Show loading indicator
+    const loadingIndicator = document.getElementById('products-loading');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+    
     try {
-        const response = await fetch('/product-database.json');
+        // Use fetch with cache optimization
+        const response = await fetch(`${import.meta.env.BASE_URL}product-database.json`, {
+            cache: 'force-cache' // Cache for better performance
+        });
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const products = await response.json();
-        console.log('Product database loaded:', products.length, 'products');
+        console.log('✅ Product database loaded:', products.length, 'products');
         
-        // Store products globally
+        // Store products globally with memory optimization
         (window as any).productDatabase = products;
         
-        // Populate filters
+        // Populate filters efficiently
         populateProductFilters(products);
         
-        // Display products
-        console.log('About to display products:', products.length);
-        displayProducts(products);
-        console.log('Products display completed');
+        // Display products with lazy loading
+        await displayProducts(products);
         
         // Hide loading indicator
-        const loadingIndicator = document.getElementById('products-loading');
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
         }
@@ -1004,10 +1342,10 @@ function populateProductFilters(products: any[]) {
         });
     }
     
-    // Standard filter
+    // Standard filter (NEW DATABASE STRUCTURE)
     const standardFilter = document.getElementById('standard-filter') as HTMLSelectElement;
     if (standardFilter) {
-        const standards = [...new Set(products.map(p => p.standard).filter(Boolean))];
+        const standards = [...new Set(products.map(p => p.technical_data?.standard).filter(Boolean))];
         standards.forEach(standard => {
             const option = document.createElement('option');
             option.value = standard;
@@ -1016,14 +1354,15 @@ function populateProductFilters(products: any[]) {
         });
     }
     
-    // Vehicle type filter
+    // Material filter (NEW DATABASE STRUCTURE - replacing vehicle type)
     const vehicleTypeFilter = document.getElementById('vehicle-type-filter') as HTMLSelectElement;
     if (vehicleTypeFilter) {
-        const vehicleTypes = [...new Set(products.map(p => p.vehicleType).filter(Boolean))];
-        vehicleTypes.forEach(vehicleType => {
+        // Update to use material instead of vehicleType for new database structure
+        const materials = [...new Set(products.map(p => p.technical_data?.material).filter(Boolean))];
+        materials.forEach(material => {
             const option = document.createElement('option');
-            option.value = vehicleType;
-            option.textContent = vehicleType;
+            option.value = material;
+            option.textContent = material;
             vehicleTypeFilter.appendChild(option);
         });
     }
@@ -1032,18 +1371,24 @@ function populateProductFilters(products: any[]) {
 /**
  * Display products in the table
  */
-function displayProducts(products: any[]) {
-    console.log('displayProducts called with', products.length, 'products');
+async function displayProducts(products: any[]) {
+    console.log('🎯 displayProducts called with', products.length, 'products');
+    
+    // Check if required HTML elements exist
+    const tableBody = document.getElementById('products-tbody');
+    const gridContainer = document.getElementById('products-grid');
+    console.log('🔍 Table body element:', tableBody ? 'EXISTS' : 'MISSING');
+    console.log('🔍 Grid container element:', gridContainer ? 'EXISTS' : 'MISSING');
     
     // Display in table view
-    console.log('Calling displayProductsTable...');
+    console.log('🎯 Calling displayProductsTable...');
     displayProductsTable(products);
     
     // Display in grid view
-    console.log('Calling displayProductsGrid...');
-    displayProductsGrid(products);
+    console.log('🎯 Calling displayProductsGrid...');
+    await displayProductsGrid(products);
     
-    console.log('displayProducts completed');
+    console.log('✅ displayProducts completed');
 }
 
 /**
@@ -1075,21 +1420,23 @@ function displayProductsTable(products: any[]) {
         noProducts.style.display = 'none';
     }
     
-    products.forEach((product, index) => {
+    // Clean products before displaying in table
+    const cleanedProducts = removeDuplicateProducts(products);
+    
+    cleanedProducts.forEach((product, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${product.manufacturer || 'N/A'}</td>
-            <td>${product.type || 'N/A'}</td>
-            <td>${product.standard || 'N/A'}</td>
-            <td>${product.vehicleWeight || 'N/A'}</td>
-            <td>${product.vehicleType || 'N/A'}</td>
-            <td>${product.speed || 'N/A'}</td>
-            <td>${product.impactAngle || 'N/A'}</td>
-            <td>${product.penetration || 'N/A'}</td>
-            <td>${product.debrisDistance || 'N/A'}</td>
+            <td>${product.product_name || 'N/A'}</td>
+            <td>${product.technical_data?.standard || 'N/A'}</td>
+            <td>${product.technical_data?.performance_rating || 'N/A'}</td>
+            <td>${product.technical_data?.dimensions || 'N/A'}</td>
+            <td>${product.technical_data?.foundation_depth || 'N/A'}</td>
+            <td>${product.technical_data?.material || 'N/A'}</td>
+            <td>${product.datasheet_url ? `<a href="${product.datasheet_url}" target="_blank">Link</a>` : 'N/A'}</td>
             <td>
                 <button class="view-details-btn" data-product-index="${index}">
-                    Details anzeigen
+                    ${t('manufacturer.sidebar.productDatabase.viewDetails')}
                 </button>
             </td>
         `;
@@ -1097,15 +1444,21 @@ function displayProductsTable(products: any[]) {
         tbody.appendChild(row);
     });
     
-    console.log('Added', products.length, 'rows to table');
+    console.log('Added', cleanedProducts.length, 'rows to table');
     
     // Add click event listeners to view details buttons
     const viewButtons = tbody.querySelectorAll('.view-details-btn');
     viewButtons.forEach(button => {
         button.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
-            const productIndex = parseInt(target.getAttribute('data-product-index') || '0');
-            showProductDetails(productIndex);
+            const cleanedIndex = parseInt(target.getAttribute('data-product-index') || '0');
+            // Find the original index in the full product database
+            const product = cleanedProducts[cleanedIndex];
+            const originalProducts = (window as any).productDatabase || [];
+            const originalIndex = originalProducts.findIndex((p: any) => 
+                p.manufacturer === product.manufacturer && p.product_name === product.product_name
+            );
+            showProductDetails(originalIndex >= 0 ? originalIndex : cleanedIndex);
         });
     });
 }
@@ -1113,7 +1466,7 @@ function displayProductsTable(products: any[]) {
 /**
  * Display products in grid format
  */
-function displayProductsGrid(products: any[]) {
+async function displayProductsGrid(products: any[]) {
     const grid = document.getElementById('products-grid');
     if (!grid) return;
     
@@ -1133,22 +1486,23 @@ function displayProductsGrid(products: any[]) {
         noProductsGrid.style.display = 'none';
     }
     
-    // Sort products: products with images first, then without images
-    const sortedProducts = sortProductsByImageAvailability(products);
+    // First, remove duplicates and invalid products
+    const cleanedProducts = removeDuplicateProducts(products);
+    
+    // Sort products: products with REAL images first, then without images
+    const sortedProducts = await sortProductsByImageAvailability(cleanedProducts);
     
     // Debug: Log first few products to see sorting
     console.log('First 5 products after sorting:', sortedProducts.slice(0, 5).map(p => ({
-        type: p.type,
-        hasImage: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access',
-        validType: p.type && p.type.trim() !== '' && p.type !== 'N/A' && p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
+        product_name: p.product_name,
+        hasRealImage: p.hasRealImage,
+        manufacturer: p.manufacturer
     })));
     
-    // Debug: Count products with and without valid types
-    const productsWithValidTypes = sortedProducts.filter(p => 
-        p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
-        p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2
-    );
-    console.log(`Products with valid types: ${productsWithValidTypes.length}/${sortedProducts.length}`);
+    // Debug: Count products with and without real images
+    const productsWithImages = sortedProducts.filter(p => p.hasRealImage);
+    const productsWithoutImages = sortedProducts.filter(p => !p.hasRealImage);
+    console.log(`Products WITH real images: ${productsWithImages.length}, WITHOUT real images: ${productsWithoutImages.length}, total: ${sortedProducts.length}`);
     
     sortedProducts.forEach((product, index) => {
         const card = document.createElement('div');
@@ -1156,11 +1510,11 @@ function displayProductsGrid(products: any[]) {
         
         // Generate product image path based on product type
         const productImage = generateProductImagePath(product);
+        console.log(`🖼️ Product ${index + 1}: ${product.product_name} -> Image: ${productImage}`);
         
-        // Check if product has a valid type (could have an image)
-        const hasValidType = product.type && product.type.trim() !== '' && 
-                            product.type !== 'N/A' && product.type !== 'Manufacturer: ATG Access' && 
-                            !product.type.includes('Manufacturer:') && product.type.length > 2;
+        // Check if product actually has a real image
+        const hasValidType = product.hasRealImage;
+        console.log(`🖼️ Product ${index + 1} has real image: ${hasValidType}`);
         
         // Add special class for first 20 products with valid types
         if (hasValidType && index < 20) {
@@ -1171,49 +1525,45 @@ function displayProductsGrid(products: any[]) {
         
         card.innerHTML = `
             <div class="product-card-image ${!hasValidType ? 'no-image' : ''}">
-                <img src="${productImage}" alt="${product.type || 'Produkt'}" 
+                <img src="${productImage}" alt="${product.product_name || 'Produkt'}" 
+                     loading="lazy" decoding="async"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
                      class="product-image">
                 <div class="product-image-placeholder" style="display: none;">
                     <i class="fas fa-image"></i>
                     <span>Kein Bild verfügbar</span>
-                </span>
                 </div>
             </div>
             <div class="product-card-content">
                 <div class="product-card-header">
-                    <div class="product-card-title">${product.type || 'N/A'}</div>
+                    <div class="product-card-title">${product.product_name || 'N/A'}</div>
                     <div class="product-card-manufacturer">${product.manufacturer || 'N/A'}</div>
                 </div>
                 <div class="product-card-specs">
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.standard')}</div>
-                        <div class="product-card-spec-value">${product.standard || 'N/A'}</div>
+                        <div class="product-card-spec-label">Standard</div>
+                        <div class="product-card-spec-value">${product.technical_data?.standard || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleWeight')}</div>
-                        <div class="product-card-spec-value">${product.vehicleWeight || 'N/A'} kg</div>
+                        <div class="product-card-spec-label">Leistungsbewertung</div>
+                        <div class="product-card-spec-value">${product.technical_data?.performance_rating || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.vehicleType')}</div>
-                        <div class="product-card-spec-value">${product.vehicleType || 'N/A'}</div>
+                        <div class="product-card-spec-label">Abmessungen</div>
+                        <div class="product-card-spec-value">${product.technical_data?.dimensions || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.speed')}</div>
-                        <div class="product-card-spec-value">${product.speed || 'N/A'} km/h</div>
+                        <div class="product-card-spec-label">Fundamenttiefe</div>
+                        <div class="product-card-spec-value">${product.technical_data?.foundation_depth || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.impactAngle')}</div>
-                        <div class="product-card-spec-value">${product.impactAngle || 'N/A'}°</div>
-                    </div>
-                    <div class="product-card-spec">
-                        <div class="product-card-spec-label">${t('manufacturer.productDatabase.technicalSpecs.penetration')}</div>
-                        <div class="product-card-spec-value">${product.penetration || 'N/A'} m</div>
+                        <div class="product-card-spec-label">Material</div>
+                        <div class="product-card-spec-value">${product.technical_data?.material || 'N/A'}</div>
                     </div>
                 </div>
                 <div class="product-card-actions">
                     <button class="product-card-btn secondary" data-product-index="${index}">
-                        Details
+                        Details anzeigen
                     </button>
                 </div>
             </div>
@@ -1228,76 +1578,218 @@ function displayProductsGrid(products: any[]) {
         card.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
             if (target.classList.contains('product-card-btn')) {
-                const productIndex = parseInt(target.getAttribute('data-product-index') || '0');
-                showProductDetails(productIndex);
+                const sortedIndex = parseInt(target.getAttribute('data-product-index') || '0');
+                // Find the original index in the full product database
+                const product = sortedProducts[sortedIndex];
+                const originalProducts = (window as any).productDatabase || [];
+                const originalIndex = originalProducts.findIndex((p: any) => 
+                    p.manufacturer === product.manufacturer && p.product_name === product.product_name
+                );
+                showProductDetails(originalIndex >= 0 ? originalIndex : sortedIndex);
             }
         });
     });
 }
 
 /**
- * Sort products by image availability - products with images first
+ * Remove duplicate products and filter out invalid entries
  */
-function sortProductsByImageAvailability(products: any[]): any[] {
-    console.log('Sorting products by image availability...');
+function removeDuplicateProducts(products: any[]): any[] {
+    console.log('Removing duplicates from', products.length, 'products');
     
-    const sorted = [...products].sort((a, b) => {
-        // Check if product has a meaningful type that could have an image
-        const aHasImage = a.type && a.type.trim() !== '' && a.type !== 'N/A' && a.type !== 'Manufacturer: ATG Access';
-        const bHasImage = b.type && b.type.trim() !== '' && b.type !== 'N/A' && b.type !== 'Manufacturer: ATG Access';
+    // Filter out products with empty or missing product names (NEW DATABASE STRUCTURE)
+    const validProducts = products.filter((product: any) => {
+        const hasProductName = product.product_name && product.product_name.trim() !== '';
+        const hasManufacturer = product.manufacturer && product.manufacturer.trim() !== '';
         
-        // Additional check: exclude products with very generic or invalid types
-        const aValidType = aHasImage && !a.type.includes('Manufacturer:') && a.type.length > 2;
-        const bValidType = bHasImage && !b.type.includes('Manufacturer:') && b.type.length > 2;
+        if (!hasProductName) {
+            console.log('🔍 Filtering out product with empty product_name:', {
+                product_name: product.product_name,
+                manufacturer: product.manufacturer,
+                keys: Object.keys(product),
+                fullProduct: product
+            });
+        }
+        if (!hasManufacturer) {
+            console.log('Filtering out product with empty manufacturer:', product);
+        }
         
-        if (aValidType && !bValidType) {
-            console.log(`Sorting: "${a.type}" (valid) before "${b.type}" (invalid)`);
-            return -1; // a has valid type, b doesn't
-        }
-        if (!aValidType && bValidType) {
-            console.log(`Sorting: "${b.type}" (valid) before "${a.type}" (invalid)`);
-            return 1;  // b has valid type, a doesn't
-        }
-        return 0; // both have valid types or both don't
+        return hasProductName && hasManufacturer;
     });
     
-    console.log('Sorting completed. First 10 products:');
-    sorted.slice(0, 10).forEach((p, i) => {
-        const isValid = p.type && p.type.trim() !== '' && p.type !== 'N/A' && 
-                       p.type !== 'Manufacturer: ATG Access' && !p.type.includes('Manufacturer:') && p.type.length > 2;
-        console.log(`${i + 1}. "${p.type}" - Valid: ${isValid}`);
+    console.log('Valid products after filtering:', validProducts.length);
+    
+            // Remove duplicates based on manufacturer + product_name combination (NEW DATABASE STRUCTURE)
+        const uniqueProducts = validProducts.filter((product: any, index: number, array: any[]) => {
+            const key = `${product.manufacturer.trim()}|${product.product_name.trim()}`;
+            const isDuplicate = array.findIndex((p: any) => `${p.manufacturer.trim()}|${p.product_name.trim()}` === key) !== index;
+            return !isDuplicate;
+        });
+        
+        // Minimal logging for production
+        if (import.meta.env.DEV) {
+            console.log('Unique products after deduplication:', uniqueProducts.length);
+            console.log('Removed', products.length - uniqueProducts.length, 'duplicates and invalid entries');
+        }
+    
+    return uniqueProducts;
+}
+
+/**
+ * Sort products by ACTUAL image availability - products with real images first
+ */
+async function sortProductsByImageAvailability(products: any[]): Promise<any[]> {
+    console.log('Sorting products by ACTUAL image availability...');
+    
+    // Check actual image availability for all products
+    const productsWithImageStatus = await Promise.all(
+        products.map(async (product) => {
+            const imagePath = generateProductImagePath(product);
+            const hasRealImage = await checkImageExists(imagePath);
+            const hasDatabaseFilename = product.product_image_file && product.product_image_file !== null && product.product_image_file.trim() !== '';
+            return {
+                ...product,
+                hasRealImage: hasRealImage,
+                hasDatabaseFilename: hasDatabaseFilename
+            };
+        })
+    );
+    
+    // Sort by priority: 1) Products with database filename AND real image, 2) Products with real image (but no database filename), 3) Products without images
+    const sorted = productsWithImageStatus.sort((a, b) => {
+        // Priority 1: Products with database filename and real image
+        if (a.hasDatabaseFilename && a.hasRealImage && !(b.hasDatabaseFilename && b.hasRealImage)) {
+            console.log(`Sorting: "${a.product_name}" (database image) before "${b.product_name}"`);
+            return -1;
+        }
+        if (b.hasDatabaseFilename && b.hasRealImage && !(a.hasDatabaseFilename && a.hasRealImage)) {
+            console.log(`Sorting: "${b.product_name}" (database image) before "${a.product_name}"`);
+            return 1;
+        }
+        
+        // Priority 2: Products with real image (fallback to name-based image)
+        if (a.hasRealImage && !b.hasRealImage) {
+            console.log(`Sorting: "${a.product_name}" (has real image) before "${b.product_name}" (no image)`);
+            return -1;
+        }
+        if (!a.hasRealImage && b.hasRealImage) {
+            console.log(`Sorting: "${b.product_name}" (has real image) before "${a.product_name}" (no image)`);
+            return 1;
+        }
+        
+        return 0; // Equal priority
+    });
+    
+    // Debug output
+    const withDatabaseImages = sorted.filter(p => p.hasDatabaseFilename && p.hasRealImage);
+    const withTypeBasedImages = sorted.filter(p => !p.hasDatabaseFilename && p.hasRealImage);
+    const withoutImages = sorted.filter(p => !p.hasRealImage);
+    console.log(`Sorting completed: ${withDatabaseImages.length} products with DATABASE images, ${withTypeBasedImages.length} products with TYPE-based images, ${withoutImages.length} products WITHOUT images`);
+    
+    console.log('First 5 products with database images:');
+    withDatabaseImages.slice(0, 5).forEach((p, i) => {
+        console.log(`${i + 1}. "${p.product_name}" - Database filename: ${p.product_image_file}`);
     });
     
     return sorted;
 }
 
 /**
- * Generate product image path based on product type
+ * Check if an image exists with optimized loading
+ */
+function checkImageExists(imagePath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        const timeout = setTimeout(() => {
+            resolve(false);
+        }, 1500); // Reduced timeout for faster loading
+        
+        img.onload = () => {
+            clearTimeout(timeout);
+            resolve(true);
+        };
+        
+        img.onerror = () => {
+            clearTimeout(timeout);
+            resolve(false);
+        };
+        
+        // Add loading optimization
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = imagePath;
+        
+        // Timeout after 2 seconds to avoid hanging
+        setTimeout(() => {
+            console.log('⏰ Image check timeout:', imagePath);
+            resolve(false);
+        }, 2000);
+    });
+}
+
+
+
+/**
+ * Generate product image path based on product_image_file or product name (NEW DATABASE STRUCTURE)
  */
 function generateProductImagePath(product: any): string {
-    if (!product.type || product.type === '') {
-        return '/Datenbank_Produktbilder/default_product_img01.jpg';
+    console.log('🖼️ === GENERATING IMAGE PATH ===');
+    console.log('🖼️ Product:', {
+        name: product.product_name,
+        manufacturer: product.manufacturer,
+        image_file: product.product_image_file
+    });
+    console.log('🖼️ BASE_URL:', import.meta.env.BASE_URL);
+
+    // Priority 1: Use product_image_file if available (NEW DATABASE STRUCTURE)
+    if (product.product_image_file && product.product_image_file !== null && product.product_image_file.trim() !== '') {
+        const imageFromDatabase = `${import.meta.env.BASE_URL}images/${product.product_image_file}`;
+        console.log('🖼️ ✅ Using database image file:', product.product_image_file);
+        console.log('🖼️ ✅ Full image path from database:', imageFromDatabase);
+        
+        // Test if image exists by creating a test image element
+        const testImg = new Image();
+        testImg.onload = () => console.log('🖼️ ✅ Image exists and loaded:', imageFromDatabase);
+        testImg.onerror = () => console.log('🖼️ ❌ Image failed to load:', imageFromDatabase);
+        testImg.src = imageFromDatabase;
+        
+        return imageFromDatabase;
     }
     
-    // Clean product type for filename matching
-    let cleanType = product.type
+    // Priority 2: Fallback to product name-based naming if no database filename
+    if (!product.product_name || product.product_name === '') {
+        const defaultPath = `${import.meta.env.BASE_URL}images/default_product_img01.jpg`;
+        console.log('Using default image path:', defaultPath);
+        return defaultPath;
+    }
+    
+    // Clean product name for filename matching
+    let cleanName = product.product_name
         .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special characters except spaces, hyphens, underscores
         .replace(/\s+/g, '_') // Replace spaces with underscores
         .replace(/[_-]+/g, '_') // Replace multiple hyphens/underscores with single
         .trim();
     
+    console.log('Original product name:', product.product_name);
+    console.log('Cleaned product name:', cleanName);
+    console.log('No product_image_file found, using name-based fallback');
+    
     // Try different image naming patterns
     const imagePatterns = [
-        `${cleanType}_img01.jpg`,
-        `${cleanType}_img02.jpg`,
-        `${cleanType}_img03.jpg`,
-        `${cleanType}.jpg`,
-        `${cleanType}_01.jpg`,
-        `${cleanType}_02.jpg`
+        `${cleanName}_img01.jpg`,
+        `${cleanName}_img02.jpg`,
+        `${cleanName}_img03.jpg`,
+        `${cleanName}.jpg`,
+        `${cleanName}_01.jpg`,
+        `${cleanName}_02.jpg`
     ];
     
     // Return the first pattern (we'll let the browser handle 404s)
-    return `/Datenbank_Produktbilder/${imagePatterns[0]}`;
+    const finalPath = `${import.meta.env.BASE_URL}images/${imagePatterns[0]}`;
+    console.log('Final image path (name-based):', finalPath);
+    console.log('Available patterns:', imagePatterns);
+    
+    return finalPath;
 }
 
 /**
@@ -1407,7 +1899,7 @@ function setView(view: 'table' | 'grid') {
         gridContainer.style.display = 'block';
         
         // Update button to show "back to table"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToTable');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToTable');
         if (buttonIcon) buttonIcon.className = 'fas fa-table';
     } else {
         console.log('Switching to table view');
@@ -1423,7 +1915,7 @@ function setView(view: 'table' | 'grid') {
         }
         
         // Update button to show "back to grid"
-        if (buttonText) buttonText.textContent = t('manufacturer.productDatabase.toggleToGrid');
+        if (buttonText) buttonText.textContent = t('manufacturer.sidebar.productDatabase.toggleToGrid');
         if (buttonIcon) buttonIcon.className = 'fas fa-th-large';
         
         console.log('Table view activated, table should be visible now');
@@ -1435,7 +1927,7 @@ function setView(view: 'table' | 'grid') {
 /**
  * Filter products based on search input and filter selections
  */
-function filterProducts() {
+async function filterProducts() {
     const products = (window as any).productDatabase || [];
     const searchTerm = (document.getElementById('product-search') as HTMLInputElement)?.value.toLowerCase() || '';
     const manufacturer = (document.getElementById('manufacturer-filter') as HTMLSelectElement)?.value || '';
@@ -1445,17 +1937,18 @@ function filterProducts() {
     const filteredProducts = products.filter((product: any) => {
         const matchesSearch = !searchTerm || 
             product.manufacturer?.toLowerCase().includes(searchTerm) ||
-            product.type?.toLowerCase().includes(searchTerm) ||
-            product.standard?.toLowerCase().includes(searchTerm);
+            product.product_name?.toLowerCase().includes(searchTerm) ||
+            product.technical_data?.standard?.toLowerCase().includes(searchTerm);
         
         const matchesManufacturer = !manufacturer || product.manufacturer === manufacturer;
-        const matchesStandard = !standard || product.standard === standard;
-        const matchesVehicleType = !vehicleType || product.vehicleType === vehicleType;
+        const matchesStandard = !standard || product.technical_data?.standard === standard;
+        // Updated to use material filter for new database structure
+        const matchesVehicleType = !vehicleType || product.technical_data?.material === vehicleType;
         
         return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType;
     });
     
-    displayProducts(filteredProducts);
+    await displayProducts(filteredProducts);
 }
 
 /**
@@ -1484,6 +1977,8 @@ function initProductModal() {
             const modal = document.getElementById('product-modal');
             if (modal) {
                 modal.style.display = 'none';
+                // Clear stored product index
+                (modal as any).currentProductIndex = undefined;
             }
         });
     }
@@ -1502,6 +1997,8 @@ function initProductModal() {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.style.display = 'none';
+                // Clear stored product index
+                (modal as any).currentProductIndex = undefined;
             }
         });
     }
@@ -1519,16 +2016,18 @@ function showProductDetails(productIndex: number) {
     // Update modal content
     const modalProductName = document.getElementById('modal-product-name');
     if (modalProductName) {
-        modalProductName.textContent = `${product.manufacturer} - ${product.type}`;
+        modalProductName.textContent = `${product.manufacturer} - ${product.product_name}`;
     }
     
     // Technical specifications
     const technicalSpecs = document.getElementById('modal-technical-specs');
     if (technicalSpecs) {
         technicalSpecs.innerHTML = `
-            <p><strong>Hersteller:</strong> ${product.manufacturer || 'N/A'}</p>
-            <p><strong>Typ:</strong> ${product.type || 'N/A'}</p>
-            <p><strong>Standard:</strong> ${product.standard || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.manufacturer')}:</strong> ${product.manufacturer || 'N/A'}</p>
+            <p><strong>Produktname:</strong> ${product.product_name || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.standard')}:</strong> ${product.technical_data?.standard || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.dimensions')}:</strong> ${product.technical_data?.dimensions || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.material')}:</strong> ${product.technical_data?.material || 'N/A'}</p>
         `;
     }
     
@@ -1536,12 +2035,10 @@ function showProductDetails(productIndex: number) {
     const performanceData = document.getElementById('modal-performance-data');
     if (performanceData) {
         performanceData.innerHTML = `
-            <p><strong>Fahrzeuggewicht:</strong> ${product.vehicleWeight || 'N/A'} kg</p>
-            <p><strong>Fahrzeugtyp:</strong> ${product.vehicleType || 'N/A'}</p>
-            <p><strong>Geschwindigkeit:</strong> ${product.speed || 'N/A'} km/h</p>
-            <p><strong>Anprallwinkel:</strong> ${product.impactAngle || 'N/A'}°</p>
-            <p><strong>Penetration:</strong> ${product.penetration || 'N/A'} m</p>
-            <p><strong>Trümmerdistanz:</strong> ${product.debrisDistance || 'N/A'} m</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.performance')}:</strong> ${product.technical_data?.performance_rating || 'N/A'}</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.foundation')}:</strong> ${product.technical_data?.foundation_depth || 'N/A'}</p>
+            <p><strong>Standard getestet nach:</strong> ${product.technical_data?.standard_tested_to || 'N/A'}</p>
+            <p><strong>Download Datum:</strong> ${product.technical_data?.download_date || 'N/A'}</p>
         `;
     }
     
@@ -1549,8 +2046,9 @@ function showProductDetails(productIndex: number) {
     const certification = document.getElementById('modal-certification');
     if (certification) {
         certification.innerHTML = `
-            <p><strong>Zertifizierungsstandard:</strong> ${product.standard || 'N/A'}</p>
-            <p><strong>Testbedingungen:</strong> ${product.vehicleWeight || 'N/A'} kg bei ${product.speed || 'N/A'} km/h</p>
+            <p><strong>${t('manufacturer.sidebar.productDatabase.standard')}:</strong> ${product.technical_data?.standard || 'N/A'}</p>
+            <p><strong>Datenblatt URL:</strong> ${product.datasheet_url ? `<a href="${product.datasheet_url}" target="_blank">${product.datasheet_url}</a>` : 'N/A'}</p>
+            <p><strong>Produktbild:</strong> ${product.product_image_file || 'N/A'}</p>
         `;
     }
     
@@ -1558,6 +2056,8 @@ function showProductDetails(productIndex: number) {
     const modal = document.getElementById('product-modal');
     if (modal) {
         modal.style.display = 'flex';
+        // Store current product index for language switching
+        (modal as any).currentProductIndex = productIndex;
     }
 }
 
@@ -1649,6 +2149,11 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     // Debug: Log which translations source is being used
     console.log(`Translation request for key: ${key}, language: ${currentLanguage}`);
     console.log(`Translations source:`, translations === embeddedTranslations ? 'embedded' : 'external');
+    
+    // Debug: Log the structure of translations
+    console.log('Current translations structure:', translations);
+    console.log('Embedded translations structure:', embeddedTranslations);
+    
     // Ensure we have translations available
     if (!translations || !translations[currentLanguage]) {
         console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
@@ -1656,16 +2161,19 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
     }
     
     let text = getProperty(translations[currentLanguage as keyof typeof translations], key);
+    console.log(`Text from main translations for key '${key}':`, text);
     
     // If still no text found, try embedded translations
     if (typeof text !== 'string') {
         console.warn(`Translation key not found in main translations for language '${currentLanguage}': ${key}`);
         text = getProperty(embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations], key);
+        console.log(`Text from embedded translations for key '${key}':`, text);
         
         if (typeof text !== 'string') {
             console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
             // Return a more user-friendly fallback instead of the raw key
             const fallbackText = getFallbackText(key);
+            console.log(`Fallback text for key '${key}':`, fallbackText);
             return fallbackText || key;
         }
     }
@@ -1676,7 +2184,7 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
         }
     }
     
-    console.log(`Translation result for ${key}:`, text);
+    console.log(`Final translation result for ${key}:`, text);
     return text;
 }
 
@@ -1825,6 +2333,29 @@ async function translateUI() {
     
     console.log(`UI translation completed: ${translatedElements} elements translated, ${failedElements} failed`);
     
+    // Translate product tiles in manufacturer view
+    translateProductTiles();
+    
+    // Re-render product cards if manufacturer view is active
+    const manufacturerView = document.getElementById('manufacturer-view');
+    if (manufacturerView && manufacturerView.style.display !== 'none') {
+        const products = (window as any).productDatabase;
+        if (products && products.length > 0) {
+            console.log('Re-rendering product cards for language change');
+            displayProducts(products);
+        }
+        
+        // Re-render product modal if it's open
+        const modal = document.getElementById('product-modal');
+        if (modal && modal.style.display === 'block') {
+            const currentProductIndex = (modal as any).currentProductIndex;
+            if (currentProductIndex !== undefined) {
+                console.log('Re-rendering product modal for language change');
+                showProductDetails(currentProductIndex);
+            }
+        }
+    }
+    
     // Force refresh of all text content that might have been missed
     setTimeout(() => {
         let refreshCount = 0;
@@ -1850,60 +2381,12 @@ async function translateUI() {
  * Fetches the translation data from the JSON file.
  */
 async function loadTranslations() {
-    try {
-        // Try multiple paths for GitHub Pages compatibility
-        const paths = [
-            `${import.meta.env.BASE_URL}translations.json`,
-            '/translations.json',
-            './translations.json',
-            '../translations.json'
-        ];
-        
-        let loaded = false;
-        for (const path of paths) {
-            try {
-                console.log(`Trying to load translations from: ${path}`);
-                const response = await fetch(path);
-                if (response.ok) {
-                    translations = await response.json();
-                    console.log(`Translations loaded successfully from: ${path}`);
-                    loaded = true;
-                    break;
-                }
-            } catch (pathError) {
-                console.log(`Failed to load from ${path}:`, pathError);
-            }
-        }
-        
-        if (!loaded) {
-            throw new Error('All translation file paths failed');
-        }
-    } catch (error) {
-        console.error("Could not load translations from any file path:", error);
-        // Simplified fallback
-        try {
-            const fallbackResponse = await fetch('/translations.json');
-            if (fallbackResponse.ok) {
-                translations = await fallbackResponse.json();
-            }
-        } catch (fallbackError) {
-            console.error("Fallback translation loading also failed:", fallbackError);
-        }
-    }
+    // Translation file loading disabled to avoid conflicts
+    console.log('Translation file loading disabled to avoid conflicts');
     
-    // If no translations loaded from file, use embedded translations
-    if (!translations.de && !translations.en) {
-        console.log('No translations loaded from file, using embedded translations');
+    // Always use embedded translations to avoid conflicts
+    console.log('Using embedded translations to avoid conflicts');
         translations = embeddedTranslations;
-    } else {
-        console.log('Translations loaded successfully from file');
-    }
-    
-    // Ensure we always have translations available
-    if (!translations.de || !translations.en) {
-        console.warn('Incomplete translations, falling back to embedded');
-        translations = embeddedTranslations;
-    }
 }
 
 /**
@@ -1937,7 +2420,7 @@ async function setLanguage(lang: string) {
     // Also translate manufacturer view if it's visible
     const manufacturerView = document.getElementById('manufacturer-view');
     if (manufacturerView && manufacturerView.style.display !== 'none') {
-        translateManufacturerView();
+        translateUI(); // Use the main translation function
     }
     
     // Always translate chatbot when language changes
@@ -2089,6 +2572,36 @@ function initOpenStreetMap(): void {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
     
+    // Force map to calculate correct size after initialization
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated after initialization');
+        }
+    }, 100);
+    
+    // Additional invalidation after tiles load
+    tileLayer.once('load', () => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated after tiles loaded');
+        }
+    });
+    
+    // Add event listeners for map movement to update pinned tooltips
+    map.on('move', () => {
+        console.log('Map move event triggered');
+        updatePinnedTooltipPositions();
+    });
+    map.on('zoom', () => {
+        console.log('Map zoom event triggered');
+        updatePinnedTooltipPositions();
+    });
+    map.on('resize', () => {
+        console.log('Map resize event triggered');
+        updatePinnedTooltipPositions();
+    });
+    
     console.log('Map initialized successfully');
 }
 
@@ -2115,6 +2628,9 @@ const clearThreatAnalysis = () => {
     }
     const floating = document.getElementById('floating-threats');
     if (floating) floating.classList.add('view-hidden');
+    
+    // Reset title to default
+    updateThreatListTitle(false);
     const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
     if (productRecommendationsContainer) {
         productRecommendationsContainer.classList.add('hidden');
@@ -2260,6 +2776,8 @@ function renderThreatList() {
     threatList.innerHTML = '';
 
     if (threatsMap.size === 0) {
+        // Reset title to default when no threats
+        updateThreatListTitle();
         return; // Nothing to render
     }
 
@@ -2287,12 +2805,14 @@ function renderThreatList() {
     threatsArray.forEach(({ name, maxSpeed, lengthInMeters }) => {
         const li = document.createElement('li');
         
-        let speedText = '';
+        // Format: Straßenname (Beschleunigungsstrecke / Endgeschwindigkeit)
+        let displayText = `${name} (${lengthInMeters} m`;
         if (maxSpeed > 0) {
-            speedText = ` | ${t('threats.speed')}: ${maxSpeed} km/h`;
+            displayText += ` / ${maxSpeed} km/h`;
         }
+        displayText += ')';
 
-        li.textContent = `${name} (${lengthInMeters} m)${speedText}`;
+        li.textContent = displayText;
         li.setAttribute('role', 'button');
         li.setAttribute('tabindex', '0');
 
@@ -2320,8 +2840,26 @@ function renderThreatList() {
         li.textContent = t('threats.noCrossingWaysBoundary');
         threatList.appendChild(li);
     }
+    
+    // Update the title to show analysis format
+    updateThreatListTitle(true);
 }
 
+/**
+ * Updates the threat list title to show analysis format
+ */
+function updateThreatListTitle(showAnalysisFormat: boolean = false) {
+    const titleElement = document.querySelector('#floating-threats h4');
+    if (!titleElement) return;
+    
+    if (showAnalysisFormat) {
+        // Title format: "Gefahrenanalyse (Strecke / Endgeschw.)"
+        titleElement.textContent = `${t('threats.title')} (Strecke / Endgeschw.)`;
+    } else {
+        // Default title
+        titleElement.textContent = t('threats.title');
+    }
+}
 
 /**
  * Analyzes the drawn polygon for potential vehicle threats.
@@ -2910,59 +3448,451 @@ async function getReportLocationName(center: any): Promise<string> {
 }
 
 /**
- * Updates the product recommendation section based on vehicle selection.
+ * Updates the product recommendation section and map with interactive tooltips
  */
 async function updateProductRecommendations() {
-    if (productDatabase.length === 0) {
+    // Get the actual product database from window (where it's stored)
+    let products = (window as any).productDatabase || [];
+    
+    if (products.length === 0) {
         try {
             const response = await fetch(`${import.meta.env.BASE_URL}product-database.json`);
             if (!response.ok) throw new Error('Product database fetch failed');
-            productDatabase = await response.json();
+            products = await response.json();
+            // Store in window for future use
+            (window as any).productDatabase = products;
         } catch (error) {
             console.error(t('alerts.productDbError'), error);
-            const pollerRecommendationEl = document.querySelector('#poller-category-header small');
-            const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
-            if (pollerRecommendationEl) pollerRecommendationEl.textContent = t('products.dbError');
-            if (barrierRecommendationEl) barrierRecommendationEl.textContent = t('products.dbError');
             return;
         }
     }
     
+    // Show the map and threat analysis results for product selection
+    await initProductSelectionMap();
+}
+
+/**
+ * Initialize the product selection map with interactive tooltips
+ */
+async function initProductSelectionMap() {
+    console.log('Initializing product selection map with threat data');
+    
+    // Make sure the map is visible and properly sized
+    const mapDiv = document.getElementById('map');
+    if (!mapDiv || !map) {
+        console.error('Map not available for product selection');
+        return;
+    }
+    
+    mapDiv.classList.remove('view-hidden');
+    
+    // Invalidate map size to ensure proper display
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Map size invalidated for product selection');
+        }
+    }, 100);
+    
+    // If we have threat analysis data, show it on the map with interactive tooltips
+    if (threatsMap.size > 0) {
+        await addProductRecommendationTooltips();
+    } else {
+        console.log('No threat analysis data available for product selection');
+    }
+}
+
+/**
+ * Add interactive product recommendation tooltips to threat markers
+ */
+async function addProductRecommendationTooltips() {
+    console.log('Adding product recommendation tooltips to threat markers');
+    
+    // Clear existing tooltips first
+    clearProductTooltips();
+    
+    // Iterate through all threat markers and add interactive tooltips
+    threatMarkersMap.forEach((markers, streetName) => {
+        const threatData = threatsMap.get(streetName);
+        if (!threatData || !markers) return;
+        
+        markers.forEach((marker) => {
+            // Get the speed for this specific access point
+            const maxSpeed = calculateMaxSpeedForThreat(threatData);
+            
+            // Find suitable products for this speed requirement
+            const recommendedProducts = findProductsForSpeed(maxSpeed);
+            
+            if (recommendedProducts.length > 0) {
+                addInteractiveTooltip(marker, streetName, maxSpeed, recommendedProducts[0]);
+            } else {
+                // No suitable product found - add fallback tooltip
+                addNoProductTooltip(marker, streetName, maxSpeed);
+                console.log(`No suitable product found for ${streetName} (required: ${maxSpeed} km/h)`);
+            }
+        });
+    });
+}
+
+/**
+ * Find products that can handle the required speed
+ */
+function findProductsForSpeed(requiredSpeed: number): any[] {
+    // Get the actual product database from window (where it's stored)
+    const products = (window as any).productDatabase || [];
+    console.log('Finding products for required speed:', requiredSpeed);
+    console.log('Product database size:', products.length);
+    
+    if (!products || products.length === 0) {
+        console.log('No product database available');
+        return [];
+    }
+    
+    // Find products that have been tested at speeds higher than required
+    const suitableProducts = products.filter(product => {
+        const productSpeed = parseFloat(product.speed);
+        const isValid = !isNaN(productSpeed) && productSpeed >= requiredSpeed;
+        if (isValid) {
+            console.log(`Suitable product found: ${product.type} (${productSpeed} km/h >= ${requiredSpeed} km/h)`);
+        }
+        return isValid;
+    });
+    
+    console.log(`Found ${suitableProducts.length} suitable products`);
+    
+    // Sort by speed (highest first) to get the most suitable products
+    const sorted = suitableProducts.sort((a, b) => parseFloat(b.speed) - parseFloat(a.speed));
+    
+    if (sorted.length > 0) {
+        console.log('Best product selected:', sorted[0]);
+    }
+    
+    return sorted;
+}
+
+/**
+ * Add fallback tooltip for threats without suitable products
+ */
+function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) {
+    // Create popup content for no product case
+    const createNoProductContent = () => {
+        return `
+            <div class="product-tooltip">
+                <div class="tooltip-header">
+                    <h4>${streetName}</h4>
+                    <span class="tooltip-close">×</span>
+                </div>
+                <div class="tooltip-content">
+                    <div class="no-product-info">
+                        <div class="warning-icon">
+                            <i class="fas fa-exclamation-triangle" style="color: #ff9900; font-size: 2rem; margin-bottom: 12px;"></i>
+                        </div>
+                        <h5>${t('products.contactAdvice')}</h5>
+                        <p><strong>${t('products.requiredSpeed')}:</strong> ${maxSpeed} km/h</p>
+                        <div class="contact-message">
+                            <p style="text-align: center; font-weight: 500; line-height: 1.5; margin: 16px 0;">
+                                ${t('products.noSuitableProduct')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tooltip-pin-indicator">
+                    <i class="fas fa-info-circle"></i> ${isPinned ? t('products.pinned') || 'Angepinnt' : t('products.clickToPin') || 'Klicken zum Anpinnen'}
+                </div>
+            </div>
+        `;
+    };
+    
+    let leafletPopup: any = null;
+    let isPinned = false;
+    
+    // Add CSS class to marker for hover effects
+    const markerIcon = marker.getElement();
+    if (markerIcon) {
+        markerIcon.classList.add('has-tooltip', 'no-product-marker');
+    }
+    
+    // Click event for pinning
+    marker.on('click', (e: any) => {
+        e.originalEvent.stopPropagation();
+        
+        if (isPinned) {
+            // Unpin the popup
+            isPinned = false;
+            if (leafletPopup) {
+                map.closePopup(leafletPopup);
+                leafletPopup = null;
+                console.log('No-product popup unpinned');
+            }
+        } else {
+            // Pin the popup
+            isPinned = true;
+            
+            const popupContent = createNoProductContent();
+            leafletPopup = L.popup({
+                closeButton: true,
+                autoClose: false,
+                closeOnClick: false,
+                className: 'product-popup no-product-popup',
+                offset: [10, -10]
+            })
+            .setLatLng(marker.getLatLng())
+            .setContent(popupContent)
+            .openOn(map);
+            
+            console.log(`No-product popup pinned for ${streetName} (${maxSpeed} km/h)`);
+            
+            // Add close event handler for popup
+            leafletPopup.on('remove', () => {
+                isPinned = false;
+                leafletPopup = null;
+                console.log('No-product popup closed');
+            });
+        }
+    });
+}
+
+/**
+ * Add interactive tooltip to a marker
+ */
+function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number, product: any) {
+    let tooltipElement: HTMLElement | null = null;
+    let isPinned = false;
+    let leafletPopup: any = null; // For pinned state using Leaflet popup
+    
+    // Add CSS class to marker for hover effects
+    const markerIcon = marker.getElement();
+    if (markerIcon) {
+        markerIcon.classList.add('has-tooltip');
+    }
+    
+    // Create tooltip content
+    const createTooltipContent = () => {
+        const productImage = generateProductImagePath(product);
+        console.log('Tooltip: Product image path generated:', productImage);
+        console.log('Tooltip: Product data:', product);
+        
+        return `
+            <div class="product-tooltip">
+                <div class="tooltip-header">
+                    <h4>${streetName}</h4>
+                    <span class="tooltip-close">×</span>
+                </div>
+                <div class="tooltip-content">
+                    <div class="product-image">
+                        <img src="${productImage}" alt="${product.type}" 
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="product-image-placeholder" style="display: none;">
+                            <i class="fas fa-image"></i>
+                        </div>
+                    </div>
+                    <div class="product-info">
+                        <h5>${product.type}</h5>
+                        <p><strong>Hersteller:</strong> ${product.manufacturer}</p>
+                        <p><strong>Getestete Geschw.:</strong> ${product.speed} km/h</p>
+                        <p><strong>Erforderlich:</strong> ${maxSpeed} km/h</p>
+                        <p><strong>Standard:</strong> ${product.standard}</p>
+                    </div>
+                </div>
+                <div class="tooltip-pin-indicator ${isPinned ? 'pinned' : ''}">
+                    <i class="fas fa-thumbtack"></i> ${isPinned ? 'Angepinnt' : 'Klicken zum Anpinnen'}
+                </div>
+            </div>
+        `;
+    };
+    
+    // Mouse enter event
+    marker.on('mouseover', (e: any) => {
+        if (isPinned) return; // Don't show hover tooltip if already pinned
+        
+        tooltipElement = document.createElement('div');
+        tooltipElement.className = 'leaflet-tooltip-pane';
+        tooltipElement.innerHTML = createTooltipContent();
+        
+        document.body.appendChild(tooltipElement);
+        
+        // Position tooltip near mouse
+        const updateTooltipPosition = (event: MouseEvent) => {
+            if (tooltipElement) {
+                tooltipElement.style.left = `${event.clientX + 10}px`;
+                tooltipElement.style.top = `${event.clientY - 10}px`;
+            }
+        };
+        
+        updateTooltipPosition(e.originalEvent);
+        
+        // Track mouse movement for tooltip positioning
+        document.addEventListener('mousemove', updateTooltipPosition);
+        
+        // Store the cleanup function
+        (tooltipElement as any).cleanup = () => {
+            document.removeEventListener('mousemove', updateTooltipPosition);
+        };
+    });
+    
+    // Mouse leave event
+    marker.on('mouseout', () => {
+        if (isPinned) return; // Don't hide if pinned
+        
+        if (tooltipElement) {
+            if ((tooltipElement as any).cleanup) {
+                (tooltipElement as any).cleanup();
+            }
+            document.body.removeChild(tooltipElement);
+            tooltipElement = null;
+        }
+    });
+    
+    // Click event for pinning/unpinning
+    marker.on('click', (e: any) => {
+        e.originalEvent.stopPropagation();
+        
+        if (isPinned) {
+            // Unpin the tooltip/popup
+            isPinned = false;
+            
+            // Close Leaflet popup if it exists
+            if (leafletPopup) {
+                map.closePopup(leafletPopup);
+                leafletPopup = null;
+                console.log('Popup unpinned');
+            }
+            
+            // Clean up old tooltip if it exists
+            if (tooltipElement) {
+                // Remove from pinned tooltips array
+                const index = pinnedTooltips.findIndex(pt => pt.element === tooltipElement);
+                if (index !== -1) {
+                    pinnedTooltips.splice(index, 1);
+                }
+                
+                if ((tooltipElement as any).cleanup) {
+                    (tooltipElement as any).cleanup();
+                }
+                document.body.removeChild(tooltipElement);
+                tooltipElement = null;
+            }
+        } else {
+            // Pin the tooltip using Leaflet popup
+            isPinned = true;
+            
+            // Remove any existing hover tooltip
+            if (tooltipElement && !tooltipElement.classList.contains('pinned-tooltip')) {
+                if ((tooltipElement as any).cleanup) {
+                    (tooltipElement as any).cleanup();
+                }
+                document.body.removeChild(tooltipElement);
+                tooltipElement = null;
+            }
+            
+            // Create pinned tooltip using Leaflet popup
+            const popupContent = createTooltipContent();
+            leafletPopup = L.popup({
+                closeButton: true,
+                autoClose: false,
+                closeOnClick: false,
+                className: 'product-popup',
+                offset: [10, -10]
+            })
+            .setLatLng(marker.getLatLng())
+            .setContent(popupContent)
+            .openOn(map);
+            
+            console.log(`Popup pinned using Leaflet API at:`, marker.getLatLng());
+            
+            // Add close event handler for popup
+            leafletPopup.on('remove', () => {
+                    isPinned = false;
+                leafletPopup = null;
+                console.log('Popup closed');
+            });
+        }
+    });
+}
+
+/**
+ * Calculate maximum speed for a threat based on its data
+ */
+function calculateMaxSpeedForThreat(threatData: any): number {
+    if (!threatData.entryPoints || threatData.entryPoints.length === 0) return 0;
+    
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
     const selectedWeight = vehicleSelect.value;
+    const accelerationRange = getAccelerationRange(selectedWeight);
     
-    const pollerRecommendationEl = document.querySelector('#poller-category-header small');
-    const barrierRecommendationEl = document.querySelector('#barrier-category-header small');
+    if (!accelerationRange) return 0;
     
-    if (pollerRecommendationEl) {
-        pollerRecommendationEl.textContent = t('products.resistanceHigh');
-    }
-    if (barrierRecommendationEl) {
-        barrierRecommendationEl.textContent = t('products.resistanceMedium');
-    }
-
-    if (selectedWeight === 'alle') return;
+    let maxSpeed = 0;
+    threatData.entryPoints.forEach(() => {
+        const speed = calculateVelocity(accelerationRange[1], threatData.totalLength);
+        if (speed > maxSpeed) {
+            maxSpeed = speed;
+        }
+    });
     
-    const pollerKeywords = ['bollard', 'poller'];
-    const barrierKeywords = ['barrier', 'barriere', 'gate'];
+    return Math.round(maxSpeed);
+}
 
-    const recommendedPoller = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight && p.type && pollerKeywords.some(kw => p.type.toLowerCase().includes(kw))
-    );
-    const recommendedBarrier = productDatabase.find(p => 
-        p.vehicleWeight === selectedWeight && p.type && barrierKeywords.some(kw => p.type.toLowerCase().includes(kw))
-    );
+/**
+ * Clear all existing product tooltips
+ */
+function clearProductTooltips() {
+    // Close all Leaflet popups with product-popup class (including no-product-popup)
+    if (map) {
+        map.eachLayer((layer: any) => {
+            if (layer instanceof L.Popup && 
+                (layer.options.className === 'product-popup' || 
+                 layer.options.className === 'product-popup no-product-popup')) {
+                map.closePopup(layer);
+            }
+        });
+    }
+    
+    // Remove all pinned tooltips (legacy DOM elements)
+    const pinnedTooltipElements = document.querySelectorAll('.pinned-tooltip');
+    pinnedTooltipElements.forEach(tooltip => {
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
+    
+    // Remove any hover tooltips
+    const hoverTooltips = document.querySelectorAll('.leaflet-tooltip-pane:not(.pinned-tooltip)');
+    hoverTooltips.forEach(tooltip => {
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
+    
+    // Clear the pinned tooltips array
+    pinnedTooltips = [];
+    
+    console.log('All product tooltips and popups cleared');
+}
 
-    if (pollerRecommendationEl) {
-        pollerRecommendationEl.textContent = recommendedPoller 
-            ? `${t('products.recommendation')} ${recommendedPoller.type}` 
-            : t('products.noRecommendation');
-    }
-    if (barrierRecommendationEl) {
-        barrierRecommendationEl.textContent = recommendedBarrier
-            ? `${t('products.recommendation')} ${recommendedBarrier.type}`
-            : t('products.noRecommendation');
-    }
+/**
+ * Update positions of all pinned tooltips when map moves
+ */
+function updatePinnedTooltipPositions() {
+    console.log(`Updating ${pinnedTooltips.length} pinned tooltips`);
+    
+    pinnedTooltips.forEach((pinnedTooltip, index) => {
+        const { element, marker, latLng } = pinnedTooltip;
+        
+        // Calculate new position based on marker's lat/lng
+        const containerPoint = map.latLngToContainerPoint(latLng);
+        const mapContainer = map.getContainer();
+        const mapRect = mapContainer.getBoundingClientRect();
+        
+        const newLeft = `${mapRect.left + containerPoint.x + 10}px`;
+        const newTop = `${mapRect.top + containerPoint.y - 10}px`;
+        
+        console.log(`Tooltip ${index}: Moving from (${element.style.left}, ${element.style.top}) to (${newLeft}, ${newTop})`);
+        
+        // Update tooltip position
+        element.style.left = newLeft;
+        element.style.top = newTop;
+    });
 }
 
 function getSecurityLevelText(value: number): string {
@@ -3379,11 +4309,14 @@ function downloadRiskReport() {
 // ===============================================
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM Content Loaded - Starting initialization...');
+// This initialization function will be called after authentication
+async function initializeApp() {
+    console.log('🚀 INITIALIZE APP CALLED!');
     
     // Step 1: Initialize basic UI components
+    console.log('🔥 About to call initViewSwitcher from initializeApp...');
     initViewSwitcher();
+    console.log('🔥 About to call initOpenStreetMap...');
     initOpenStreetMap();
     
     // Step 2: Load translations with retry mechanism
@@ -3612,6 +4545,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (newTabId === 'nav-product-selection') {
             await updateProductRecommendations();
+        } else {
+            // Clear product tooltips when leaving product selection or switching tabs
+            clearProductTooltips();
         }
         if (newTabId === 'nav-project-description') {
             // Handle project description tab
@@ -3712,8 +4648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     initViewSwitcher();
-
-});
+}
 
 // Function to debug current view state
 function debugViewState() {
@@ -3756,7 +4691,7 @@ function debugViewState() {
 }
 
 // Function to restore all planning view elements
-function restorePlanningViewElements() {
+function _restorePlanningViewElements() {
     console.log('Restoring all planning view elements...');
     
     // List of all elements that need to be restored
@@ -3801,7 +4736,7 @@ function restorePlanningViewElements() {
 }
 
 // Function to translate manufacturer view specifically
-function translateManufacturerView() {
+function _translateManufacturerView() {
     const manufacturerView = document.getElementById('manufacturer-view');
     if (!manufacturerView) {
         return;
@@ -3840,16 +4775,127 @@ function translateManufacturerView() {
     const productsTable = document.getElementById('products-table');
     
     if (productsGrid && productsGrid.style.display !== 'none') {
-        // Grid view is active, re-render products to update technical data labels
-        console.log('Re-rendering products grid to update translations...');
-        // Reload products from the database to get fresh data
-        loadProductDatabase();
+        // Grid view is active, translate existing tiles
+        console.log('Translating product tiles technical data...');
+        translateProductTiles();
     } else if (productsTable && productsTable.style.display !== 'none') {
-        // Table view is active, re-render table to update headers
-        console.log('Re-rendering products table to update translations...');
-        // Reload products from the database to get fresh data
-        loadProductDatabase();
+        // Table view is active, translations are handled by data-translate-key attributes
+        console.log('Table view translations handled by translateUI()');
     }
+}
+
+/**
+ * Function to translate technical data labels in product tiles
+ */
+function translateProductTiles() {
+    const productsGrid = document.getElementById('products-grid');
+    if (!productsGrid) {
+        return;
+    }
+    
+    // Find all product cards in the grid
+    const productCards = productsGrid.querySelectorAll('.product-card');
+    
+    productCards.forEach(card => {
+        // Find all text content in the card and translate common technical terms
+        const textElements = card.querySelectorAll('.product-card-spec-label, .tech-spec-item, .tech-spec-label, .spec-label');
+        
+        textElements.forEach(element => {
+            let text = element.textContent || '';
+            
+            // Translate common technical specification labels
+            if (currentLanguage === 'en') {
+                // German to English
+                text = text
+                    .replace(/Fahrzeuggewicht \(kg\)/gi, t('manufacturer.sidebar.productDatabase.vehicleWeight'))
+                    .replace(/Fahrzeugtyp/gi, t('manufacturer.sidebar.productDatabase.vehicleType'))
+                    .replace(/Geschwindigkeit \(km\/h\)/gi, t('manufacturer.sidebar.productDatabase.speed'))
+                    .replace(/Aufprallwinkel \(°\)/gi, t('manufacturer.sidebar.productDatabase.impactAngle'))
+                    .replace(/Penetration \(m\)/gi, t('manufacturer.sidebar.productDatabase.penetration'))
+                    .replace(/Trümmerentfernung \(m\)/gi, t('manufacturer.sidebar.productDatabase.debrisDistance'))
+                    .replace(/Standard/gi, t('manufacturer.sidebar.productDatabase.standard'))
+                    .replace(/Hersteller/gi, t('manufacturer.sidebar.productDatabase.manufacturer'))
+                    .replace(/Typ/gi, t('manufacturer.sidebar.productDatabase.type'))
+                    .replace(/FAHRZEUGGEWICHT \(KG\)/gi, t('manufacturer.sidebar.productDatabase.vehicleWeight').toUpperCase())
+                    .replace(/FAHRZEUGTYP/gi, t('manufacturer.sidebar.productDatabase.vehicleType').toUpperCase())
+                    .replace(/GESCHWINDIGKEIT \(KM\/H\)/gi, t('manufacturer.sidebar.productDatabase.speed').toUpperCase())
+                    .replace(/AUFPRALLWINKEL \(°\)/gi, t('manufacturer.sidebar.productDatabase.impactAngle').toUpperCase())
+                    .replace(/PENETRATION \(M\)/gi, t('manufacturer.sidebar.productDatabase.penetration').toUpperCase())
+                    .replace(/STANDARD/gi, t('manufacturer.sidebar.productDatabase.standard').toUpperCase())
+                    .replace(/HERSTELLER/gi, t('manufacturer.sidebar.productDatabase.manufacturer').toUpperCase())
+                    .replace(/TYP/gi, t('manufacturer.sidebar.productDatabase.type').toUpperCase());
+            } else {
+                // English to German
+                text = text
+                    .replace(/Vehicle Weight \(kg\)/gi, 'Fahrzeuggewicht (kg)')
+                    .replace(/Vehicle Type/gi, 'Fahrzeugtyp')
+                    .replace(/Speed \(km\/h\)/gi, 'Geschwindigkeit (km/h)')
+                    .replace(/Impact Angle \(°\)/gi, 'Aufprallwinkel (°)')
+                    .replace(/Penetration \(m\)/gi, 'Penetration (m)')
+                    .replace(/Debris Distance \(m\)/gi, 'Trümmerentfernung (m)')
+                    .replace(/Standard/gi, 'Standard')
+                    .replace(/Manufacturer/gi, 'Hersteller')
+                    .replace(/Type/gi, 'Typ')
+                    .replace(/VEHICLE WEIGHT \(KG\)/gi, 'FAHRZEUGGEWICHT (KG)')
+                    .replace(/VEHICLE TYPE/gi, 'FAHRZEUGTYP')
+                    .replace(/SPEED \(KM\/H\)/gi, 'GESCHWINDIGKEIT (KM/H)')
+                    .replace(/IMPACT ANGLE \(°\)/gi, 'AUFPRALLWINKEL (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/MANUFACTURER/gi, 'HERSTELLER')
+                    .replace(/TYPE/gi, 'TYP');
+            }
+            
+            element.textContent = text;
+        });
+        
+        // Also check for any direct text nodes that might contain the labels
+        const walker = document.createTreeWalker(
+            card,
+            NodeFilter.SHOW_TEXT,
+            null
+        );
+        
+        const textNodes: Text[] = [];
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue && node.nodeValue.trim()) {
+                textNodes.push(node as Text);
+            }
+        }
+        
+        textNodes.forEach(textNode => {
+            let text = textNode.nodeValue || '';
+            
+            if (currentLanguage === 'en') {
+                // German to English
+                text = text
+                    .replace(/FAHRZEUGGEWICHT \(KG\)/gi, 'VEHICLE WEIGHT (KG)')
+                    .replace(/FAHRZEUGTYP/gi, 'VEHICLE TYPE')
+                    .replace(/GESCHWINDIGKEIT \(KM\/H\)/gi, 'SPEED (KM/H)')
+                    .replace(/AUFPRALLWINKEL \(°\)/gi, 'IMPACT ANGLE (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/HERSTELLER/gi, 'MANUFACTURER')
+                    .replace(/TYP/gi, 'TYPE');
+            } else {
+                // English to German
+                text = text
+                    .replace(/VEHICLE WEIGHT \(KG\)/gi, 'FAHRZEUGGEWICHT (KG)')
+                    .replace(/VEHICLE TYPE/gi, 'FAHRZEUGTYP')
+                    .replace(/SPEED \(KM\/H\)/gi, 'GESCHWINDIGKEIT (KM/H)')
+                    .replace(/IMPACT ANGLE \(°\)/gi, 'AUFPRALLWINKEL (°)')
+                    .replace(/PENETRATION \(M\)/gi, 'PENETRATION (M)')
+                    .replace(/STANDARD/gi, 'STANDARD')
+                    .replace(/MANUFACTURER/gi, 'HERSTELLER')
+                    .replace(/TYPE/gi, 'TYP');
+            }
+            
+            textNode.nodeValue = text;
+        });
+    });
+    
+    console.log('Product tiles translation completed for language:', currentLanguage);
 }
 
 // Function to translate chatbot specifically
@@ -3889,36 +4935,34 @@ function translateChatbot() {
     console.log('Chatbot translation completed');
 }
 
+// ===============================================
+// APPLICATION INITIALIZATION
+// ===============================================
+
+
+
 /**
- * Helper function to get currently displayed products
- * This function tries to extract products from the current display
+ * Setup logo click listener for logout functionality
  */
-function getCurrentDisplayedProducts(): any[] {
-    // Try to get products from the current product database
-    try {
-        // If we have a global products variable, use it
-        if (typeof window !== 'undefined' && (window as any).products) {
-            return (window as any).products;
-        }
-        
-        // Try to get products from the current display by looking at existing cards
-        const productsGrid = document.getElementById('products-grid');
-        const productsTable = document.getElementById('products-table');
-        
-        if (productsGrid && productsGrid.children.length > 0) {
-            // Extract product data from existing grid cards
-            const productCards = productsGrid.querySelectorAll('.product-card');
-            if (productCards.length > 0) {
-                // We have products displayed, but we need to reload them from the source
-                // For now, return empty array to trigger a reload
-                return [];
-            }
-        }
-        
-        // Otherwise, try to reload from the JSON file
-        return [];
-    } catch (error) {
-        console.warn('Could not get current products:', error);
-        return [];
-    }
+function setupLogoLogout() {
+    const logoElements = document.querySelectorAll('.logo-img, .welcome-logo');
+    logoElements.forEach(logo => {
+        logo.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Logo clicked - logging out...');
+            logout();
+        });
+        // Add pointer cursor to indicate clickability
+        (logo as HTMLElement).style.cursor = 'pointer';
+    });
 }
+
+// Initialize authentication system when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing authentication...');
+    initAuth();
+    setupLogoLogout();
+});
+
+
+

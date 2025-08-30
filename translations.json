@@ -88,6 +88,140 @@
     "placeholders": {
         "assetToProtect": "Bitte eintragen"
     },
+    "manufacturer": {
+        "title": "",
+        "subtitle": "",
+        "products": "Produkte",
+        "quotations": "Angebote",
+        "customers": "Kunden",
+        "analytics": "Analysen",
+        "manageCatalog": "Verwalten Sie Ihren Produktkatalog",
+        "createQuotations": "Erstellen und verwalten Sie Angebote",
+        "manageContacts": "Verwalten Sie Ihre Kundenkontakte",
+        "businessAnalytics": "Betriebs- und Verkaufsanalysen",
+        "open": "Öffnen",
+        "nav": {
+            "products": "Produkte",
+            "quotations": "Angebote",
+            "customers": "Kunden",
+            "analytics": "Analysen",
+            "settings": "Einstellungen"
+        },
+        "sidebar": {
+            "productManagement": "Produktverwaltung",
+            "productCategory": "Produktkategorie",
+            "productStatus": "Produktstatus",
+            "customerManagement": "Kundenverwaltung",
+            "customerType": "Kundentyp",
+            "customerRegion": "Region",
+            "analytics": "Analysen",
+            "dateRange": "Zeitraum",
+            "options": {
+                "category": {
+                    "all": "Alle Kategorien",
+                    "bollards": "Poller",
+                    "barriers": "Barrieren",
+                    "posts": "Pfosten",
+                    "ditches": "Gräben"
+                },
+                "status": {
+                    "all": "Alle Status",
+                    "active": "Aktiv",
+                    "inactive": "Inaktiv",
+                    "draft": "Entwurf"
+                },
+                "customerType": {
+                    "all": "Alle Typen",
+                    "private": "Privat",
+                    "business": "Geschäft",
+                    "government": "Behörde"
+                },
+                "region": {
+                    "all": "Alle Regionen",
+                    "north": "Nord",
+                    "south": "Süd",
+                    "east": "Ost",
+                    "west": "West"
+                },
+                "dateRange": {
+                    "7days": "Letzte 7 Tage",
+                    "30days": "Letzte 30 Tage",
+                    "90days": "Letzte 90 Tage",
+                    "1year": "Letztes Jahr"
+                },
+                "manufacturer": {
+                    "all": "Alle Hersteller"
+                },
+                "standard": {
+                    "all": "Alle Standards"
+                },
+                "vehicleType": {
+                    "all": "Alle Fahrzeugtypen"
+                }
+            },
+            "productDatabase": {
+                "title": "Produktdatenbank",
+                "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
+                "search": "Produktsuche",
+                "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
+                "filterBy": "Filtern nach",
+                "manufacturer": "Hersteller",
+                "type": "Typ",
+                "standard": "Standard",
+                "performance": "Leistungsbewertung",
+                "dimensions": "Abmessungen",
+                "foundation": "Fundamenttiefe",
+                "material": "Material",
+                "actions": "Aktionen",
+                "noProducts": "Keine Produkte gefunden",
+                "loading": "Produkte werden geladen...",
+                "technicalSpecs": "Technische Spezifikationen",
+                "performanceData": "Leistungsdaten",
+                "certification": "Zertifizierung",
+                "toggleToTable": "Zur Tabellenansicht",
+                "toggleToGrid": "Zur Kachelansicht",
+                "viewDetails": "Details anzeigen",
+                "viewDetails": "Details anzeigen",
+                "closeDetails": "Schließen",
+                "exportData": "Daten exportieren",
+                "printSpecs": "Spezifikationen drucken",
+                "modal": {
+                    "title": "Produktdetails",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken"
+                }
+            },
+            "productDatabase": {
+                "toggleToTable": "Zur Tabellenansicht",
+                "toggleToGrid": "Zur Kachelansicht",
+                "modal": {
+                    "title": "Produktdetails",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken"
+                },
+                "toggleToGrid": "Kachelansicht",
+                "toggleToTable": "Tabellenansicht",
+                "table": {
+                    "manufacturer": "Hersteller",
+                    "type": "Typ",
+                    "standard": "Standard",
+                    "vehicleWeight": "Fahrzeuggewicht (kg)",
+                    "vehicleType": "Fahrzeugtyp",
+                    "speed": "Geschwindigkeit (km/h)",
+                    "impactAngle": "Anprallwinkel (°)",
+                    "penetration": "Penetration (m)",
+                    "debrisDistance": "Trümmerdistanz (m)",
+                    "actions": "Aktionen"
+                }
+            }
+        }
+    },
     "tooltips": {
       "securityRisk": "Informationen zum Sicherheitsrisiko.",
       "productClass": "Informationen zur empfohlenen Produktklasse."
@@ -148,7 +282,10 @@
       "showMore": "Weitere Produkte anzeigen",
       "dbError": "Produkt-DB Fehler",
       "recommendation": "Empfehlung:",
-      "noRecommendation": "Keine passende Empfehlung gefunden"
+      "noRecommendation": "Keine passende Empfehlung gefunden",
+      "noSuitableProduct": "Kein passendes Produkt in der Datenbank gefunden. Bitte kontaktieren Sie einen zertifizierten Sicherheitsberater",
+      "contactAdvice": "Kontaktempfehlung",
+      "requiredSpeed": "Erforderliche Geschwindigkeit"
     },
     "alerts": {
       "noPolygon": "Bitte markieren Sie zuerst einen Sicherheitsbereich unter dem Reiter 'Sicherheitsbereich markieren'.",
@@ -163,123 +300,6 @@
     },
     "ai": {
       "reportPrompt": "Du bist ein professioneller Sicherheitsberater, der einen Risikobericht für Fahrzeuganprallschutz (HVM) erstellt. Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Hier sind die Kontextdaten:\n\n- **Standortname**: {locationName}\n- **Zu schützendes Objekt**: {assetToProtect}\n- **Angestrebtes Sicherheitsniveau**: {securityLevel}\n- **Abgeleiteter Sicherungsgrad**: {protectionGrade}\n- **Hauptbedrohungen (Zufahrtsstraßen)**: {threatList}\n- **Art der HVM-Lösung**: {protectionPeriod}\n- **Empfohlener FSB-Typ**: {productType}\n- **Erwartete Mindestanprallleistung**: Eindringtiefe von {penetration} m und Trümmerflugweite von {debrisDistance} m.\n\nFülle jeden der folgenden Abschnitte mit sinnvollem, professionellem Text, der auf den bereitgestellten Daten basiert. Wenn ein Wert ein Platzhalter in eckigen Klammern ist (z.B. '[Keine Gefahrenanalyse durchgeführt]'), erkenne an, dass diese Information fehlt, und formuliere stattdessen eine allgemeine Beschreibung, welche Art von Information an dieser Stelle für einen vollständigen Bericht erforderlich wäre."
-    },
-    "manufacturer": {
-      "title": "",
-      "subtitle": "",
-      "products": "Produkte",
-      "quotations": "Angebote",
-      "customers": "Kunden",
-      "analytics": "Analysen",
-      "manageCatalog": "Verwalten Sie Ihren Produktkatalog",
-      "createQuotations": "Erstellen und verwalten Sie Angebote",
-      "manageContacts": "Verwalten Sie Ihre Kundenkontakte",
-      "businessAnalytics": "Betriebs- und Verkaufsanalysen",
-      "open": "Öffnen",
-      "nav": {
-        "products": "Produkte",
-        "quotations": "Angebote",
-        "customers": "Kunden",
-        "analytics": "Analysen",
-        "settings": "Einstellungen"
-      },
-      "sidebar": {
-        "productManagement": "Produktverwaltung",
-        "productCategory": "Produktkategorie",
-        "productStatus": "Produktstatus",
-        "customerManagement": "Kundenverwaltung",
-        "customerType": "Kundentyp",
-        "customerRegion": "Region",
-        "analytics": "Analysen",
-        "dateRange": "Zeitraum",
-        "options": {
-          "category": {
-            "all": "Alle Kategorien",
-            "bollards": "Poller",
-            "barriers": "Barrieren",
-            "posts": "Pfosten",
-            "ditches": "Gräben"
-          },
-          "status": {
-            "all": "Alle Status",
-            "active": "Aktiv",
-            "inactive": "Inaktiv",
-            "draft": "Entwurf"
-          },
-          "customerType": {
-            "all": "Alle Typen",
-            "private": "Privat",
-            "business": "Geschäft",
-            "government": "Behörde"
-          },
-          "region": {
-            "all": "Alle Regionen",
-            "north": "Nord",
-            "south": "Süd",
-            "east": "Ost",
-            "west": "West"
-          },
-          "dateRange": {
-            "7days": "Letzte 7 Tage",
-            "30days": "Letzte 30 Tage",
-            "90days": "Letzte 90 Tage",
-            "1year": "Letztes Jahr"
-          },
-          "manufacturer": {
-            "all": "Alle Hersteller"
-          },
-          "standard": {
-            "all": "Alle Standards"
-          },
-          "vehicleType": {
-            "all": "Alle Fahrzeugtypen"
-          }
-        }
-      },
-                          "productDatabase": {
-                        "title": "Produktdatenbank",
-                        "subtitle": "Technische Daten und Spezifikationen aller verfügbaren Produkte",
-                        "search": "Produktsuche",
-                        "searchPlaceholder": "Produktname, Hersteller oder Typ eingeben...",
-                        "filterBy": "Filtern nach",
-                        "manufacturer": "Hersteller",
-                        "type": "Typ",
-                        "standard": "Standard",
-                        "vehicleWeight": "Fahrzeuggewicht (kg)",
-                        "vehicleType": "Fahrzeugtyp",
-                        "speed": "Geschwindigkeit (km/h)",
-                        "impactAngle": "Anprallwinkel (°)",
-                        "penetration": "Penetration (m)",
-                        "debrisDistance": "Trümmerdistanz (m)",
-                        "actions": "Aktionen",
-                        "noProducts": "Keine Produkte gefunden",
-                        "loading": "Produkte werden geladen...",
-                        "technicalSpecs": "Technische Spezifikationen",
-                        "performanceData": "Leistungsdaten",
-                        "certification": "Zertifizierung",
-                        "viewDetails": "Details anzeigen",
-                        "closeDetails": "Schließen",
-                        "exportData": "Daten exportieren",
-                        "printSpecs": "Spezifikationen drucken",
-                        "modal": {
-                            "title": "Produktdetails",
-                            "technicalSpecs": "Technische Spezifikationen",
-                            "performanceData": "Leistungsdaten",
-                            "certification": "Zertifizierung",
-                            "exportData": "Daten exportieren",
-                            "printSpecs": "Spezifikationen drucken"
-                        },
-                        "toggleToGrid": "Kachelansicht",
-                        "toggleToTable": "Tabellenansicht",
-                        "technicalSpecs": {
-                            "standard": "Standard",
-                            "vehicleWeight": "Fahrzeuggewicht",
-                            "vehicleType": "Fahrzeugtyp",
-                            "speed": "Geschwindigkeit",
-                            "impactAngle": "Anprallwinkel",
-                            "penetration": "Penetration"
-                        }
-                    }
     }
   },
   "en": {
@@ -367,6 +387,9 @@
         }
       }
     },
+    "placeholders": {
+        "assetToProtect": "Please enter"
+    },
     "map": {
       "searchPlaceholder": "Paderborn, Cathedral Square",
       "searchButton": "Search",
@@ -378,78 +401,6 @@
       "downloadReport": "Download Report",
       "securityAreaLabel": "Security Area",
       "securityArea": "Security Area"
-    },
-    "manufacturer": {
-      "productDatabase": {
-        "technicalSpecs": {
-          "standard": "Standard",
-          "vehicleWeight": "Vehicle Weight",
-          "vehicleType": "Vehicle Type",
-          "speed": "Speed",
-          "impactAngle": "Impact Angle",
-          "penetration": "Penetration"
-        }
-      }
-    },
-    "report": {
-      "generating": "Generating report...",
-      "mainTitle": "Reduced Initial Report – Vehicle Access Protection Concept for {locationName}",
-      "sections": {
-        "purpose": { "title": "1. Purpose and Protection Objectives" },
-        "threatAnalysis": { "title": "2. Threat Analysis & Risk Assessment" },
-        "vulnerabilities": { "title": "3. Vulnerability Analysis" },
-        "hvmMeasures": { "title": "4. Proposed HVM Measures" },
-        "siteConsiderations": { "title": "5. Site-Specific Considerations & Integration" },
-        "operationalImpact": { "title": "6. Operational and Aesthetic Impact" }
-      },
-      "watermark": "Initial Draft",
-      "reportFilename": "Risk-Report-BarricadiX.pdf",
-      "not_applicable": "N/A",
-      "undefinedLocation": "[Location not defined on map]",
-      "undefinedAsset": "[No specific protection asset specified]",
-      "threatsTable": {
-        "title": "Identified Threat Roads",
-        "street": "Street",
-        "distance": "Distance",
-        "maxSpeed": "Max. Speed"
-      },
-      "noThreatAnalysis": "[No threat analysis performed]",
-      "undefinedValue": "[Value not determined]",
-      "noMapAvailable": "A map of the security area would be displayed here. To generate this, please mark an area in the 'Mark Security Area' tab."
-    },
-    "threats": {
-      "title": "Intrusion Threats",
-      "loading": "Analyzing access roads...",
-      "speed": "Speed",
-      "noCrossingWaysBoundary": "No crossing paths found at the boundary.",
-      "noCrossingWaysArea": "No crossing paths found in the marked area.",
-      "analysisFailed": "Analysis failed.",
-      "popupHeader": "Access Road"
-    },
-    "products": {
-      "title": "Product Recommendations",
-      "pollers": "Fixed Bollards",
-      "resistanceHigh": "Resistance class: high",
-      "barriers": "Mobile Barriers",
-      "resistanceMedium": "medium",
-      "showMore": "Show more products",
-      "dbError": "Product DB Error",
-      "recommendation": "Recommendation:",
-      "noRecommendation": "No suitable recommendation found"
-    },
-    "alerts": {
-      "noPolygon": "Please mark a security area first under the 'Mark Security Area' tab.",
-      "overpassError": "Overpass API request failed with status {status}",
-      "analysisError": "An error occurred during the analysis. Please try again later.",
-      "locationNotFound": "Location not found.",
-      "searchError": "An error occurred during the search.",
-      "reportCreationError": "The report could not be created. See console for details.",
-      "noReportToDownload": "No report has been generated to download yet.",
-      "productDbError": "Error loading the product database:",
-      "geminiError": "The AI-powered analysis could not be generated due to an error."
-    },
-    "ai": {
-      "reportPrompt": "You are a professional security consultant creating a risk report for Hostile Vehicle Mitigation (HVM). Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFill each of the following sections with meaningful, professional text based on the provided data. If a value is a placeholder in square brackets (e.g., '[No threat analysis performed]'), acknowledge that this information is missing and instead formulate a general description of what kind of information would be required in this section for a complete report."
     },
     "manufacturer": {
       "title": "Manufacturer View",
@@ -521,44 +472,132 @@
           "vehicleType": {
             "all": "All Vehicle Types"
           }
-        }
-      },
-      "productDatabase": {
-        "title": "Product Database",
-        "subtitle": "Technical data and specifications of all available products",
-        "search": "Product Search",
-        "searchPlaceholder": "Enter product name, manufacturer or type...",
-        "filterBy": "Filter by",
-        "manufacturer": "Manufacturer",
-        "type": "Type",
-        "standard": "Standard",
-        "vehicleWeight": "Vehicle Weight (kg)",
-        "vehicleType": "Vehicle Type",
-        "speed": "Speed (km/h)",
-        "impactAngle": "Impact Angle (°)",
-        "penetration": "Penetration (m)",
-        "debrisDistance": "Debris Distance (m)",
-        "actions": "Actions",
-        "noProducts": "No products found",
-        "loading": "Loading products...",
-        "technicalSpecs": "Technical Specifications",
-        "performanceData": "Performance Data",
-        "certification": "Certification",
-        "viewDetails": "View Details",
-        "closeDetails": "Close",
-        "exportData": "Export Data",
-        "printSpecs": "Print Specifications",
-        "modal": {
-          "title": "Product Details",
+        },
+        "productDatabase": {
+          "title": "Product Database",
+          "subtitle": "Technical data and specifications of all available products",
+          "search": "Product Search",
+          "searchPlaceholder": "Enter product name, manufacturer or type...",
+          "filterBy": "Filter by",
+          "manufacturer": "Manufacturer",
+          "type": "Type",
+          "standard": "Standard",
+          "performance": "Performance Rating",
+          "dimensions": "Dimensions",
+          "foundation": "Foundation Depth",
+          "material": "Material",
+          "actions": "Actions",
+          "noProducts": "No products found",
+          "loading": "Loading products...",
           "technicalSpecs": "Technical Specifications",
           "performanceData": "Performance Data",
           "certification": "Certification",
+          "toggleToTable": "Switch to Table View",
+          "toggleToGrid": "Switch to Grid View",
+          "viewDetails": "View Details",
+          "viewDetails": "View Details",
+          "closeDetails": "Close",
           "exportData": "Export Data",
-          "printSpecs": "Print Specifications"
+          "printSpecs": "Print Specifications",
+          "modal": {
+            "title": "Product Details",
+            "technicalSpecs": "Technical Specifications",
+            "performanceData": "Performance Data",
+            "certification": "Certification",
+            "exportData": "Export Data",
+            "printSpecs": "Print Specifications"
+          }
         },
-        "toggleToGrid": "Grid View",
-        "toggleToTable": "Table View"
+        "productDatabase": {
+          "toggleToTable": "Switch to Table View",
+          "toggleToGrid": "Switch to Grid View",
+          "modal": {
+            "title": "Product Details",
+            "technicalSpecs": "Technical Specifications",
+            "performanceData": "Performance Data",
+            "certification": "Certification",
+            "exportData": "Export Data",
+            "printSpecs": "Print Specifications"
+          },
+          "toggleToGrid": "Grid View",
+          "toggleToTable": "Table View",
+          "table": {
+            "manufacturer": "Manufacturer",
+            "type": "Type",
+            "standard": "Standard",
+            "vehicleWeight": "Vehicle Weight (kg)",
+            "vehicleType": "Vehicle Type",
+            "speed": "Speed (km/h)",
+            "impactAngle": "Impact Angle (°)",
+            "penetration": "Penetration (m)",
+            "debrisDistance": "Debris Distance (m)",
+            "actions": "Actions"
+          }
+        }
       }
+    },
+    "report": {
+      "generating": "Generating report...",
+      "mainTitle": "Reduced Initial Report – Vehicle Access Protection Concept for {locationName}",
+      "sections": {
+        "purpose": { "title": "1. Purpose and Protection Objectives" },
+        "threatAnalysis": { "title": "2. Threat Analysis & Risk Assessment" },
+        "vulnerabilities": { "title": "3. Vulnerability Analysis" },
+        "hvmMeasures": { "title": "4. Proposed HVM Measures" },
+        "siteConsiderations": { "title": "5. Site-Specific Considerations & Integration" },
+        "operationalImpact": { "title": "6. Operational and Aesthetic Impact" }
+      },
+      "watermark": "Initial Draft",
+      "reportFilename": "Risk-Report-BarricadiX.pdf",
+      "not_applicable": "N/A",
+      "undefinedLocation": "[Location not defined on map]",
+      "undefinedAsset": "[No specific protection asset specified]",
+      "threatsTable": {
+        "title": "Identified Threat Roads",
+        "street": "Street",
+        "distance": "Distance",
+        "maxSpeed": "Max. Speed"
+      },
+      "noThreatAnalysis": "[No threat analysis performed]",
+      "undefinedValue": "[Value not determined]",
+      "noMapAvailable": "A map of the security area would be displayed here. To generate this, please mark an area in the 'Mark Security Area' tab."
+    },
+    "threats": {
+      "title": "Intrusion Threats",
+      "loading": "Analyzing access roads...",
+      "speed": "Speed",
+      "noCrossingWaysBoundary": "No crossing paths found at the boundary.",
+      "noCrossingWaysArea": "No crossing paths found in the marked area.",
+      "analysisFailed": "Analysis failed.",
+      "popupHeader": "Access Road"
+    },
+    "products": {
+      "title": "Product Recommendations",
+      "pollers": "Fixed Bollards",
+      "resistanceHigh": "Resistance class: high",
+      "barriers": "Mobile Barriers",
+      "resistanceMedium": "medium",
+      "showMore": "Show more products",
+      "dbError": "Product DB Error",
+      "recommendation": "Recommendation:",
+      "noRecommendation": "No suitable recommendation found",
+      "noSuitableProduct": "No suitable product found in database. Please contact a certified security consultant",
+      "contactAdvice": "Contact Recommendation",
+      "requiredSpeed": "Required Speed"
+    },
+    "alerts": {
+      "noPolygon": "Please mark a security area first under the 'Mark Security Area' tab.",
+      "overpassError": "Overpass API request failed with status {status}",
+      "analysisError": "An error occurred during the analysis. Please try again later.",
+      "locationNotFound": "Location not found.",
+      "searchError": "An error occurred during the search.",
+      "reportCreationError": "The report could not be created. See console for details.",
+      "noReportToDownload": "No report has been generated to download yet.",
+      "productDbError": "Error loading the product database:",
+      "geminiError": "The AI-powered analysis could not be generated due to an error."
+    },
+    "ai": {
+      "reportPrompt": "You are a professional security consultant creating a risk report for Hostile Vehicle Mitigation (HVM). Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFill each of the following sections with meaningful, professional text based on the provided data. If a value is a placeholder in square brackets (e.g., '[No threat analysis performed]'), acknowledge that this information is missing and instead formulate a general description of what kind of information would be required in this section for a complete report."
     }
   }
 }
