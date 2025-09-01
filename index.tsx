@@ -16,6 +16,9 @@ import { createElement } from "react";
 import type {} from "react-dom";
 import ZufahrtsschutzChatbot from "./ZufahrtsschutzChatbot";
 import { createRoot } from "react-dom/client";
+import { fetchOsmBundleForPolygon, osmCache, OsmBundle } from './src/utils/osm.js';
+import { OsmSpeedLimiter, SpeedLimitConfig } from './src/utils/osmSpeedLimits.js';
+import { WeatherCondition } from './src/utils/osmParse.js';
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -228,7 +231,13 @@ let pathLine: any = null;
 let drawnPolygon: any = null;
 let polygonLabel: any = null; // To store the label for the polygon
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
-let threatsMap = new Map<string, { entryPoints: any[], pathSegments: any[][], totalLength: number }>(); // To store analysis data for report
+let threatsMap = new Map<string, { entryPoints: {lat: number, lon: number, distance: number}[], pathSegments: any[][], totalLength: number, threatLevel?: number, roadType?: string, maxSpeed?: number }>(); // To store analysis data for report
+
+// OSM Speed Limits Integration
+let osmSpeedLimiter: OsmSpeedLimiter | null = null;
+let currentOsmData: OsmBundle | null = null;
+let osmLoadingController: AbortController | null = null;
+let osmDebounceTimeout: number | null = null;
 let generatedPdf: any = null; // To hold the generated PDF object
 let generatedPdfUrl: string | null = null; // Object URL for iframe preview
 let productDatabase: any[] = []; // To cache the product data
@@ -263,6 +272,19 @@ const embeddedTranslations = {
             "loggedIn": "Angemeldet: BarricadiX Admin"
         },
         "sidebar": {
+            "osmLimits": {
+                "title": "OSM Geschwindigkeitsbegrenzungen",
+                "maxspeed": "Tempolimits aus OSM anwenden (empfohlen)",
+                "trafficCalming": "Verkehrsberuhiger bremsen Fahrzeuge",
+                "weather": "Wetter",
+                "weatherOptions": {
+                    "dry": "trocken",
+                    "wet": "nass",
+                    "snow": "Schnee",
+                    "ice": "Eis"
+                },
+                "surface": "Belag berücksichtigen (OSM surface)"
+            },
             "trafficData": "Verkehrsdaten",
             "vehicleSelect": "Fahrzeugauswahl",
             "accessRoads": "Zufahrten",
@@ -328,11 +350,16 @@ const embeddedTranslations = {
         "products": {
             "resistanceMedium": "Widerstandsmedium",
             "resistanceHigh": "Hoher Widerstand",
-            "resistanceLow": "Niedriger Widerstand"
+            "resistanceLow": "Niedriger Widerstand",
+            "contactAdvice": "Kontaktempfehlung",
+            "requiredSpeed": "Erforderliche Geschwindigkeit",
+            "noSuitableProduct": "Kein passendes Produkt in der Datenbank gefunden. Bitte kontaktieren Sie einen zertifizierten Sicherheitsberater",
+            "pinned": "Angepinnt",
+            "clickToPin": "Klicken zum Anpinnen"
         },
 
         "ai": {
-            "reportPrompt": "Erstellen Sie einen detaillierten Risikobericht basierend auf den gesammelten Daten.",
+            "reportPrompt": "Du bist ein Spezialist für physischen Zufahrtsschutz und erstellst einen Sicherheitsbericht für den Schutz vor Fahrzeugangriffen und unbefugtem Eindringen mit Kraftfahrzeugen (Vehicle Security Barriers / Hostile Vehicle Mitigation). Der Fokus liegt auf dem physischen Schutz von Gebäuden, Plätzen und Infrastruktur vor Terroranschlägen mit Fahrzeugen, Amokfahrten oder Unfällen. WICHTIG: Dies ist KEIN Cybersecurity-Bericht! Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Fokussiere ausschließlich auf: Fahrzeugbarrieren, Poller, physische Sperren, Fahrzeuganprallschutz, Rammangriffe, Teststandards wie PAS 68 oder IWA 14, Geschwindigkeiten, Fahrzeugmassen, Anprallwinkel, Eindringtiefen. Erwähne NIEMALS: Malware, Cyberangriffe, Netzwerksicherheit, Software, IT-Systeme.",
             "chatbot": {
                 "title": "Zufahrtsschutz-Assistent",
                 "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
@@ -366,7 +393,13 @@ const embeddedTranslations = {
                 "riskMatrixQuestionInfo": "Erzeugt Sicherungsgrad & Schutzklasse (DIN SPEC 91414-2)",
                 "infoPrefix": "Hinweis: ",
                 "completionMessage": "Danke! Alle erforderlichen Angaben sind vorhanden. Möchten Sie den normkonformen PDF-Plan erzeugen?"
-            }
+            },
+            "error": "Fehler bei der KI-Analyse",
+            "retry": "Erneut versuchen",
+            "loading": "KI-Analyse wird erstellt...",
+            "timeout": "Zeitüberschreitung bei der Analyse",
+            "networkError": "Netzwerkfehler bei der KI-Analyse",
+            "serviceUnavailable": "KI-Service vorübergehend nicht verfügbar"
         },
         "manufacturer": {
             "title": "Herstelleransicht",
@@ -561,6 +594,17 @@ const embeddedTranslations = {
                 "print": "Drucken",
                 "export": "Exportieren",
                 "share": "Teilen"
+            },
+            "generation": {
+                "failed": "Berichterstellung fehlgeschlagen",
+                "networkError": "Netzwerkfehler bei der Berichterstellung",
+                "retry": "Bericht erneut generieren",
+                "loading": "Bericht wird erstellt..."
+            },
+            "ai": {
+                "error": "Fehler bei der KI-Berichterstellung",
+                "loading": "KI-Bericht wird generiert...",
+                "timeout": "Zeitüberschreitung bei der KI-Berichterstellung"
             }
         },
         "threats": {
@@ -569,7 +613,10 @@ const embeddedTranslations = {
             "analysisFailed": "Gefahrenanalyse fehlgeschlagen",
             "noCrossingWaysBoundary": "Keine kreuzenden Wege an der Grenze gefunden",
             "popupHeader": "Gefahreninformationen",
-            "loading": "Lade Gefahrenanalyse..."
+            "loading": "Lade Gefahrenanalyse...",
+            "minimize": "Minimieren",
+            "maximize": "Maximieren",
+            "close": "Schließen"
         },
         "map": {
             "createReport": "Bericht erstellen",
@@ -622,6 +669,19 @@ const embeddedTranslations = {
             "loggedIn": "Logged in: BarricadiX Admin"
         },
         "sidebar": {
+            "osmLimits": {
+                "title": "OSM Speed Limits",
+                "maxspeed": "Apply OSM speed limits (recommended)",
+                "trafficCalming": "Traffic calming slows vehicles",
+                "weather": "Weather",
+                "weatherOptions": {
+                    "dry": "dry",
+                    "wet": "wet",
+                    "snow": "snow",
+                    "ice": "ice"
+                },
+                "surface": "Consider surface (OSM surface)"
+            },
             "trafficData": "Traffic Data",
             "vehicleSelect": "Vehicle Selection",
             "accessRoads": "Access Roads",
@@ -687,10 +747,15 @@ const embeddedTranslations = {
         "products": {
             "resistanceMedium": "Resistance Medium",
             "resistanceHigh": "High Resistance",
-            "resistanceLow": "Low Resistance"
+            "resistanceLow": "Low Resistance",
+            "contactAdvice": "Contact Recommendation",
+            "requiredSpeed": "Required Speed",
+            "noSuitableProduct": "No suitable product found in database. Please contact a certified security consultant",
+            "pinned": "Pinned",
+            "clickToPin": "Click to pin"
         },
         "ai": {
-            "reportPrompt": "Create a detailed risk report based on the collected data.",
+            "reportPrompt": "You are a specialist for physical vehicle access protection creating a security report for protection against vehicle attacks and unauthorized vehicle intrusion (Vehicle Security Barriers / Hostile Vehicle Mitigation). The focus is on physical protection of buildings, squares and infrastructure against vehicle terrorist attacks, rampage attacks or accidents. IMPORTANT: This is NOT a cybersecurity report! Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Focus exclusively on: vehicle barriers, bollards, physical barriers, vehicle impact protection, ram attacks, test standards like PAS 68 or IWA 14, speeds, vehicle masses, impact angles, penetration depths. NEVER mention: malware, cyber attacks, network security, software, IT systems.",
             "chatbot": {
                 "title": "Access Protection Assistant",
                 "welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
@@ -724,7 +789,13 @@ const embeddedTranslations = {
                 "riskMatrixQuestionInfo": "Generates security level & protection class (DIN SPEC 91414-2)",
                 "infoPrefix": "Note: ",
                 "completionMessage": "Thank you! All required information is available. Would you like to generate the standards-compliant PDF plan?"
-            }
+            },
+            "error": "Error in AI analysis",
+            "retry": "Try again",
+            "loading": "AI analysis is being created...",
+            "timeout": "Analysis timeout",
+            "networkError": "Network error in AI analysis",
+            "serviceUnavailable": "AI service temporarily unavailable"
         },
         "manufacturer": {
             "title": "Manufacturer View",
@@ -919,6 +990,17 @@ const embeddedTranslations = {
                 "print": "Print",
                 "export": "Export",
                 "share": "Share"
+            },
+            "generation": {
+                "failed": "Report generation failed",
+                "networkError": "Network error in report generation",
+                "retry": "Generate report again",
+                "loading": "Report is being created..."
+            },
+            "ai": {
+                "error": "Error in AI report generation",
+                "loading": "AI report is being generated...",
+                "timeout": "Timeout in AI report generation"
             }
         },
         "threats": {
@@ -927,7 +1009,10 @@ const embeddedTranslations = {
             "analysisFailed": "Threat analysis failed",
             "noCrossingWaysBoundary": "No crossing ways found at boundary",
             "popupHeader": "Threat Information",
-            "loading": "Loading threat analysis..."
+            "loading": "Loading threat analysis...",
+            "minimize": "Minimize",
+            "maximize": "Maximize",
+            "close": "Close"
         },
         "map": {
             "createReport": "Create Report",
@@ -1275,9 +1360,9 @@ async function loadProductDatabase() {
     }
     
     try {
-        // Use fetch with cache optimization
+        // Use fetch without cache during development to ensure latest data
         const response = await fetch(`${import.meta.env.BASE_URL}product-database.json`, {
-            cache: 'force-cache' // Cache for better performance
+            cache: 'no-cache' // Disable cache to get latest data
         });
         
         if (!response.ok) {
@@ -1425,15 +1510,25 @@ function displayProductsTable(products: any[]) {
     
     cleanedProducts.forEach((product, index) => {
         const row = document.createElement('tr');
+        // Get confidence indicator
+        const confidence = product.product_type_confidence || 0;
+        const confidenceIcon = confidence >= 0.9 ? '🟢' : 
+                              confidence >= 0.7 ? '🟡' : 
+                              confidence >= 0.5 ? '🟠' : '🔴';
+        
         row.innerHTML = `
             <td>${product.manufacturer || 'N/A'}</td>
             <td>${product.product_name || 'N/A'}</td>
+            <td><span title="Produkttyp: ${product.product_type || 'N/A'}">${product.product_type || 'N/A'}</span></td>
+            <td><span title="Cluster: ${product.product_cluster || 'N/A'}">${product.product_cluster || 'N/A'}</span></td>
+            <td><span title="Vertrauen: ${(confidence * 100).toFixed(0)}%">${confidenceIcon} ${(confidence * 100).toFixed(0)}%</span></td>
             <td>${product.technical_data?.standard || 'N/A'}</td>
-            <td>${product.technical_data?.performance_rating || 'N/A'}</td>
-            <td>${product.technical_data?.dimensions || 'N/A'}</td>
-            <td>${product.technical_data?.foundation_depth || 'N/A'}</td>
-            <td>${product.technical_data?.material || 'N/A'}</td>
-            <td>${product.datasheet_url ? `<a href="${product.datasheet_url}" target="_blank">Link</a>` : 'N/A'}</td>
+            <td>${product.technical_data?.pr_mass_kg || 'N/A'}</td>
+            <td>${product.technical_data?.pr_veh || 'N/A'}</td>
+            <td>${product.technical_data?.pr_speed_kph || 'N/A'}</td>
+            <td>${product.technical_data?.pr_angle_deg || 'N/A'}</td>
+            <td>${product.technical_data?.pr_pen_m || 'N/A'}</td>
+            <td>${product.technical_data?.pr_debris_m || 'N/A'}</td>
             <td>
                 <button class="view-details-btn" data-product-index="${index}">
                     ${t('manufacturer.sidebar.productDatabase.viewDetails')}
@@ -1539,26 +1634,36 @@ async function displayProductsGrid(products: any[]) {
                     <div class="product-card-title">${product.product_name || 'N/A'}</div>
                     <div class="product-card-manufacturer">${product.manufacturer || 'N/A'}</div>
                 </div>
+                <div class="product-card-classification">
+                    <div class="product-card-type">
+                        <span class="type-badge ${product.product_cluster?.toLowerCase() || 'unknown'}">${product.product_type || 'N/A'}</span>
+                        <span class="cluster-badge">${product.product_cluster || 'N/A'}</span>
+                    </div>
+                    <div class="confidence-indicator">
+                        <span class="confidence-label">Vertrauen:</span>
+                        <span class="confidence-value">${product.product_type_confidence ? (product.product_type_confidence * 100).toFixed(0) + '%' : 'N/A'}</span>
+                    </div>
+                </div>
                 <div class="product-card-specs">
                     <div class="product-card-spec">
                         <div class="product-card-spec-label">Standard</div>
                         <div class="product-card-spec-value">${product.technical_data?.standard || 'N/A'}</div>
                     </div>
-                    <div class="product-card-spec">
-                        <div class="product-card-spec-label">Leistungsbewertung</div>
-                        <div class="product-card-spec-value">${product.technical_data?.performance_rating || 'N/A'}</div>
+                    <div class="product-card-spec highlight-speed">
+                        <div class="product-card-spec-label">Testgeschwindigkeit</div>
+                        <div class="product-card-spec-value"><strong>${product.technical_data?.pr_speed_kph || 'N/A'} km/h</strong></div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Abmessungen</div>
-                        <div class="product-card-spec-value">${product.technical_data?.dimensions || 'N/A'}</div>
+                        <div class="product-card-spec-label">Fahrzeugtyp</div>
+                        <div class="product-card-spec-value">${product.technical_data?.pr_veh || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Fundamenttiefe</div>
-                        <div class="product-card-spec-value">${product.technical_data?.foundation_depth || 'N/A'}</div>
+                        <div class="product-card-spec-label">Anprallwinkel</div>
+                        <div class="product-card-spec-value">${product.technical_data?.pr_angle_deg || 'N/A'}°</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Material</div>
-                        <div class="product-card-spec-value">${product.technical_data?.material || 'N/A'}</div>
+                        <div class="product-card-spec-label">Eindringtiefe</div>
+                        <div class="product-card-spec-value">${product.technical_data?.pr_pen_m || 'N/A'} m</div>
                     </div>
                 </div>
                 <div class="product-card-actions">
@@ -1656,7 +1761,7 @@ async function sortProductsByImageAvailability(products: any[]): Promise<any[]> 
     );
     
     // Sort by priority: 1) Products with database filename AND real image, 2) Products with real image (but no database filename), 3) Products without images
-    const sorted = productsWithImageStatus.sort((a, b) => {
+    const sorted = productsWithImageStatus.sort((a: any, b: any) => {
         // Priority 1: Products with database filename and real image
         if (a.hasDatabaseFilename && a.hasRealImage && !(b.hasDatabaseFilename && b.hasRealImage)) {
             console.log(`Sorting: "${a.product_name}" (database image) before "${b.product_name}"`);
@@ -1822,6 +1927,12 @@ function initProductSearchAndFilters() {
         vehicleTypeFilter.addEventListener('change', filterProducts);
     }
     
+    // Speed filter
+    const speedFilter = document.getElementById('speed-filter');
+    if (speedFilter) {
+        speedFilter.addEventListener('change', filterProducts);
+    }
+    
     // Initialize view toggle functionality
     initViewToggle();
 }
@@ -1933,6 +2044,7 @@ async function filterProducts() {
     const manufacturer = (document.getElementById('manufacturer-filter') as HTMLSelectElement)?.value || '';
     const standard = (document.getElementById('standard-filter') as HTMLSelectElement)?.value || '';
     const vehicleType = (document.getElementById('vehicle-type-filter') as HTMLSelectElement)?.value || '';
+    const minSpeed = (document.getElementById('speed-filter') as HTMLSelectElement)?.value || '';
     
     const filteredProducts = products.filter((product: any) => {
         const matchesSearch = !searchTerm || 
@@ -1945,7 +2057,29 @@ async function filterProducts() {
         // Updated to use material filter for new database structure
         const matchesVehicleType = !vehicleType || product.technical_data?.material === vehicleType;
         
-        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType;
+        // Speed filter based on test speed
+        const matchesSpeed = !minSpeed || (() => {
+            const requiredSpeed = parseFloat(minSpeed);
+            let productSpeed = 0;
+            
+            // Get product speed from the new technical data fields
+            if (product.technical_data?.pr_speed_kph) {
+                productSpeed = parseFloat(product.technical_data.pr_speed_kph);
+            } else if (product.speed) {
+                productSpeed = parseFloat(product.speed);
+            } else if (product.technical_data?.performance_rating) {
+                // Extract from performance rating as fallback
+                const parts = product.technical_data.performance_rating.split('/');
+                if (parts.length >= 3) {
+                    const speedPart = parts[2];
+                    productSpeed = parseFloat(speedPart) || 0;
+                }
+            }
+            
+            return !isNaN(productSpeed) && productSpeed >= requiredSpeed;
+        })();
+        
+        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType && matchesSpeed;
     });
     
     await displayProducts(filteredProducts);
@@ -2039,6 +2173,22 @@ function showProductDetails(productIndex: number) {
             <p><strong>${t('manufacturer.sidebar.productDatabase.foundation')}:</strong> ${product.technical_data?.foundation_depth || 'N/A'}</p>
             <p><strong>Standard getestet nach:</strong> ${product.technical_data?.standard_tested_to || 'N/A'}</p>
             <p><strong>Download Datum:</strong> ${product.technical_data?.download_date || 'N/A'}</p>
+            <div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-radius: 8px;">
+                <h4 style="margin-bottom: 12px; color: #1565c0;">🏷️ Produktklassifizierung</h4>
+                <p><strong>Produkttyp:</strong> ${product.product_type || 'N/A'}</p>
+                <p><strong>Cluster:</strong> ${product.product_cluster || 'N/A'}</p>
+                <p><strong>Vertrauenswert:</strong> ${product.product_type_confidence ? (product.product_type_confidence * 100).toFixed(0) + '%' : 'N/A'}</p>
+                <p><strong>Erkennungsquelle:</strong> ${product.product_type_source || 'N/A'}</p>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
+                <h4 style="margin-bottom: 12px; color: #495057;">⚡ Testparameter</h4>
+                <p><strong>Fahrzeuggewicht:</strong> ${product.technical_data?.pr_mass_kg || 'N/A'} kg</p>
+                <p><strong>Fahrzeugtyp:</strong> ${product.technical_data?.pr_veh || 'N/A'}</p>
+                <p><strong>Testgeschwindigkeit:</strong> ${product.technical_data?.pr_speed_kph || 'N/A'} km/h</p>
+                <p><strong>Anprallwinkel:</strong> ${product.technical_data?.pr_angle_deg || 'N/A'}°</p>
+                <p><strong>Eindringtiefe:</strong> ${product.technical_data?.pr_pen_m || 'N/A'} m</p>
+                <p><strong>Trümmerstreuweite:</strong> ${product.technical_data?.pr_debris_m || 'N/A'} m</p>
+            </div>
         `;
     }
     
@@ -2588,10 +2738,14 @@ function initOpenStreetMap(): void {
         }
     });
     
-    // Add event listeners for map movement to update pinned tooltips
+        // Add event listeners for map movement to update pinned tooltips (throttled for performance)
+    let moveTimeout: number | undefined;
     map.on('move', () => {
-        console.log('Map move event triggered');
+        if (moveTimeout) clearTimeout(moveTimeout);
+        moveTimeout = window.setTimeout(() => {
+            // console.log('Map move event triggered'); // Reduced logging
         updatePinnedTooltipPositions();
+        }, 100);
     });
     map.on('zoom', () => {
         console.log('Map zoom event triggered');
@@ -2670,6 +2824,57 @@ function getLineSegmentIntersection(
         };
     }
     return null;
+}
+
+/**
+ * Determines if two road names should be combined as the same road
+ * @param road1 - First road name
+ * @param road2 - Second road name  
+ * @returns true if roads should be combined
+ */
+function shouldCombineRoads(road1: string, road2: string): boolean {
+    // Remove IDs and common suffixes for comparison
+    const clean1 = road1.replace(/\(ID:\d+\)/g, '').replace(/(straße|weg|gasse|platz|allee)$/i, '').trim().toLowerCase();
+    const clean2 = road2.replace(/\(ID:\d+\)/g, '').replace(/(straße|weg|gasse|platz|allee)$/i, '').trim().toLowerCase();
+    
+    // Same name without suffix
+    if (clean1 === clean2 && clean1.length > 2) return true;
+    
+    // Very similar names (Levenshtein distance)
+    if (getLevenshteinDistance(clean1, clean2) <= 1 && Math.min(clean1.length, clean2.length) > 3) return true;
+    
+    // Same road with different types (Hauptstraße vs Hauptweg)
+    const baseName1 = clean1.replace(/^(haupt|neben|ober|unter|neu|alt)\s*/i, '');
+    const baseName2 = clean2.replace(/^(haupt|neben|ober|unter|neu|alt)\s*/i, '');
+    if (baseName1 === baseName2 && baseName1.length > 2) return true;
+    
+    return false;
+}
+
+/**
+ * Calculates Levenshtein distance between two strings
+ * @param str1 - First string
+ * @param str2 - Second string
+ * @returns Distance value
+ */
+function getLevenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+        for (let i = 1; i <= str1.length; i++) {
+            const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1,    // deletion
+                matrix[j - 1][i] + 1,    // insertion
+                matrix[j - 1][i - 1] + indicator  // substitution
+            );
+        }
+    }
+    
+    return matrix[str2.length][str1.length];
 }
 
 /**
@@ -2767,6 +2972,67 @@ function calculateVelocity(acceleration: number, distance: number): number {
 }
 
 /**
+ * Setup minimize/close functionality for threat panel
+ */
+function setupThreatPanelControls() {
+    const minimizeBtn = document.getElementById('minimize-threats-btn');
+    const closeBtn = document.getElementById('close-threats-btn');
+    const threatPanel = document.getElementById('floating-threats');
+    
+    if (minimizeBtn && threatPanel) {
+        minimizeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Toggle the minimized class
+            threatPanel.classList.toggle('minimized');
+            const isMinimized = threatPanel.classList.contains('minimized');
+            
+            // Also manually set styles as backup
+            const threatPanelContent = threatPanel.querySelector('.threat-panel-content') as HTMLElement;
+            if (threatPanelContent) {
+                if (isMinimized) {
+                    threatPanelContent.style.maxHeight = '0';
+                    threatPanelContent.style.opacity = '0';
+                    threatPanelContent.style.padding = '0';
+                    threatPanelContent.style.margin = '0';
+                    threatPanelContent.style.overflow = 'hidden';
+                } else {
+                    threatPanelContent.style.maxHeight = '';
+                    threatPanelContent.style.opacity = '';
+                    threatPanelContent.style.padding = '';
+                    threatPanelContent.style.margin = '';
+                    threatPanelContent.style.overflow = '';
+                }
+            }
+            
+            console.log('Panel minimized state changed:', isMinimized);
+            
+            // Update tooltip with translation
+            minimizeBtn.title = isMinimized ? t('threats.maximize') : t('threats.minimize');
+            
+            // Update button icon
+            const icon = minimizeBtn.querySelector('i');
+            if (icon) {
+                if (isMinimized) {
+                    icon.className = 'fas fa-plus';
+                } else {
+                    icon.className = 'fas fa-minus';
+                }
+            }
+        });
+    }
+    
+    if (closeBtn && threatPanel) {
+        closeBtn.addEventListener('click', () => {
+            threatPanel.classList.add('view-hidden');
+            // Also clear the threat analysis
+            clearThreatAnalysis();
+        });
+    }
+}
+
+/**
  * Renders the list of identified threats into the UI based on the current state of threatsMap.
  */
 function renderThreatList() {
@@ -2793,24 +3059,53 @@ function renderThreatList() {
         
         if (accelerationRange && lengthInMeters > 0) {
             const [, maxAcc] = accelerationRange;
-            maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+            // Use OSM-enhanced velocity calculation if available
+            const pathCoords = data.entryPoints.length > 0 ? [{lat: data.entryPoints[0].lat, lng: data.entryPoints[0].lon}] : undefined;
+            maxSpeed = Math.round(calculateVelocityWithOsm(maxAcc, lengthInMeters, pathCoords));
         }
         
-        return { name, data, maxSpeed, lengthInMeters };
+        // Enhanced threat data for report generation
+        const threatLevel = data.threatLevel || 5;
+        const roadType = data.roadType || 'unbekannt';
+        const roadMaxSpeed = data.maxSpeed || 50;
+        
+        return { 
+            name, 
+            data, 
+            maxSpeed, 
+            lengthInMeters, 
+            threatLevel, 
+            roadType, 
+            roadMaxSpeed 
+        };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
 
-    // Sort by maxSpeed in descending order
-    threatsArray.sort((a, b) => b.maxSpeed - a.maxSpeed);
+    // Sort by threat level first, then by maxSpeed
+    threatsArray.sort((a: any, b: any) => {
+        // Primary sort: threat level (descending)
+        if (a.threatLevel !== b.threatLevel) {
+            return b.threatLevel - a.threatLevel;
+        }
+        // Secondary sort: maxSpeed (descending)
+        return b.maxSpeed - a.maxSpeed;
+    });
 
-    threatsArray.forEach(({ name, maxSpeed, lengthInMeters }) => {
+    threatsArray.forEach(({ name, maxSpeed, lengthInMeters, threatLevel, roadType }) => {
         const li = document.createElement('li');
         
-        // Format: Straßenname (Beschleunigungsstrecke / Endgeschwindigkeit)
-        let displayText = `${name} (${lengthInMeters} m`;
+        // Enhanced format with threat level indicator
+        const threatIcon = threatLevel >= 9 ? '🔴' : 
+                         threatLevel >= 7 ? '🟠' : 
+                         threatLevel >= 5 ? '🟡' : 
+                         threatLevel >= 3 ? '🟢' : '⚪';
+        
+                // Format: Icon Straßenname (Type/Threat Level) - Beschleunigungsstrecke / Endgeschwindigkeit
+        let displayText = `${threatIcon} ${name}`;
+        displayText += ` (${roadType}, Level ${threatLevel})`;
+        displayText += ` - ${lengthInMeters} m`;
         if (maxSpeed > 0) {
             displayText += ` / ${maxSpeed} km/h`;
         }
-        displayText += ')';
 
         li.textContent = displayText;
         li.setAttribute('role', 'button');
@@ -2900,23 +3195,52 @@ const analyzeAndMarkThreats = async () => {
             throw new Error('Invalid polygon bounds');
         }
 
-        const buffer = 0.002; 
+        const buffer = 0.005; // Increased buffer for better road detection 
         const southWest = bounds.getSouthWest();
         const northEast = bounds.getNorthEast();
         const bbox = `${southWest.lat - buffer},${southWest.lng - buffer},${northEast.lat + buffer},${northEast.lng + buffer}`;
         
         console.log('Analysis bounds:', bbox);
+        console.log('🔧 THREAT ANALYSIS: Using enhanced query with', 
+                   'residential + service + track + cycleway + access roads');
+        
+        // Define exclusion patterns for filtering unwanted ways BEFORE they are used
+        const exclusionPatterns = {
+            names: [
+                /bikepark/i, /bike\s*park/i, /mountainbike/i, /mtb/i,
+                /singletrail/i, /trail/i, /downhill/i, /freeride/i,
+                /pumptrack/i, /pump\s*track/i, /bmx/i,
+                /skatepark/i, /skate\s*park/i,
+                /spielplatz/i, /playground/i,
+                /golfplatz/i, /golf/i,
+                /wanderweg/i, /hiking/i, /spazierweg/i,
+                /serpentin/i, /kurve/i, /schleife/i
+            ],
+            tags: {
+                'sport': ['cycling', 'mtb', 'bmx', 'skateboard', 'golf', 'hiking'],
+                'leisure': ['park', 'playground', 'sports_centre', 'track', 'golf_course'],
+                'tourism': ['attraction', 'viewpoint'],
+                'mtb': ['yes', 'designated'],
+                'motor_vehicle': ['no', 'private'],  // Removed 'destination' - Anliegerstraßen sind OK
+                'access': ['private', 'no', 'forestry', 'agricultural']
+            }
+        };
         
         const query = `
-            [out:json][timeout:25];
+            [out:json][timeout:30];
             (
-              way["highway"](bbox:${bbox});
+              way["highway"~"^(primary|secondary|tertiary|residential|unclassified|service|living_street|track)$"](bbox:${bbox});
+              way["highway"~"^(motorway|trunk)$"](bbox:${bbox});
+              way["highway"="cycleway"]["motor_vehicle"!="no"](bbox:${bbox});
               way["railway"="tram"](bbox:${bbox});
+              way["access"~"^(yes|permissive)$"]["highway"](bbox:${bbox});
             );
             (._;>;);
-            out;
+            out geom;
         `;
         const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+        console.log('🌐 THREAT ANALYSIS Query URL:', url);
+        console.log('🔍 THREAT ANALYSIS Raw query:', query);
 
         let data;
         try {
@@ -2925,8 +3249,38 @@ const analyzeAndMarkThreats = async () => {
                 throw new Error(t('alerts.overpassError', { status: response.status }));
             }
             data = await response.json();
+            const elementCount = data?.elements?.length || 0;
+            console.log('🎯 THREAT ANALYSIS OSM Data received:', elementCount, 'elements');
+            
+            // Count different road types for better debugging
+            const roadTypes: Record<string, number> = {};
+            data?.elements?.forEach((el: any) => {
+                if (el.type === 'way' && el.tags?.highway) {
+                    roadTypes[el.tags.highway] = (roadTypes[el.tags.highway] || 0) + 1;
+                }
+            });
+            console.log('📊 Road types found:', roadTypes);
+            
+            // Count excluded ways for user feedback
+            let excludedCount = 0;
+            data?.elements?.forEach((el: any) => {
+                if (el.type === 'way' && el.tags?.highway) {
+                    let roadName = el.tags.name;
+                    if (!roadName) {
+                        if (el.tags.highway === 'residential') roadName = `Wohnstraße (ID:${el.id})`;
+                        else if (el.tags.highway === 'service') roadName = `Erschließungsstraße (ID:${el.id})`;
+                        else roadName = `${el.tags.highway} (ID:${el.id})`;
+                    }
+                    
+                    if (shouldExcludeWay(roadName, el, [])) { // Empty nodes for pre-check
+                        excludedCount++;
+                    }
+                }
+            });
+            
+            console.log(`🚫 Pre-filtering: ${excludedCount} recreational/restricted ways will be excluded from threat analysis`);
         } catch (error) {
-            console.error('Overpass API error:', error);
+            console.error('🚨 THREAT ANALYSIS Overpass API error:', error);
             alert(t('alerts.analysisError'));
             loadingIndicator.classList.add('hidden');
             return;
@@ -2935,17 +3289,181 @@ const analyzeAndMarkThreats = async () => {
         const nodes: { [id: number]: { lat: number, lon: number } } = {};
         const ways: { [id: number]: { name: string, nodes: number[], id: number } } = {};
 
+        console.log(`🔍 THREAT ANALYSIS: Processing ${data.elements.length} OSM elements`);
+        
+        let nodeCount = 0;
+        let wayCount = 0;
+        let skippedWayCount = 0;
+
         data.elements.forEach((el: any) => {
             if (el.type === 'node') {
                 nodes[el.id] = { lat: el.lat, lon: el.lon };
+                nodeCount++;
             } else if (el.type === 'way' && el.tags && (el.tags.highway || el.tags.railway)) {
-                if (el.tags.name) {
-                    ways[el.id] = { name: el.tags.name, nodes: el.nodes, id: el.id };
+                // Enhanced name detection for unnamed roads
+                let roadName = el.tags.name;
+                if (!roadName) {
+                    // Generate descriptive name for unnamed roads
+                    if (el.tags.highway === 'residential') roadName = `Wohnstraße (ID:${el.id})`;
+                    else if (el.tags.highway === 'service') roadName = `Erschließungsstraße (ID:${el.id})`;
+                    else if (el.tags.highway === 'unclassified') roadName = `Nebenstraße (ID:${el.id})`;
+                    else if (el.tags.highway === 'track') roadName = `Wirtschaftsweg (ID:${el.id})`;
+                    else if (el.tags.ref) roadName = el.tags.ref;
+                    else roadName = `${el.tags.highway || 'Straße'} (ID:${el.id})`;
                 }
+                // Check if nodes array exists before adding to ways
+                if (el.nodes && Array.isArray(el.nodes) && el.nodes.length > 0) {
+                    ways[el.id] = { name: roadName, nodes: el.nodes, id: el.id };
+                    wayCount++;
+                } else {
+                    console.warn(`⚠️ THREAT ANALYSIS: Way ${el.id} has no valid nodes array, skipping`);
+                    skippedWayCount++;
+                }
+                // console.log(`🛣️ THREAT ANALYSIS: Found road "${roadName}" (${el.tags.highway}, ${el.nodes.length} nodes)`); // Reduced logging for performance
+            } else if (el.type === 'way') {
+                skippedWayCount++;
             }
         });
+        
+        console.log(`📊 THREAT ANALYSIS: Found ${nodeCount} nodes, ${wayCount} ways (highways/railways), ${skippedWayCount} other ways`);
+        console.log(`📊 THREAT ANALYSIS: Ways object contains ${Object.keys(ways).length} entries`);
 
-        const threats = new Map<string, { entryPoints: {lat: number, lon: number}[], pathSegments: {lat: number, lon: number}[][], totalLength: number }>();
+        // Define threat priority levels based on road type
+        const threatPriority = {
+            'motorway': 10,     // Höchste Bedrohung - Autobahnen
+            'trunk': 10,        // Höchste Bedrohung - Schnellstraßen  
+            'primary': 9,       // Sehr hohe Bedrohung - Bundesstraßen
+            'secondary': 8,     // Hohe Bedrohung - Landstraßen
+            'tertiary': 7,      // Mittlere Bedrohung - Kreisstraßen
+            'unclassified': 6,  // Mittlere Bedrohung - Nebenstraßen
+            'residential': 5,   // Niedrigere Bedrohung - Wohnstraßen
+            'living_street': 4, // Niedrige Bedrohung - verkehrsberuhigt
+            'service': 3,       // Geringe Bedrohung - Erschließungsstraßen
+            'track': 2,         // Sehr geringe Bedrohung - Feldwege
+            'cycleway': 1,      // Minimale Bedrohung - Radwege
+            'footway': 1,       // Minimale Bedrohung - Fußwege
+            'path': 1           // Minimale Bedrohung - Pfade
+        };
+
+        // exclusionPatterns bereits oben definiert
+
+        // Function to analyze path geometry for serpentine patterns
+        function isSerpentinePath(wayNodes: any[]): boolean {
+            if (wayNodes.length < 4) return false;
+            
+            let directionChanges = 0;
+            let totalAngleChange = 0;
+            
+            for (let i = 1; i < wayNodes.length - 1; i++) {
+                const prev = wayNodes[i - 1];
+                const curr = wayNodes[i];
+                const next = wayNodes[i + 1];
+                
+                // Calculate bearing changes
+                const bearing1 = Math.atan2(curr.lat - prev.lat, curr.lon - prev.lon);
+                const bearing2 = Math.atan2(next.lat - curr.lat, next.lon - curr.lon);
+                
+                let angleDiff = Math.abs(bearing2 - bearing1);
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                
+                totalAngleChange += angleDiff;
+                
+                // Count significant direction changes (> 45 degrees)
+                if (angleDiff > Math.PI / 4) {
+                    directionChanges++;
+                }
+            }
+            
+            // Average angle change per segment
+            const avgAngleChange = totalAngleChange / (wayNodes.length - 2);
+            
+            // Criteria for serpentine path:
+            // - Many direction changes relative to path length
+            // - High average angle change
+            const isSerpentine = (directionChanges / wayNodes.length > 0.3) && (avgAngleChange > Math.PI / 6);
+            
+            if (isSerpentine) {
+                console.log(`🐍 SERPENTINE detected: ${directionChanges} direction changes, avg angle: ${(avgAngleChange * 180 / Math.PI).toFixed(1)}°`);
+            }
+            
+            return isSerpentine;
+        }
+
+        // Function to check if a way should be excluded from threat analysis
+        function shouldExcludeWay(wayName: string, wayElement: any, wayNodes: any[]): boolean {
+            // Check name patterns
+            for (const pattern of exclusionPatterns.names) {
+                if (pattern.test(wayName)) {
+                    console.log(`🚫 EXCLUDED by name pattern "${pattern}": ${wayName}`);
+                    return true;
+                }
+            }
+            
+            // Check OSM tags
+            if (wayElement?.tags) {
+                for (const [tagKey, values] of Object.entries(exclusionPatterns.tags)) {
+                    const tagValue = wayElement.tags[tagKey];
+                    if (tagValue && values.includes(tagValue)) {
+                        // Special handling: Don't exclude normal roads that just happen to allow bikes/foot
+                        if ((tagKey === 'bicycle' || tagKey === 'foot') && 
+                            wayElement.tags.highway && 
+                            !['cycleway', 'footway', 'path'].includes(wayElement.tags.highway)) {
+                            // This is a normal road that allows bikes/foot - don't exclude
+                            continue;
+                        }
+                        console.log(`🚫 EXCLUDED by tag ${tagKey}=${tagValue}: ${wayName}`);
+                        return true;
+                    }
+                }
+                
+                // Additional checks for recreational facilities
+                if (wayElement.tags.leisure || wayElement.tags.sport || wayElement.tags.tourism) {
+                    console.log(`🚫 EXCLUDED as recreational facility: ${wayName}`);
+                    return true;
+                }
+                
+                // Check for strict motor vehicle restrictions (but allow 'destination')
+                if (wayElement.tags.motor_vehicle === 'no' || 
+                    wayElement.tags.motorcar === 'no' ||
+                    wayElement.tags.vehicle === 'no') {
+                    console.log(`🚫 EXCLUDED by motor vehicle restriction: ${wayName}`);
+                    return true;
+                }
+                
+                // Allow motor_vehicle=destination (Anliegerstraßen are legitimate access routes)
+                
+                // Check for private access or completely restricted access
+                if (wayElement.tags.access === 'private' || 
+                    wayElement.tags.access === 'no') {
+                    console.log(`🚫 EXCLUDED by access restriction: ${wayName}`);
+                    return true;
+                }
+                
+                // Only exclude if it's ONLY for bicycles/pedestrians (not mixed use)
+                if ((wayElement.tags.bicycle === 'designated' && wayElement.tags.highway === 'cycleway') ||
+                    (wayElement.tags.foot === 'designated' && wayElement.tags.highway === 'footway')) {
+                    console.log(`🚫 EXCLUDED as dedicated bike/foot path: ${wayName}`);
+                    return true;
+                }
+            }
+            
+            // Check for serpentine geometry (characteristic of bike trails)
+            if (isSerpentinePath(wayNodes)) {
+                console.log(`🚫 EXCLUDED as serpentine path (likely recreational): ${wayName}`);
+                return true;
+            }
+            
+            return false;
+        }
+
+        const threats = new Map<string, { 
+            entryPoints: {lat: number, lon: number, distance: number}[], 
+            pathSegments: {lat: number, lon: number}[][], 
+            totalLength: number,
+            threatLevel: number,
+            roadType: string,
+            maxSpeed: number
+        }>();
         
         // Enhanced polygon coordinate extraction with validation
         let polygonVertices: { lat: number, lon: number }[] = [];
@@ -2992,7 +3510,7 @@ const analyzeAndMarkThreats = async () => {
                 throw new Error('Invalid polygon: insufficient valid coordinates');
             }
             
-            console.log(`Extracted ${polygonVertices.length} valid polygon vertices:`, polygonVertices);
+            console.log(`🔸 THREAT ANALYSIS: Extracted ${polygonVertices.length} valid polygon vertices:`, polygonVertices);
             
         } catch (error) {
             console.error('Error extracting polygon coordinates:', error);
@@ -3001,13 +3519,36 @@ const analyzeAndMarkThreats = async () => {
             return;
         }
 
+        console.log(`🔄 THREAT ANALYSIS: Processing ${Object.keys(ways).length} ways for threat detection`);
+        
+        let processedWays = 0;
+        let excludedWays = 0;
+        let validThreats = 0;
+
         for (const wayId in ways) {
+            // First check if the property actually exists and is not inherited
+            if (!ways.hasOwnProperty(wayId)) {
+                continue;
+            }
+            
             const way = ways[wayId];
+            
+            // Safety check
+            if (!way || !way.nodes) {
+                console.warn(`⚠️ Invalid way data for ID ${wayId}:`, way);
+                console.warn(`⚠️ Way type:`, typeof way);
+                console.warn(`⚠️ Way keys:`, way ? Object.keys(way) : 'way is null/undefined');
+                console.warn(`⚠️ wayId type:`, typeof wayId);
+                continue;
+            }
+            
             const wayNodes = way.nodes.map(id => ({ id, ...nodes[id] })).filter(n => n.lat && n.lon);
             if (wayNodes.length < 2) continue;
+            
+            processedWays++;
 
             const wayThreatSegments: { lat: number, lon: number }[][] = [];
-            const wayEntryPoints: { lat: number, lon: number }[] = [];
+            const wayEntryPoints: { lat: number, lon: number, distance: number }[] = [];
 
             for (let i = 0; i < wayNodes.length - 1; i++) {
                 const prevNode = wayNodes[i];
@@ -3028,7 +3569,36 @@ const analyzeAndMarkThreats = async () => {
                     }
                     
                     if (intersectionPoint) {
-                        wayEntryPoints.push(intersectionPoint);
+                        // Calculate the distance along the road from the start to this entry point
+                        let approachDistance = 0;
+                        if (isCurrIn) {
+                            // Entry point is between prevNode (outside) and currNode (inside)
+                            // Calculate distance from start of way to prevNode, then to intersection
+                            for (let k = 0; k < i; k++) {
+                                approachDistance += getHaversineDistance(wayNodes[k], wayNodes[k + 1]);
+                            }
+                            // Add distance from prevNode to intersection point
+                            approachDistance += getHaversineDistance(prevNode, intersectionPoint);
+                        } else {
+                            // Entry point is between prevNode (inside) and currNode (outside)
+                            // Calculate distance from start of way to intersection point
+                            for (let k = 0; k < i; k++) {
+                                approachDistance += getHaversineDistance(wayNodes[k], wayNodes[k + 1]);
+                            }
+                            // Add distance from prevNode to intersection point
+                            approachDistance += getHaversineDistance(prevNode, intersectionPoint);
+                        }
+                        
+                        // Create entry point with distance property
+                        const entryPointWithDistance = {
+                            lat: intersectionPoint.lat,
+                            lon: intersectionPoint.lon,
+                            distance: Math.max(approachDistance, 10) // Minimum 10m to avoid zero speed
+                        };
+                        
+                        console.log(`📍 ENTRY POINT: Creating entry point for way "${way.name}" at distance ${Math.round(approachDistance)}m along road (${entryPointWithDistance.distance}m after min)`);
+                        
+                        wayEntryPoints.push(entryPointWithDistance);
                         const pathSegment: { lat: number, lon: number }[] = [intersectionPoint];
                         let traceStartIndex: number;
                         let traceDirection: number;
@@ -3050,7 +3620,8 @@ const analyzeAndMarkThreats = async () => {
                                 const p2 = pathSegment[pathSegment.length - 1];
                                 const p3 = { lat: traceNode.lat, lon: traceNode.lon };
                                 const angle = getAngle(p1, p2, p3);
-                                if (angle < 150) break; 
+                                // More permissive angle threshold for better path tracing
+                                if (angle < 120) break; 
                             }
                             pathSegment.push({ lat: traceNode.lat, lon: traceNode.lon });
                         }
@@ -3060,8 +3631,46 @@ const analyzeAndMarkThreats = async () => {
             }
             
             if (wayEntryPoints.length > 0) {
+                // Find highway type from original OSM data
+                const wayElement = data.elements.find((el: any) => el.id === way.id);
+                
+                // Check if this way should be excluded (recreational paths, bikeparks, etc.)
+                if (shouldExcludeWay(way.name, wayElement, wayNodes)) {
+                    console.log(`🚫 Skipping recreational/restricted way: ${way.name}`);
+                    excludedWays++;
+                    continue; // Skip this way entirely
+                }
+                
                 if (!threats.has(way.name)) {
-                    threats.set(way.name, { entryPoints: [], pathSegments: [], totalLength: 0 });
+                    const roadType = wayElement?.tags?.highway || 'unknown';
+                    const baseThreatLevel = (threatPriority as any)[roadType] || 3;
+                    
+                    // Extract max speed from way tags if available
+                    let maxSpeed = 50; // Default speed
+                    const wayData = data.elements.find((el: any) => el.id === way.id);
+                    if (wayData?.tags?.maxspeed) {
+                        const speedMatch = wayData.tags.maxspeed.match(/\d+/);
+                        if (speedMatch) {
+                            maxSpeed = parseInt(speedMatch[0]);
+                        }
+                    }
+                    
+                    // Adjust threat level based on speed
+                    let adjustedThreatLevel = baseThreatLevel;
+                    if (maxSpeed >= 100) adjustedThreatLevel += 2;      // Autobahn speeds
+                    else if (maxSpeed >= 80) adjustedThreatLevel += 1.5; // Landstraße speeds  
+                    else if (maxSpeed >= 50) adjustedThreatLevel += 1;   // Standard speeds
+                    else if (maxSpeed <= 30) adjustedThreatLevel -= 1;   // Zone 30
+                    
+                    threats.set(way.name, { 
+                        entryPoints: [], 
+                        pathSegments: [], 
+                        totalLength: 0,
+                        threatLevel: Math.round(adjustedThreatLevel * 10) / 10, // Round to 1 decimal
+                        roadType: roadType,
+                        maxSpeed: maxSpeed
+                    });
+                    validThreats++;
                 }
                 const threatData = threats.get(way.name)!;
                 threatData.entryPoints.push(...wayEntryPoints);
@@ -3077,7 +3686,36 @@ const analyzeAndMarkThreats = async () => {
             }
         }
         
-        threatsMap = threats;
+        console.log(`📊 THREAT ANALYSIS Results: ${processedWays} ways processed, ${excludedWays} excluded, ${validThreats} valid threats found`);
+        
+        // Enhanced post-processing: Connect related road segments
+        const connectedThreats = new Map<string, { entryPoints: {lat: number, lon: number, distance: number}[], pathSegments: {lat: number, lon: number}[][], totalLength: number, threatLevel: number, roadType: string, maxSpeed: number }>();
+        
+        for (const [roadName, threatData] of threats) {
+            // Check for similar road names that should be combined
+            let combinedName = roadName;
+            let combinedData = threatData;
+            
+            // Look for existing similar roads
+            for (const [existingName, existingData] of connectedThreats) {
+                if (shouldCombineRoads(roadName, existingName)) {
+                    combinedName = existingName;
+                    combinedData = {
+                        entryPoints: [...existingData.entryPoints, ...threatData.entryPoints],
+                        pathSegments: [...existingData.pathSegments, ...threatData.pathSegments],
+                        totalLength: existingData.totalLength + threatData.totalLength,
+                        threatLevel: Math.max(existingData.threatLevel, threatData.threatLevel), // Use highest threat level
+                        roadType: existingData.threatLevel >= threatData.threatLevel ? existingData.roadType : threatData.roadType,
+                        maxSpeed: Math.max(existingData.maxSpeed, threatData.maxSpeed) // Use highest speed
+                    };
+                    break;
+                }
+            }
+            
+            connectedThreats.set(combinedName, combinedData);
+        }
+        
+        threatsMap = connectedThreats;
         
         if (threatsMap.size > 0) {
             // Prepare a group to hold all overlays so we can clear them reliably later
@@ -3094,11 +3732,57 @@ const analyzeAndMarkThreats = async () => {
 
             threatsMap.forEach((data, name) => {
                 if (data.entryPoints.length === 0) return;
+                
+                // Determine visual threat level based on threat priority
+                const threatLevel = data.threatLevel || 5;
+                let circleColor = 'red';
+                let fillColor = '#f03';
+                let radius = 5;
+                
+                if (threatLevel >= 9) {
+                    // Critical threat - Large red circles
+                    circleColor = '#8B0000'; // Dark red
+                    fillColor = '#DC143C';   // Crimson
+                    radius = 10;
+                } else if (threatLevel >= 7) {
+                    // High threat - Medium red circles  
+                    circleColor = '#B22222'; // Fire brick
+                    fillColor = '#FF6347';   // Tomato
+                    radius = 8;
+                } else if (threatLevel >= 5) {
+                    // Medium threat - Standard red circles
+                    circleColor = 'red';
+                    fillColor = '#f03';
+                    radius = 6;
+                } else if (threatLevel >= 3) {
+                    // Low threat - Orange circles
+                    circleColor = '#FF8C00'; // Dark orange
+                    fillColor = '#FFA500';   // Orange
+                    radius = 5;
+                } else {
+                    // Minimal threat - Yellow circles
+                    circleColor = '#DAA520'; // Goldenrod
+                    fillColor = '#FFD700';   // Gold
+                    radius = 4;
+                }
+                
                 const currentStreetMarkers: any[] = [];
                 data.entryPoints.forEach(point => {
+                    const threatDescription = `
+                        <b>${t('threats.popupHeader')}</b><br>
+                        <b>Straße:</b> ${name}<br>
+                        <b>Straßentyp:</b> ${data.roadType || 'unbekannt'}<br>
+                        <b>Bedrohungslevel:</b> ${threatLevel}/10<br>
+                        <b>Max. Geschwindigkeit:</b> ${data.maxSpeed || 'unbekannt'} km/h
+                    `;
+                    
                     const threatCircle = L.circle([point.lat, point.lon], {
-                        radius: 5, color: 'red', fillColor: '#f03', fillOpacity: 1, weight: 2
-                    }).bindPopup(`<b>${t('threats.popupHeader')}</b><br>${name}`);
+                        radius: radius, 
+                        color: circleColor, 
+                        fillColor: fillColor, 
+                        fillOpacity: 0.8, 
+                        weight: 3
+                    }).bindPopup(threatDescription);
                     threatLayerGroup.addLayer(threatCircle);
                     currentStreetMarkers.push(threatCircle);
                 });
@@ -3127,7 +3811,10 @@ const analyzeAndMarkThreats = async () => {
             renderThreatList(); // Render the list from the new data
             // Show floating panel on the map
             const floating = document.getElementById('floating-threats');
-            if (floating) floating.classList.remove('view-hidden');
+            if (floating) {
+                floating.classList.remove('view-hidden');
+                floating.classList.remove('minimized'); // Ensure it's expanded when shown
+            }
             
             const productRecommendationsContainer = document.querySelector('.product-recommendations-container') as HTMLElement;
             if (productRecommendationsContainer) {
@@ -3140,7 +3827,10 @@ const analyzeAndMarkThreats = async () => {
             li.textContent = t('threats.noCrossingWaysArea');
             threatList.appendChild(li);
             const floating = document.getElementById('floating-threats');
-            if (floating) floating.classList.remove('view-hidden');
+            if (floating) {
+                floating.classList.remove('view-hidden');
+                floating.classList.remove('minimized'); // Ensure it's expanded when shown
+            }
         }
 
     } catch (error) {
@@ -3170,18 +3860,55 @@ async function getAIReportSections(context: any): Promise<any> {
             return buildReportFromStateFallback(context);
         }
         const ai = new GoogleGenAI({ apiKey });
-        const prompt = t('ai.reportPrompt', {
-            locationName: context.locationName,
-            assetToProtect: context.assetToProtect,
-            securityLevel: context.securityLevel,
-            protectionGrade: context.protectionGrade,
-            threatList: context.threatList,
-            protectionPeriod: context.protectionPeriod,
-            productType: context.productType,
-            penetration: context.penetration,
-            debrisDistance: context.debrisDistance,
-            language: currentLanguage === 'de' ? 'German' : 'English'
-        }) + `\n\nIMPORTANT: Generate the report in ${currentLanguage === 'de' ? 'German' : 'English'} language only. All text must be in ${currentLanguage === 'de' ? 'German' : 'English'}.`;
+        // Calculate average threat level for recommendations
+        const threats = Array.from(threatsMap.values());
+        const avgThreatLevel = threats.length > 0 ? 
+            threats.reduce((sum, t) => sum + (t.threatLevel || 5), 0) / threats.length : 5;
+        
+        // Generate intelligent product type recommendations
+        const locationContext = generateLocationContext();
+        const recommendedProductTypes = recommendProductTypes({
+            assetToProtect: context.assetToProtect || '',
+            securityLevel: context.securityLevel || 'medium',
+            protectionGrade: context.protectionGrade || 'permanent',
+            locationContext: locationContext,
+            threatLevel: avgThreatLevel
+        });
+        
+        // Enhanced context with threat level analysis and product recommendations
+        const enhancedContext = {
+            ...context,
+            threatAnalysis: generateThreatAnalysisText(),
+            highestThreatRoads: getHighestThreatRoads(),
+            threatLevelDistribution: getThreatLevelDistribution(),
+            locationContext: locationContext,
+            recommendedProductTypes: recommendedProductTypes.join(', '),
+            averageThreatLevel: avgThreatLevel.toFixed(1),
+            productTypeJustification: generateProductTypeJustification(recommendedProductTypes, context.assetToProtect || '', locationContext, avgThreatLevel)
+        };
+        
+        const prompt = t('ai.reportPrompt', enhancedContext) + 
+        `\n\nENHANCED THREAT ANALYSIS:
+        ${enhancedContext.threatAnalysis}
+        
+        HIGHEST THREAT ROADS:
+        ${enhancedContext.highestThreatRoads}
+        
+        THREAT LEVEL DISTRIBUTION:
+        ${enhancedContext.threatLevelDistribution}
+        
+        RECOMMENDED PRODUCT TYPES:
+        ${enhancedContext.recommendedProductTypes}
+        
+        PRODUCT TYPE JUSTIFICATION:
+        ${enhancedContext.productTypeJustification}
+        
+        LOCATION CONTEXT: ${enhancedContext.locationContext}
+        AVERAGE THREAT LEVEL: ${enhancedContext.averageThreatLevel}/10
+        
+        IMPORTANT: Generate the report in ${currentLanguage === 'de' ? 'German' : 'English'} language only. All text must be in ${currentLanguage === 'de' ? 'German' : 'English'}. 
+        Focus on the threat level analysis and provide specific justifications for each threat level based on road type, traffic speed, and vehicle access capabilities.
+        Include the recommended product types and explain why they are suitable for this specific context and threat level.`;
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -3283,6 +4010,13 @@ function translateAIText(text: string, targetGerman: boolean): string {
             .replace(/\bThe primary threat\b/gi, 'Die primäre Bedrohung')
             .replace(/\bis\b/gi, 'ist')
             .replace(/\buse of vehicles\b/gi, 'die Nutzung von Fahrzeugen')
+            .replace(/\bvehicle as weapon\b/gi, 'Fahrzeug als Waffe')
+            .replace(/\bram attack\b/gi, 'Rammangriff')
+            .replace(/\bvehicle impact\b/gi, 'Fahrzeuganprall')
+            .replace(/\bcrash barrier\b/gi, 'Anprallbarriere')
+            .replace(/\bsecurity barrier\b/gi, 'Sicherheitsbarriere')
+            .replace(/\bpenetration depth\b/gi, 'Eindringtiefe')
+            .replace(/\bdebris scatter\b/gi, 'Trümmerstreuung')
             .replace(/\bas\b/gi, 'als')
             .replace(/\bweapon\b/gi, 'Waffe')
             .replace(/\bPotential\b/gi, 'Potenzielle')
@@ -3290,9 +4024,9 @@ function translateAIText(text: string, targetGerman: boolean): string {
             .replace(/\binclude\b/gi, 'umfassen')
             .replace(/\bstate-sponsored\b/gi, 'staatsgestützte')
             .replace(/\bterrorist\b/gi, 'terroristische')
-            .replace(/\binsider threats\b/gi, 'Innentäter-Bedrohungen')
-            .replace(/\bmalicious software\b/gi, 'schädliche Software')
-            .replace(/\bdistributed denial\b/gi, 'verteilte Verweigerung')
+            .replace(/\bvehicle threats\b/gi, 'Fahrzeugbedrohungen')
+            .replace(/\bvehicle attacks\b/gi, 'Fahrzeugangriffe')
+            .replace(/\bram attacks\b/gi, 'Rammangriffe')
             .replace(/\battacks\b/gi, 'Angriffe')
             .replace(/\bGiven\b/gi, 'Angesichts')
             .replace(/\bglobal\b/gi, 'globaler')
@@ -3346,9 +4080,9 @@ function translateAIText(text: string, targetGerman: boolean): string {
             .replace(/\bumfassen\b/gi, 'include')
             .replace(/\bstaatsgestützte\b/gi, 'state-sponsored')
             .replace(/\bterroristische\b/gi, 'terrorist')
-            .replace(/\bInnentäter-Bedrohungen\b/gi, 'insider threats')
-            .replace(/\bschädliche Software\b/gi, 'malicious software')
-            .replace(/\bverteilte Verweigerung\b/gi, 'distributed denial')
+            .replace(/\bFahrzeugbedrohungen\b/gi, 'vehicle threats')
+            .replace(/\bFahrzeugangriffe\b/gi, 'vehicle attacks')
+            .replace(/\bRammangriffe\b/gi, 'ram attacks')
             .replace(/\bAngriffe\b/gi, 'attacks')
             .replace(/\bAngesichts\b/gi, 'Given')
             .replace(/\bglobaler\b/gi, 'global')
@@ -3516,22 +4250,124 @@ async function addProductRecommendationTooltips() {
         const threatData = threatsMap.get(streetName);
         if (!threatData || !markers) return;
         
-        markers.forEach((marker) => {
-            // Get the speed for this specific access point
-            const maxSpeed = calculateMaxSpeedForThreat(threatData);
+        markers.forEach((marker, markerIndex) => {
+            // Get the speed for this specific entry point using its individual distance
+            const maxSpeed = calculateMaxSpeedForSpecificEntryPoint(threatData, markerIndex);
             
             // Find suitable products for this speed requirement
             const recommendedProducts = findProductsForSpeed(maxSpeed);
             
             if (recommendedProducts.length > 0) {
-                addInteractiveTooltip(marker, streetName, maxSpeed, recommendedProducts[0]);
+                // Select optimal product based on speed requirement rather than always picking the first
+                const selectedProduct = selectOptimalProduct(recommendedProducts, maxSpeed, streetName, markerIndex);
+                addInteractiveTooltip(marker, streetName, maxSpeed, selectedProduct);
             } else {
                 // No suitable product found - add fallback tooltip
                 addNoProductTooltip(marker, streetName, maxSpeed);
-                console.log(`No suitable product found for ${streetName} (required: ${maxSpeed} km/h)`);
+                console.log(`No suitable product found for ${streetName} entry point ${markerIndex} (required: ${maxSpeed} km/h)`);
             }
         });
     });
+}
+
+/**
+ * Calculate maximum speed for a specific entry point
+ */
+function calculateMaxSpeedForSpecificEntryPoint(threatData: any, entryPointIndex: number): number {
+    if (!threatData.entryPoints || threatData.entryPoints.length === 0 || entryPointIndex >= threatData.entryPoints.length) {
+        return 0;
+    }
+    
+    const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+    const selectedWeight = vehicleSelect.value;
+    const accelerationRange = getAccelerationRange(selectedWeight);
+    
+    if (!accelerationRange) return 0;
+    
+    const entryPoint = threatData.entryPoints[entryPointIndex];
+    // Use the specific distance for this entry point instead of total length
+    const distance = entryPoint.distance || threatData.totalLength;
+    
+    console.log(`🚗 Calculating speed for entry point ${entryPointIndex}: distance=${distance}m, acceleration=${accelerationRange[1]}m/s²`);
+    
+    const speed = calculateVelocity(accelerationRange[1], distance);
+    const roundedSpeed = Math.round(speed);
+    
+    console.log(`🚗 RESULT: Raw speed=${speed}, Rounded speed=${roundedSpeed} km/h for entry point ${entryPointIndex}`);
+    console.log(`🚗 Vehicle weight selected: ${selectedWeight}, acceleration range: [${accelerationRange[0]}, ${accelerationRange[1]}]`);
+    
+    return roundedSpeed;
+}
+
+/**
+ * Select the optimal product from recommended products based on speed requirement and street characteristics
+ */
+function selectOptimalProduct(recommendedProducts: any[], maxSpeed: number, streetName: string, markerIndex?: number): any {
+    if (recommendedProducts.length === 1) {
+        return recommendedProducts[0];
+    }
+    
+    // Helper function to get product speed
+    function getProductSpeed(product: any): number {
+        if (product.technical_data?.pr_speed_kph) {
+            return parseFloat(product.technical_data.pr_speed_kph);
+        }
+        if (product.speed) {
+            return parseFloat(product.speed);
+        }
+        // Extract from performance rating as fallback
+        if (product.technical_data?.performance_rating) {
+            const parts = product.technical_data.performance_rating.split('/');
+            if (parts.length >= 3) {
+                return parseFloat(parts[2]) || 0;
+            }
+        }
+        return 0;
+    }
+    
+    // Strategy 1: Find product with speed closest to requirement (but still sufficient)
+    // This provides variety while maintaining technical appropriateness
+    let optimalProduct = recommendedProducts[0];
+    let smallestOverhead = Infinity;
+    
+    for (const product of recommendedProducts) {
+        const productSpeed = getProductSpeed(product);
+        const overhead = productSpeed - maxSpeed; // How much "over-engineered" the solution is
+        
+        if (overhead >= 0 && overhead < smallestOverhead) {
+            smallestOverhead = overhead;
+            optimalProduct = product;
+        }
+    }
+    
+    // Strategy 2: Add some variation based on street characteristics and entry point
+    // Different entry points should get different products for variety
+    if (smallestOverhead < 20) { // If we have multiple very suitable products
+        const suitableProducts = recommendedProducts.filter((product: any) => {
+            const productSpeed = getProductSpeed(product);
+            const overhead = productSpeed - maxSpeed;
+            return overhead >= 0 && overhead <= smallestOverhead + 15; // Allow some tolerance
+        });
+        
+        if (suitableProducts.length > 1) {
+            // Use street name AND marker index for consistent but varying selection
+            const streetHash = streetName.split('').reduce((a, b) => {
+                a = ((a << 5) - a) + b.charCodeAt(0);
+                return a & a;
+            }, 0);
+            
+            // Include marker index in hash calculation for variety between entry points
+            const combinedHash = streetHash + (markerIndex || 0) * 1000;
+            const index = Math.abs(combinedHash) % suitableProducts.length;
+            optimalProduct = suitableProducts[index];
+            
+            console.log(`🔄 Using variation strategy: streetHash=${streetHash}, markerIndex=${markerIndex || 0}, combinedHash=${combinedHash}, selectedIndex=${index}/${suitableProducts.length}`);
+        }
+    }
+    
+    console.log(`🎯 Selected product: ${optimalProduct.product_name} (${getProductSpeed(optimalProduct)} km/h) for ${streetName} (required: ${maxSpeed} km/h)`);
+    
+    return optimalProduct;
 }
 
 /**
@@ -3540,31 +4376,120 @@ async function addProductRecommendationTooltips() {
 function findProductsForSpeed(requiredSpeed: number): any[] {
     // Get the actual product database from window (where it's stored)
     const products = (window as any).productDatabase || [];
-    console.log('Finding products for required speed:', requiredSpeed);
-    console.log('Product database size:', products.length);
+    console.log('🔍 DETAILED ANALYSIS: Finding products for required speed:', requiredSpeed);
+    console.log('🔍 Product database size:', products.length);
+    
+    // Debug: Analyze all speed values in database
+    const allSpeeds = products.map((p: any) => {
+        let speed = 0;
+        if (p.technical_data?.pr_speed_kph) speed = p.technical_data.pr_speed_kph;
+        else if (p.speed) speed = parseFloat(p.speed);
+        return { name: p.product_name, speed: speed };
+    }).filter((p: any) => p.speed > 0).sort((a: any, b: any) => a.speed - b.speed);
+    
+    console.log('🔍 All products with speeds (sorted):', allSpeeds.slice(0, 10));
+    console.log('🔍 Speed range in database:', allSpeeds[0]?.speed, 'to', allSpeeds[allSpeeds.length - 1]?.speed);
     
     if (!products || products.length === 0) {
         console.log('No product database available');
         return [];
     }
     
+    // Helper function to extract speed from performance_rating
+    function extractSpeedFromPerformanceRating(performanceRating: string): number {
+        if (!performanceRating || typeof performanceRating !== 'string') {
+            return 0;
+        }
+        
+        // Performance rating format: "V/7500[N2]/64/90:1/9.3"
+        // Speed is typically the third number (64 in this example)
+        const parts = performanceRating.split('/');
+        if (parts.length >= 3) {
+            const speedPart = parts[2]; // "64"
+            const speed = parseFloat(speedPart);
+            if (!isNaN(speed)) {
+                return speed;
+            }
+        }
+        return 0;
+    }
+    
     // Find products that have been tested at speeds higher than required
-    const suitableProducts = products.filter(product => {
-        const productSpeed = parseFloat(product.speed);
-        const isValid = !isNaN(productSpeed) && productSpeed >= requiredSpeed;
+    const suitableProducts = products.filter((product: any) => {
+        let productSpeed = 0;
+        
+        // Priority 1: Use the new pr_speed_kph field (direct test speed)
+        if (product.technical_data && product.technical_data.pr_speed_kph) {
+            productSpeed = parseFloat(product.technical_data.pr_speed_kph);
+        }
+        // Priority 2: Try legacy speed field
+        else if (product.speed) {
+            productSpeed = parseFloat(product.speed);
+        } 
+        // Priority 3: Extract from performance rating
+        else if (product.technical_data && product.technical_data.performance_rating) {
+            productSpeed = extractSpeedFromPerformanceRating(product.technical_data.performance_rating);
+        } else if (product.performance_rating) {
+            productSpeed = extractSpeedFromPerformanceRating(product.performance_rating);
+        }
+        
+        const isValid = !isNaN(productSpeed) && productSpeed > 0 && productSpeed >= requiredSpeed;
         if (isValid) {
-            console.log(`Suitable product found: ${product.type} (${productSpeed} km/h >= ${requiredSpeed} km/h)`);
+            console.log(`✅ Suitable product found: ${product.product_name} (${productSpeed} km/h >= ${requiredSpeed} km/h)`);
+        } else if (productSpeed > 0) {
+            console.log(`❌ Product too slow: ${product.product_name} (${productSpeed} km/h < ${requiredSpeed} km/h)`);
         }
         return isValid;
     });
     
-    console.log(`Found ${suitableProducts.length} suitable products`);
+    console.log(`🔍 Found ${suitableProducts.length} suitable products out of ${products.length} total products`);
+    
+    // Debug: Show which products were filtered out and why
+    const rejectedProducts = products.filter((product: any) => {
+        let productSpeed = 0;
+        if (product.technical_data?.pr_speed_kph) productSpeed = product.technical_data.pr_speed_kph;
+        else if (product.speed) productSpeed = parseFloat(product.speed);
+        return productSpeed > 0 && productSpeed < requiredSpeed;
+    });
+    
+    console.log(`🔍 ${rejectedProducts.length} products were too slow for requirement ${requiredSpeed} km/h`);
+    if (rejectedProducts.length > 0) {
+        console.log('🔍 First 5 rejected products:', rejectedProducts.slice(0, 5).map((p: any) => ({
+            name: p.product_name,
+            speed: p.technical_data?.pr_speed_kph || p.speed
+        })));
+    }
     
     // Sort by speed (highest first) to get the most suitable products
-    const sorted = suitableProducts.sort((a, b) => parseFloat(b.speed) - parseFloat(a.speed));
+    const sorted = suitableProducts.sort((a: any, b: any) => {
+        // Helper function to get speed for sorting
+        function getSpeedForSorting(product: any): number {
+            if (product.technical_data?.pr_speed_kph) {
+                return parseFloat(product.technical_data.pr_speed_kph);
+            }
+            if (product.speed) {
+                return parseFloat(product.speed);
+            }
+            return extractSpeedFromPerformanceRating(product.technical_data?.performance_rating || product.performance_rating || '0');
+        }
+        
+        const speedA = getSpeedForSorting(a);
+        const speedB = getSpeedForSorting(b);
+        return speedB - speedA;
+    });
     
     if (sorted.length > 0) {
-        console.log('Best product selected:', sorted[0]);
+        const bestProduct = sorted[0];
+        // Use the same logic as the sorting function to get the actual speed
+        let bestSpeed = 0;
+        if (bestProduct.technical_data?.pr_speed_kph) {
+            bestSpeed = parseFloat(bestProduct.technical_data.pr_speed_kph);
+        } else if (bestProduct.speed) {
+            bestSpeed = parseFloat(bestProduct.speed);
+        } else {
+            bestSpeed = extractSpeedFromPerformanceRating(bestProduct.technical_data?.performance_rating || bestProduct.performance_rating || '0');
+        }
+        console.log(`🏆 Best product selected: ${bestProduct.product_name} (${bestSpeed} km/h)`);
     }
     
     return sorted;
@@ -3636,7 +4561,7 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
                 className: 'product-popup no-product-popup',
                 offset: [10, -10]
             })
-            .setLatLng(marker.getLatLng())
+            .setLatLng(marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng)
             .setContent(popupContent)
             .openOn(map);
             
@@ -3680,17 +4605,18 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
                 </div>
                 <div class="tooltip-content">
                     <div class="product-image">
-                        <img src="${productImage}" alt="${product.type}" 
+                        <img src="${productImage}" alt="${product.product_name || product.type || 'Produkt'}" 
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                         <div class="product-image-placeholder" style="display: none;">
                             <i class="fas fa-image"></i>
                         </div>
                     </div>
                     <div class="product-info">
-                        <h5>${product.type}</h5>
+                        <h5>${product.product_name || product.type || 'Unbekanntes Produkt'}</h5>
                         <p><strong>Hersteller:</strong> ${product.manufacturer}</p>
-                        <p><strong>Getestete Geschw.:</strong> ${product.speed} km/h</p>
+                        <p><strong>Getestete Geschw.:</strong> ${product.speed || product.pr_speed_kph || product.technical_data?.pr_speed_kph || 'N/A'} km/h</p>
                         <p><strong>Erforderlich:</strong> ${maxSpeed} km/h</p>
+                        <p><strong>Fahrzeugtyp:</strong> ${product.pr_veh || 'N/A'}</p>
                         <p><strong>Standard:</strong> ${product.standard}</p>
                     </div>
                 </div>
@@ -3794,11 +4720,11 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
                 className: 'product-popup',
                 offset: [10, -10]
             })
-            .setLatLng(marker.getLatLng())
+            .setLatLng(marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng)
             .setContent(popupContent)
             .openOn(map);
             
-            console.log(`Popup pinned using Leaflet API at:`, marker.getLatLng());
+            console.log(`Popup pinned using Leaflet API at:`, marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng);
             
             // Add close event handler for popup
             leafletPopup.on('remove', () => {
@@ -3808,6 +4734,231 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
             });
         }
     });
+}
+
+/**
+ * Intelligent product type recommendation based on context
+ */
+function recommendProductTypes(context: {
+    assetToProtect: string,
+    securityLevel: string,
+    protectionGrade: string,
+    locationContext: string,
+    threatLevel: number
+}): string[] {
+    const { assetToProtect, securityLevel, protectionGrade, locationContext, threatLevel } = context;
+    
+    // Asset-based recommendations
+    const assetLower = assetToProtect.toLowerCase();
+    const locationLower = locationContext.toLowerCase();
+    
+    let recommendations: string[] = [];
+    
+    // 🏭 Industrial/Critical Infrastructure
+    if (assetLower.includes('atomkraftwerk') || assetLower.includes('nuclear') || 
+        assetLower.includes('kraftwerk') || assetLower.includes('power plant')) {
+        recommendations = ['Tor', 'Schranke', 'Zaun', 'Poller'];
+    }
+    // 🏭 General Industrial
+    else if (assetLower.includes('industrie') || assetLower.includes('industrial') || 
+             assetLower.includes('fabrik') || assetLower.includes('factory') ||
+             assetLower.includes('werk') || assetLower.includes('plant')) {
+        recommendations = ['Tor', 'Schranke', 'Zaun'];
+    }
+    // 🏛️ Government/Military
+    else if (assetLower.includes('regierung') || assetLower.includes('government') ||
+             assetLower.includes('militär') || assetLower.includes('military') ||
+             assetLower.includes('ministerium') || assetLower.includes('embassy')) {
+        recommendations = ['Tor', 'Zaun', 'Poller', 'Durchfahrtsperre'];
+    }
+    // 🏥 Critical Services
+    else if (assetLower.includes('krankenhaus') || assetLower.includes('hospital') ||
+             assetLower.includes('flughafen') || assetLower.includes('airport') ||
+             assetLower.includes('bahnhof') || assetLower.includes('station')) {
+        recommendations = ['Poller', 'Durchfahrtsperre', 'Zaun'];
+    }
+    // 🏢 Commercial/Office
+    else if (assetLower.includes('büro') || assetLower.includes('office') ||
+             assetLower.includes('zentrum') || assetLower.includes('center') ||
+             assetLower.includes('gebäude') || assetLower.includes('building')) {
+        recommendations = ['Poller', 'Durchfahrtsperre'];
+    }
+    // 🎪 Events/Public Gatherings  
+    else if (assetLower.includes('event') || assetLower.includes('veranstaltung') ||
+             assetLower.includes('festival') || assetLower.includes('markt') ||
+             assetLower.includes('market') || assetLower.includes('platz') ||
+             assetLower.includes('square') || assetLower.includes('innenstadt')) {
+        recommendations = ['Poller', 'Durchfahrtsperre']; // NO fences/gates for public events
+    }
+    // 🏫 Schools/Universities
+    else if (assetLower.includes('schule') || assetLower.includes('school') ||
+             assetLower.includes('universität') || assetLower.includes('university') ||
+             assetLower.includes('campus')) {
+        recommendations = ['Poller', 'Durchfahrtsperre', 'Zaun'];
+    }
+    
+    // Location-based adjustments
+    if (locationLower.includes('innenstadt') || locationLower.includes('city center') ||
+        locationLower.includes('downtown') || locationLower.includes('pedestrian')) {
+        // Urban areas prefer less obtrusive solutions
+        recommendations = recommendations.filter(type => type !== 'Zaun' && type !== 'Tor');
+    }
+    
+    // Security level adjustments
+    if (securityLevel === 'high' || threatLevel >= 8) {
+        if (!recommendations.includes('Tor')) recommendations.unshift('Tor');
+        if (!recommendations.includes('Zaun')) recommendations.push('Zaun');
+    } else if (securityLevel === 'low' || threatLevel <= 4) {
+        recommendations = recommendations.filter(type => type !== 'Tor' && type !== 'Schranke');
+    }
+    
+    // Protection grade adjustments  
+    if (protectionGrade === 'permanent') {
+        if (!recommendations.includes('Zaun')) recommendations.push('Zaun');
+    } else if (protectionGrade === 'temporary') {
+        recommendations = recommendations.filter(type => type !== 'Zaun' && type !== 'Tor');
+        if (!recommendations.includes('Poller')) recommendations.unshift('Poller');
+    }
+    
+    // Default fallback
+    if (recommendations.length === 0) {
+        recommendations = ['Poller', 'Durchfahrtsperre'];
+    }
+    
+    return [...new Set(recommendations)]; // Remove duplicates
+}
+
+/**
+ * Generate context description for location
+ */
+function generateLocationContext(): string {
+    // Try to get context from current map view or user inputs
+    const assetToProtect = (document.getElementById('asset-to-protect') as HTMLInputElement)?.value || '';
+    
+    // Analyze threats to understand location type
+    const threats = Array.from(threatsMap.entries());
+    let context = 'unbekannt';
+    
+    if (threats.length > 0) {
+        const roadTypes = threats.map(([, data]) => data.roadType).filter(Boolean);
+        const hasHighSpeedRoads = threats.some(([, data]) => (data.maxSpeed || 0) > 70);
+        const hasResidential = roadTypes.includes('residential');
+        const hasPrimary = roadTypes.includes('primary') || roadTypes.includes('motorway');
+        
+        if (hasHighSpeedRoads && hasPrimary) {
+            context = 'industriell/verkehrsreich';
+        } else if (hasResidential && !hasPrimary) {
+            context = 'wohngebiet';
+        } else if (assetToProtect.toLowerCase().includes('innenstadt') || 
+                  assetToProtect.toLowerCase().includes('event')) {
+            context = 'innenstadt/öffentlich';
+        } else {
+            context = 'gemischt';
+        }
+    }
+    
+    return context;
+}
+
+/**
+ * Generate justification for recommended product types
+ */
+function generateProductTypeJustification(recommendedTypes: string[], assetToProtect: string, locationContext: string, threatLevel: number): string {
+    let justification = `Basierend auf dem zu schützenden Objekt "${assetToProtect}", dem Standortkontext "${locationContext}" und dem durchschnittlichen Bedrohungslevel von ${threatLevel.toFixed(1)}/10 werden folgende Produkttypen empfohlen:\n\n`;
+    
+    recommendedTypes.forEach(type => {
+        switch(type) {
+            case 'Tor':
+                justification += `• Tor: Geeignet für kontrollierte Zufahrten mit hohem Sicherheitsbedarf. Ermöglicht selektiven Zugang für autorisierte Fahrzeuge.\n`;
+                break;
+            case 'Schranke':
+                justification += `• Schranke: Ideal für industrielle Bereiche mit häufigem, aber kontrolliertem Fahrzeugverkehr. Bietet schnelle Durchfahrtskontrolle.\n`;
+                break;
+            case 'Zaun':
+                justification += `• Zaun: Permanente Perimetersicherung für Bereiche mit erhöhtem Sicherheitsbedarf. Verhindert unbefugtes Eindringen.\n`;
+                break;
+            case 'Poller':
+                justification += `• Poller: Diskrete Lösung für öffentliche Bereiche. Ermöglicht Fußgängerverkehr bei gleichzeitigem Fahrzeugschutz.\n`;
+                break;
+            case 'Durchfahrtsperre':
+                justification += `• Durchfahrtsperre: Flexible temporäre Lösung für Events oder veränderliche Sicherheitsanforderungen.\n`;
+                break;
+        }
+    });
+    
+    return justification;
+}
+
+/**
+ * Generate detailed threat analysis text for AI report
+ */
+function generateThreatAnalysisText(): string {
+    const threats = Array.from(threatsMap.entries());
+    if (threats.length === 0) return 'Keine Bedrohungen erkannt.';
+    
+    const criticalThreats = threats.filter(([, data]) => (data.threatLevel || 5) >= 9);
+    const highThreats = threats.filter(([, data]) => (data.threatLevel || 5) >= 7 && (data.threatLevel || 5) < 9);
+    const mediumThreats = threats.filter(([, data]) => (data.threatLevel || 5) >= 5 && (data.threatLevel || 5) < 7);
+    const lowThreats = threats.filter(([, data]) => (data.threatLevel || 5) < 5);
+    
+    let analysis = `Gesamtanzahl identifizierter Zufahrten: ${threats.length}\n`;
+    analysis += `Kritische Bedrohungen (Level 9-10): ${criticalThreats.length}\n`;
+    analysis += `Hohe Bedrohungen (Level 7-8): ${highThreats.length}\n`;
+    analysis += `Mittlere Bedrohungen (Level 5-6): ${mediumThreats.length}\n`;
+    analysis += `Niedrige Bedrohungen (Level 1-4): ${lowThreats.length}\n`;
+    
+    return analysis;
+}
+
+/**
+ * Get highest threat roads for detailed analysis
+ */
+function getHighestThreatRoads(): string {
+    const threats = Array.from(threatsMap.entries())
+        .filter(([, data]) => data.threatLevel && data.threatLevel >= 7)
+        .sort((a: any, b: any) => (b[1].threatLevel || 0) - (a[1].threatLevel || 0))
+        .slice(0, 5);
+    
+    if (threats.length === 0) return 'Keine Hochrisiko-Zufahrten identifiziert.';
+    
+    return threats.map(([name, data]) => 
+        `${name}: Level ${data.threatLevel}/10 (${data.roadType}, ${data.maxSpeed} km/h, ${Math.round(data.totalLength)}m Beschleunigungsstrecke)`
+    ).join('\n');
+}
+
+/**
+ * Get threat level distribution statistics
+ */
+function getThreatLevelDistribution(): string {
+    const threats = Array.from(threatsMap.values());
+    if (threats.length === 0) return 'Keine Daten verfügbar.';
+    
+    const roadTypes: Record<string, number> = {};
+    const speedRanges = { 'unter_30': 0, '30_50': 0, '50_80': 0, 'über_80': 0 };
+    
+    threats.forEach(data => {
+        const type = data.roadType || 'unbekannt';
+        roadTypes[type] = (roadTypes[type] || 0) + 1;
+        
+        const speed = data.maxSpeed || 50;
+        if (speed < 30) speedRanges.unter_30++;
+        else if (speed <= 50) speedRanges['30_50']++;
+        else if (speed <= 80) speedRanges['50_80']++;
+        else speedRanges.über_80++;
+    });
+    
+    let distribution = 'Straßentyp-Verteilung:\n';
+    Object.entries(roadTypes).forEach(([type, count]) => {
+        distribution += `- ${type}: ${count}\n`;
+    });
+    
+    distribution += '\nGeschwindigkeits-Verteilung:\n';
+    distribution += `- Unter 30 km/h: ${speedRanges.unter_30}\n`;
+    distribution += `- 30-50 km/h: ${speedRanges['30_50']}\n`;
+    distribution += `- 50-80 km/h: ${speedRanges['50_80']}\n`;
+    distribution += `- Über 80 km/h: ${speedRanges.über_80}\n`;
+    
+    return distribution;
 }
 
 /**
@@ -4078,14 +5229,14 @@ async function generateRiskReport() {
                 
                 if (accelerationRange && lengthInMeters > 0) {
                     const [, maxAcc] = accelerationRange;
-                    maxSpeed = Math.round(calculateVelocity(maxAcc, lengthInMeters));
+                    maxSpeed = Math.round(calculateVelocityWithOsm(maxAcc, lengthInMeters));
                 }
                 
                 return { name, lengthInMeters, maxSpeed };
             });
             
             // Sort by maxSpeed in descending order
-            threatsArray.sort((a, b) => b.maxSpeed - a.maxSpeed);
+            threatsArray.sort((a: any, b: any) => b.maxSpeed - a.maxSpeed);
             
             // Create table format
             threatList = `
@@ -4207,8 +5358,8 @@ async function generateRiskReport() {
                 let reportLine = `• ${name} (${Math.round(data.totalLength)} m)`;
                 if (accelerationRange && data.totalLength > 0) {
                     const [minAcc, maxAcc] = accelerationRange;
-                    const minSpeed = Math.round(calculateVelocity(minAcc, data.totalLength));
-                    const maxSpeed = Math.round(calculateVelocity(maxAcc, data.totalLength));
+                    const minSpeed = Math.round(calculateVelocityWithOsm(minAcc, data.totalLength));
+                    const maxSpeed = Math.round(calculateVelocityWithOsm(maxAcc, data.totalLength));
                     reportLine += ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
                 }
                 const splitLines = pdf.splitTextToSize(reportLine, content_width - 5);
@@ -4307,6 +5458,315 @@ function downloadRiskReport() {
 }
 
 // ===============================================
+// OSM SPEED LIMITS INTEGRATION
+// ===============================================
+
+/**
+ * Initialize OSM speed limits functionality
+ */
+function initOsmSpeedLimits(): void {
+    console.log('🗺️ Initializing OSM speed limits...');
+    
+    // Initialize with default config
+    const defaultConfig: SpeedLimitConfig = {
+        useMaxspeed: true,
+        useTrafficCalming: true,
+        useSurface: false,
+        weather: 'dry' as WeatherCondition
+    };
+    
+    osmSpeedLimiter = new OsmSpeedLimiter(defaultConfig);
+    
+    // Load settings from localStorage
+    loadOsmSettings();
+    
+    // Set up event listeners for controls
+    setupOsmEventListeners();
+    
+    console.log('✅ OSM speed limits initialized');
+}
+
+/**
+ * Load OSM settings from localStorage
+ */
+function loadOsmSettings(): void {
+    try {
+        const maxspeedCheckbox = document.getElementById('osm-maxspeed') as HTMLInputElement;
+        const calmingCheckbox = document.getElementById('osm-traffic-calming') as HTMLInputElement;
+        const surfaceCheckbox = document.getElementById('osm-surface') as HTMLInputElement;
+        const weatherSelect = document.getElementById('weather-select') as HTMLSelectElement;
+        
+        if (maxspeedCheckbox) {
+            maxspeedCheckbox.checked = localStorage.getItem('osm-maxspeed') !== 'false';
+        }
+        if (calmingCheckbox) {
+            calmingCheckbox.checked = localStorage.getItem('osm-traffic-calming') !== 'false';
+        }
+        if (surfaceCheckbox) {
+            surfaceCheckbox.checked = localStorage.getItem('osm-surface') === 'true';
+        }
+        if (weatherSelect) {
+            weatherSelect.value = localStorage.getItem('osm-weather') || 'dry';
+        }
+        
+        updateOsmConfig();
+    } catch (error) {
+        console.warn('Failed to load OSM settings:', error);
+    }
+}
+
+/**
+ * Save OSM settings to localStorage
+ */
+function saveOsmSettings(): void {
+    try {
+        const maxspeedCheckbox = document.getElementById('osm-maxspeed') as HTMLInputElement;
+        const calmingCheckbox = document.getElementById('osm-traffic-calming') as HTMLInputElement;
+        const surfaceCheckbox = document.getElementById('osm-surface') as HTMLInputElement;
+        const weatherSelect = document.getElementById('weather-select') as HTMLSelectElement;
+        
+        if (maxspeedCheckbox) {
+            localStorage.setItem('osm-maxspeed', maxspeedCheckbox.checked.toString());
+        }
+        if (calmingCheckbox) {
+            localStorage.setItem('osm-traffic-calming', calmingCheckbox.checked.toString());
+        }
+        if (surfaceCheckbox) {
+            localStorage.setItem('osm-surface', surfaceCheckbox.checked.toString());
+        }
+        if (weatherSelect) {
+            localStorage.setItem('osm-weather', weatherSelect.value);
+        }
+    } catch (error) {
+        console.warn('Failed to save OSM settings:', error);
+    }
+}
+
+/**
+ * Set up event listeners for OSM controls
+ */
+function setupOsmEventListeners(): void {
+    const maxspeedCheckbox = document.getElementById('osm-maxspeed') as HTMLInputElement;
+    const calmingCheckbox = document.getElementById('osm-traffic-calming') as HTMLInputElement;
+    const surfaceCheckbox = document.getElementById('osm-surface') as HTMLInputElement;
+    const weatherSelect = document.getElementById('weather-select') as HTMLSelectElement;
+    
+    const handleOsmSettingChange = () => {
+        updateOsmConfig();
+        saveOsmSettings();
+        
+        // Trigger re-analysis if polygon exists
+        if (drawnPolygon) {
+            debouncedLoadOsmData();
+        }
+    };
+    
+    if (maxspeedCheckbox) {
+        maxspeedCheckbox.addEventListener('change', handleOsmSettingChange);
+    }
+    if (calmingCheckbox) {
+        calmingCheckbox.addEventListener('change', handleOsmSettingChange);
+    }
+    if (surfaceCheckbox) {
+        surfaceCheckbox.addEventListener('change', handleOsmSettingChange);
+    }
+    if (weatherSelect) {
+        weatherSelect.addEventListener('change', handleOsmSettingChange);
+    }
+}
+
+/**
+ * Update OSM speed limiter configuration
+ */
+function updateOsmConfig(): void {
+    if (!osmSpeedLimiter) return;
+    
+    const maxspeedCheckbox = document.getElementById('osm-maxspeed') as HTMLInputElement;
+    const calmingCheckbox = document.getElementById('osm-traffic-calming') as HTMLInputElement;
+    const surfaceCheckbox = document.getElementById('osm-surface') as HTMLInputElement;
+    const weatherSelect = document.getElementById('weather-select') as HTMLSelectElement;
+    
+    const config: Partial<SpeedLimitConfig> = {
+        useMaxspeed: maxspeedCheckbox?.checked ?? true,
+        useTrafficCalming: calmingCheckbox?.checked ?? true,
+        useSurface: surfaceCheckbox?.checked ?? false,
+        weather: (weatherSelect?.value as WeatherCondition) ?? 'dry'
+    };
+    
+    osmSpeedLimiter.updateConfig(config);
+}
+
+/**
+ * Check if any OSM features are enabled
+ */
+function isOsmEnabled(): boolean {
+    const maxspeedCheckbox = document.getElementById('osm-maxspeed') as HTMLInputElement;
+    const calmingCheckbox = document.getElementById('osm-traffic-calming') as HTMLInputElement;
+    const surfaceCheckbox = document.getElementById('osm-surface') as HTMLInputElement;
+    
+    return (maxspeedCheckbox?.checked) || (calmingCheckbox?.checked) || (surfaceCheckbox?.checked);
+}
+
+/**
+ * Debounced OSM data loading
+ */
+function debouncedLoadOsmData(): void {
+    if (osmDebounceTimeout) {
+        clearTimeout(osmDebounceTimeout);
+    }
+    
+    osmDebounceTimeout = window.setTimeout(() => {
+        loadOsmDataForCurrentPolygon();
+    }, 300);
+}
+
+/**
+ * Load OSM data for the current polygon
+ */
+async function loadOsmDataForCurrentPolygon(): Promise<void> {
+    if (!drawnPolygon || !osmSpeedLimiter || !isOsmEnabled()) {
+        return;
+    }
+    
+    try {
+        // Extract polygon coordinates
+        const polygonCoords = drawnPolygon.getLatLngs()[0].map((latlng: any) => ({
+            lat: latlng.lat,
+            lng: latlng.lng
+        }));
+        
+        // Validate polygon has sufficient points
+        if (polygonCoords.length < 3) {
+            console.warn('Polygon has insufficient points for OSM query');
+            updateOsmStatus('error', 'Polygon zu klein');
+            return;
+        }
+        
+        // Generate cache key
+        const flagsKey = `${(document.getElementById('osm-maxspeed') as HTMLInputElement)?.checked ? 'M' : ''}${(document.getElementById('osm-traffic-calming') as HTMLInputElement)?.checked ? 'C' : ''}${(document.getElementById('osm-surface') as HTMLInputElement)?.checked ? 'S' : ''}`;
+        const cacheKey = osmCache.getKey(polygonCoords, flagsKey);
+        
+        // Check cache first
+        const cachedData = osmCache.get(cacheKey);
+        if (cachedData) {
+            console.log('📋 Using cached OSM data');
+            currentOsmData = cachedData;
+            osmSpeedLimiter.setOsmData(cachedData);
+            updateOsmStatus('success', `${cachedData.ways.length} Straßen, ${cachedData.calming.length} Verkehrsberuhiger`);
+            return;
+        }
+        
+        // Show loading status
+        updateOsmStatus('loading', 'Lade OSM-Daten...');
+        
+        // Cancel previous request
+        if (osmLoadingController) {
+            osmLoadingController.abort();
+        }
+        osmLoadingController = new AbortController();
+        
+        // Fetch new data
+        const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
+        
+        // Cache the result
+        osmCache.set(cacheKey, osmData);
+        
+        // Update global state
+        currentOsmData = osmData;
+        osmSpeedLimiter.setOsmData(osmData);
+        
+        // Log statistics
+        const maxspeedWays = osmData.ways.filter(w => w.tags.maxspeed).length;
+        console.log(`📊 OSM Data loaded: ${osmData.ways.length} ways (${maxspeedWays} with maxspeed), ${osmData.calming.length} traffic calming nodes`);
+        
+        updateOsmStatus('success', `${osmData.ways.length} Straßen, ${osmData.calming.length} Verkehrsberuhiger`);
+        
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.log('OSM request cancelled');
+            return;
+        }
+        
+        console.error('Failed to load OSM data:', error);
+        updateOsmStatus('error', 'OSM-Daten nicht verfügbar');
+        
+        // No automatic retry to prevent endless loops
+        // User can manually retry by changing settings or redrawing polygon
+    }
+}
+
+/**
+ * Update OSM status indicator
+ */
+function updateOsmStatus(status: 'loading' | 'success' | 'error', message: string): void {
+    const statusElement = document.getElementById('osm-status');
+    const statusText = statusElement?.querySelector('.status-text');
+    
+    if (!statusElement || !statusText) return;
+    
+    statusElement.className = `osm-status ${status}`;
+    statusElement.style.display = 'flex';
+    statusText.textContent = message;
+    
+    // Auto-hide success/error messages after 5 seconds
+    if (status !== 'loading') {
+        setTimeout(() => {
+            if (statusElement.classList.contains(status)) {
+                statusElement.style.display = 'none';
+            }
+        }, 5000);
+    }
+}
+
+/**
+ * Enhanced velocity calculation with OSM constraints
+ */
+function calculateVelocityWithOsm(acceleration: number, distance: number, pathCoords?: Array<{lat: number; lng: number}>): number {
+    // Base calculation
+    const baseVelocity = calculateVelocity(acceleration, distance);
+    
+    // Apply OSM constraints if available
+    if (osmSpeedLimiter && currentOsmData && pathCoords && pathCoords.length > 0) {
+        let minConstrainedVelocity = baseVelocity;
+        
+        // Sample points along the path
+        const sampleCount = Math.min(10, pathCoords.length);
+        const step = Math.max(1, Math.floor(pathCoords.length / sampleCount));
+        
+        for (let i = 0; i < pathCoords.length; i += step) {
+            const point = pathCoords[i];
+            const constraints = osmSpeedLimiter.getConstraintsAt(point);
+            
+            // Calculate curvature radius if we have enough points
+            let curvatureRadius: number | undefined;
+            if (i > 0 && i < pathCoords.length - 1) {
+                const prev = pathCoords[i - 1];
+                const next = pathCoords[i + 1];
+                // Simple curvature approximation - could be improved
+                const angle1 = Math.atan2(point.lat - prev.lat, point.lng - prev.lng);
+                const angle2 = Math.atan2(next.lat - point.lat, next.lng - point.lng);
+                const angleDiff = Math.abs(angle2 - angle1);
+                if (angleDiff > 0.01) { // Avoid division by very small numbers
+                    curvatureRadius = 1 / angleDiff * 1000; // Rough approximation in meters
+                }
+            }
+            
+            const constrainedVelocity = osmSpeedLimiter.applyConstraints(
+                baseVelocity,
+                constraints,
+                curvatureRadius
+            );
+            
+            minConstrainedVelocity = Math.min(minConstrainedVelocity, constrainedVelocity);
+        }
+        
+        return minConstrainedVelocity;
+    }
+    
+    return baseVelocity;
+}
+
+// ===============================================
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
 // This initialization function will be called after authentication
@@ -4318,6 +5778,8 @@ async function initializeApp() {
     initViewSwitcher();
     console.log('🔥 About to call initOpenStreetMap...');
     initOpenStreetMap();
+    console.log('🔥 About to initialize OSM speed limits...');
+    initOsmSpeedLimits();
     
     // Step 2: Load translations with retry mechanism
     let translationLoadAttempts = 0;
@@ -4491,6 +5953,12 @@ async function initializeApp() {
         pathLine = null;
         waypointMarkers.forEach(marker => map.removeLayer(marker));
         waypointMarkers = [];
+        
+        // Trigger OSM data loading for the new polygon
+        if (isOsmEnabled()) {
+            console.log('🗺️ Polygon created, triggering OSM data load...');
+            debouncedLoadOsmData();
+        }
         waypoints = [];
         setDrawingMode(false);
     };
@@ -4962,6 +6430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing authentication...');
     initAuth();
     setupLogoLogout();
+    setupThreatPanelControls();
 });
 
 

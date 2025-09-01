@@ -127,6 +127,8 @@
             <aside class="sidebar">
                 <section class="sidebar-section">
                     <h3 data-translate-key="sidebar.trafficData">Verkehrsdaten</h3>
+                    
+                    <!-- 1. Fahrzeugauswahl -->
                     <div class="form-group">
                         <label for="vehicle-select" data-translate-key="sidebar.vehicleSelect">Fahrzeugauswahl</label>
                         <select id="vehicle-select" name="vehicle-select">
@@ -138,39 +140,8 @@
                             <option value="40000" data-translate-key="sidebar.options.vehicle.truck_heavy">LKW &lt;40t</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="access-select" data-translate-key="sidebar.accessRoads">Zufahrten</label>
-                        <select id="access-select" name="access-select">
-                            <option value="alle" data-translate-key="sidebar.options.access.all">alle</option>
-                            <option value="Wiese" data-translate-key="sidebar.options.access.meadow">Wiese</option>
-                            <option value="Waldweg" data-translate-key="sidebar.options.access.forest_path">Waldweg</option>
-                            <option value="Fußgängerweg" data-translate-key="sidebar.options.access.pedestrian_path">Fußgängerweg</option>
-                            <option value="Einbahnstraße" data-translate-key="sidebar.options.access.one_way">Einbahnstraße</option>
-                            <option value="Zweispur" data-translate-key="sidebar.options.access.two_lane">Zweispur</option>
-                            <option value="Dreispur" data-translate-key="sidebar.options.access.three_lane">Dreispur</option>
-                            <option value="Vierspur" data-translate-key="sidebar.options.access.four_lane">Vierspur</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="curb-select" data-translate-key="sidebar.curbs">Bordsteinkanten</label>
-                        <select id="curb-select" name="curb-select">
-                            <option value="ja" data-translate-key="sidebar.options.curbs.yes">ja</option>
-                            <option value="nein" data-translate-key="sidebar.options.curbs.no">nein</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="obstacle-select" data-translate-key="sidebar.obstacles">Hindernisse</label>
-                        <select id="obstacle-select" name="obstacle-select">
-                            <option value="keine" data-translate-key="sidebar.options.obstacles.none">keine</option>
-                            <option value="Bäume" data-translate-key="sidebar.options.obstacles.trees">Bäume</option>
-                            <option value="Pfosten" data-translate-key="sidebar.options.obstacles.posts">Pfosten</option>
-                            <option value="Mülltonnen" data-translate-key="sidebar.options.obstacles.bins">Mülltonnen</option>
-                        </select>
-                    </div>
-                </section>
-
-                <section class="sidebar-section">
-                    <h3 data-translate-key="sidebar.protectionSelection">Schutzauswahl</h3>
+                    
+                    <!-- 2. Schutzraum (Schutzzeitraum) -->
                     <div class="form-group">
                         <label for="protection-period-select" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum</label>
                         <select id="protection-period-select" name="protection-period-select">
@@ -179,6 +150,8 @@
                             <option value="eventuell" data-translate-key="sidebar.options.period.eventual">eventuell</option>
                         </select>
                     </div>
+                    
+                    <!-- 3. Schutzprodukte -->
                     <div class="form-group">
                         <label for="protection-product-select" data-translate-key="sidebar.protectionProducts">Schutzprodukte</label>
                         <select id="protection-product-select" name="protection-product-select">
@@ -188,6 +161,8 @@
                             <option value="Graben" data-translate-key="sidebar.options.products.ditch">Graben</option>
                         </select>
                     </div>
+                    
+                    <!-- 4. Produkteigenschaften -->
                     <div class="form-group">
                         <label for="product-property-select" data-translate-key="sidebar.productProperty">Produkteigenschaft</label>
                         <select id="product-property-select" name="product-property-select">
@@ -196,14 +171,54 @@
                             <option value="entfernbar" data-translate-key="sidebar.options.property.removable">entfernbar</option>
                         </select>
                     </div>
+                    
+                    <!-- 5. Witterung -->
+                    <div class="form-group">
+                        <label for="weather-select" data-translate-key="sidebar.osmLimits.weather">Witterung</label>
+                        <select id="weather-select" name="weather-select">
+                            <option value="dry" data-translate-key="sidebar.osmLimits.weatherOptions.dry">trocken</option>
+                            <option value="wet" data-translate-key="sidebar.osmLimits.weatherOptions.wet">nass</option>
+                            <option value="snow" data-translate-key="sidebar.osmLimits.weatherOptions.snow">Schnee</option>
+                            <option value="ice" data-translate-key="sidebar.osmLimits.weatherOptions.ice">Eis</option>
+                        </select>
+                    </div>
+                    
+
+                    
+                    <!-- 6. Risikoeinschätzung - checkboxes section -->
+                    <div class="form-group osm-controls">
+                        <h4 data-translate-key="sidebar.osmLimits.title">Geschwindigkeitsbegrenzungen</h4>
+                        
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="osm-maxspeed" checked>
+                                <span data-translate-key="sidebar.osmLimits.maxspeed">Tempolimits</span>
+                            </label>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="osm-traffic-calming" checked>
+                                <span data-translate-key="sidebar.osmLimits.trafficCalming">Verkehrsberuhiger</span>
+                            </label>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="osm-surface">
+                                <span data-translate-key="sidebar.osmLimits.surface">Straßenbelag</span>
+                            </label>
+                        </div>
+                        
+                        <div id="osm-status" class="osm-status" style="display: none;">
+                            <span class="status-indicator"></span>
+                            <span class="status-text"></span>
+                        </div>
+                    </div>
                 </section>
 
                 <section class="sidebar-section">
                     <h3 data-translate-key="sidebar.riskAssessment">Risikobewertung</h3>
-                     <div class="form-group">
-                        <label for="asset-to-protect" data-translate-key="sidebar.assetToProtect">Was geschützt werden soll</label>
-                        <input type="text" id="asset-to-protect" data-translate-key-placeholder="placeholders.assetToProtect" placeholder="Bitte eintragen">
-                    </div>
                     <div class="form-group slider-group">
                         <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
                             <i class="fas fa-info-circle info-icon" data-translate-key-tooltip="tooltips.securityRisk"></i>
@@ -274,9 +289,19 @@
                     
                     <!-- Floating threat list panel (appears after analysis) -->
                     <div id="floating-threats" class="drop-panel threat-list-panel view-hidden">
-                        <h4 data-translate-key="threats.title" style="margin:0 0 8px 0;">Eindringungsgefahren</h4>
-                        <ol class="threat-list" style="margin:0; padding-left: 18px; max-height: 50vh; overflow:auto;"></ol>
-                        <div class="loading-indicator hidden" data-translate-key="threats.loading">Analysiere Zufahrten...</div>
+                        <div class="threat-panel-header">
+                            <h4 data-translate-key="threats.title" style="margin:0; flex-grow:1;">Eindringungsgefahren</h4>
+                            <button id="minimize-threats-btn" class="minimize-btn" data-translate-key-tooltip="threats.minimize" title="Minimieren">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button id="close-threats-btn" class="close-btn" data-translate-key-tooltip="threats.close" title="Schließen">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="threat-panel-content">
+                            <ol class="threat-list" style="margin:0; padding-left: 18px; max-height: 50vh; overflow:auto;"></ol>
+                            <div class="loading-indicator hidden" data-translate-key="threats.loading">Analysiere Zufahrten...</div>
+                        </div>
                     </div>
                     <!-- The report preview will be shown here, layered on top of the map container -->
                     <div id="report-preview-area" class="view-hidden">
@@ -388,6 +413,13 @@
                                     <select id="vehicle-type-filter" class="filter-select">
                                         <option value="" data-translate-key="manufacturer.sidebar.options.vehicleType.all">Alle Fahrzeugtypen</option>
                                     </select>
+                                    <select id="speed-filter" class="filter-select">
+                                        <option value="" data-translate-key="manufacturer.sidebar.options.speed.all">Alle Geschwindigkeiten</option>
+                                        <option value="30">≥ 30 km/h</option>
+                                        <option value="48">≥ 48 km/h</option>
+                                        <option value="64">≥ 64 km/h</option>
+                                        <option value="80">≥ 80 km/h</option>
+                                    </select>
                                 </div>
                                 
                                 <div class="view-toggle">
@@ -409,6 +441,9 @@
                                         <tr>
                                             <th data-translate-key="manufacturer.sidebar.productDatabase.manufacturer">Hersteller</th>
                                             <th data-translate-key="manufacturer.sidebar.productDatabase.type">Typ</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.productType">Produkttyp</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.cluster">Cluster</th>
+                                            <th data-translate-key="manufacturer.sidebar.productDatabase.confidence">Vertrauen</th>
                                             <th data-translate-key="manufacturer.sidebar.productDatabase.standard">Standard</th>
                                             <th data-translate-key="manufacturer.sidebar.productDatabase.vehicleWeight">Fahrzeuggewicht (kg)</th>
                                             <th data-translate-key="manufacturer.sidebar.productDatabase.vehicleType">Fahrzeugtyp</th>
