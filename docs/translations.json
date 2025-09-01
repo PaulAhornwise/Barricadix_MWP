@@ -38,6 +38,19 @@
       "recommendedProductClass": "Empfohlene Produktklasse",
       "low": "niedrig",
       "high": "hoch",
+      "osmLimits": {
+        "title": "Geschwindigkeitsbegrenzungen",
+        "maxspeed": "Tempolimits",
+        "trafficCalming": "Verkehrsberuhiger",
+        "weather": "Witterung",
+        "surface": "Straßenbelag",
+        "weatherOptions": {
+          "dry": "trocken",
+          "wet": "nass",
+          "snow": "Schnee",
+          "ice": "Eis"
+        }
+      },
       "options": {
         "vehicle": {
           "all": "alle",
@@ -157,6 +170,9 @@
                 },
                 "vehicleType": {
                     "all": "Alle Fahrzeugtypen"
+                },
+                "speed": {
+                    "all": "Alle Geschwindigkeiten"
                 }
             },
             "productDatabase": {
@@ -168,26 +184,35 @@
                 "manufacturer": "Hersteller",
                 "type": "Typ",
                 "standard": "Standard",
-                "vehicleWeight": "Fahrzeuggewicht (kg)",
-                "vehicleType": "Fahrzeugtyp",
-                "speed": "Geschwindigkeit (km/h)",
-                "impactAngle": "Anprallwinkel (°)",
-                "penetration": "Penetration (m)",
-                "debrisDistance": "Trümmerdistanz (m)",
-                "actions": "Aktionen",
-                "material": "Material",
-                "performance": "Leistung",
+                "performance": "Leistungsbewertung",
                 "dimensions": "Abmessungen",
-                "foundation": "Fundament",
+                "foundation": "Fundamenttiefe",
+                "material": "Material",
+                "actions": "Aktionen",
                 "noProducts": "Keine Produkte gefunden",
                 "loading": "Produkte werden geladen...",
                 "technicalSpecs": "Technische Spezifikationen",
                 "performanceData": "Leistungsdaten",
                 "certification": "Zertifizierung",
+                "toggleToTable": "Zur Tabellenansicht",
+                "toggleToGrid": "Zur Kachelansicht",
+                "viewDetails": "Details anzeigen",
                 "viewDetails": "Details anzeigen",
                 "closeDetails": "Schließen",
                 "exportData": "Daten exportieren",
                 "printSpecs": "Spezifikationen drucken",
+                "modal": {
+                    "title": "Produktdetails",
+                    "technicalSpecs": "Technische Spezifikationen",
+                    "performanceData": "Leistungsdaten",
+                    "certification": "Zertifizierung",
+                    "exportData": "Daten exportieren",
+                    "printSpecs": "Spezifikationen drucken"
+                }
+            },
+            "productDatabase": {
+                "toggleToTable": "Zur Tabellenansicht",
+                "toggleToGrid": "Zur Kachelansicht",
                 "modal": {
                     "title": "Produktdetails",
                     "technicalSpecs": "Technische Spezifikationen",
@@ -262,7 +287,86 @@
       "noCrossingWaysBoundary": "Keine querenden Wege an der Grenze gefunden.",
       "noCrossingWaysArea": "Keine querenden Wege im markierten Bereich gefunden.",
       "analysisFailed": "Analyse fehlgeschlagen.",
-      "popupHeader": "Zufahrt"
+      "popupHeader": "Zufahrt",
+      "minimize": "Minimieren",
+      "maximize": "Maximieren", 
+      "close": "Schließen"
+    },
+    "sidebar": {
+      "osmLimits": {
+        "title": "OSM Geschwindigkeitsbegrenzungen",
+        "maxspeed": "Tempolimits aus OSM anwenden (empfohlen)",
+        "trafficCalming": "Verkehrsberuhiger bremsen Fahrzeuge",
+        "weather": "Wetter",
+        "weatherOptions": {
+          "dry": "trocken",
+          "wet": "nass",
+          "snow": "Schnee",
+          "ice": "Eis"
+        },
+        "surface": "Belag berücksichtigen (OSM surface)"
+      },
+      "trafficData": "Verkehrsdaten",
+      "vehicleSelect": "Fahrzeugauswahl",
+      "options": {
+        "vehicle": {
+          "all": "alle",
+          "motorcycle": "Motorrad",
+          "car_light": "KFZ <3.5t",
+          "truck_light": "LKW <7.5t",
+          "truck_medium": "LKW <12t",
+          "truck_heavy": "LKW <40t"
+        },
+        "access": {
+          "all": "alle",
+          "meadow": "Wiese",
+          "forest_path": "Waldweg",
+          "pedestrian_path": "Fußgängerweg",
+          "one_way": "Einbahnstraße",
+          "two_lane": "Zweispur",
+          "three_lane": "Dreispur",
+          "four_lane": "Vierspur"
+        },
+        "curbs": {
+          "yes": "ja",
+          "no": "nein"
+        },
+        "obstacles": {
+          "none": "keine",
+          "trees": "Bäume",
+          "posts": "Pfosten",
+          "bins": "Mülltonnen"
+        },
+        "period": {
+          "permanent": "dauerhaft",
+          "temporary": "temporär",
+          "eventual": "eventuell"
+        },
+        "products": {
+          "bollard": "Poller",
+          "barrier": "Barriere",
+          "post": "Pfosten",
+          "ditch": "Graben"
+        },
+        "property": {
+          "automatic_rigid": "aut./starr",
+          "retractable": "versenkbar",
+          "removable": "entfernbar"
+        }
+      },
+      "accessRoads": "Zufahrten",
+      "curbs": "Bordsteinkanten",
+      "obstacles": "Hindernisse",
+      "protectionSelection": "Schutzauswahl",
+      "protectionPeriod": "Schutzzeitraum",
+      "protectionProducts": "Schutzprodukte",
+      "productProperty": "Produkteigenschaft",
+      "riskAssessment": "Risikobewertung",
+      "assetToProtect": "Was geschützt werden soll",
+      "securityRisk": "Sicherheitsrisiko",
+      "low": "niedrig",
+      "high": "hoch",
+      "recommendedProductClass": "Empfohlene Produktklasse"
     },
     "products": {
       "title": "Produktempfehlungen",
@@ -273,7 +377,12 @@
       "showMore": "Weitere Produkte anzeigen",
       "dbError": "Produkt-DB Fehler",
       "recommendation": "Empfehlung:",
-      "noRecommendation": "Keine passende Empfehlung gefunden"
+      "noRecommendation": "Keine passende Empfehlung gefunden",
+      "noSuitableProduct": "Kein passendes Produkt in der Datenbank gefunden. Bitte kontaktieren Sie einen zertifizierten Sicherheitsberater",
+      "contactAdvice": "Kontaktempfehlung",
+      "requiredSpeed": "Erforderliche Geschwindigkeit",
+      "pinned": "Angepinnt",
+      "clickToPin": "Klicken zum Anpinnen"
     },
     "alerts": {
       "noPolygon": "Bitte markieren Sie zuerst einen Sicherheitsbereich unter dem Reiter 'Sicherheitsbereich markieren'.",
@@ -287,7 +396,7 @@
       "geminiError": "Die KI-gestützte Analyse konnte aufgrund eines Fehlers nicht generiert werden."
     },
     "ai": {
-      "reportPrompt": "Du bist ein professioneller Sicherheitsberater, der einen Risikobericht für Fahrzeuganprallschutz (HVM) erstellt. Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Hier sind die Kontextdaten:\n\n- **Standortname**: {locationName}\n- **Zu schützendes Objekt**: {assetToProtect}\n- **Angestrebtes Sicherheitsniveau**: {securityLevel}\n- **Abgeleiteter Sicherungsgrad**: {protectionGrade}\n- **Hauptbedrohungen (Zufahrtsstraßen)**: {threatList}\n- **Art der HVM-Lösung**: {protectionPeriod}\n- **Empfohlener FSB-Typ**: {productType}\n- **Erwartete Mindestanprallleistung**: Eindringtiefe von {penetration} m und Trümmerflugweite von {debrisDistance} m.\n\nFülle jeden der folgenden Abschnitte mit sinnvollem, professionellem Text, der auf den bereitgestellten Daten basiert. Wenn ein Wert ein Platzhalter in eckigen Klammern ist (z.B. '[Keine Gefahrenanalyse durchgeführt]'), erkenne an, dass diese Information fehlt, und formuliere stattdessen eine allgemeine Beschreibung, welche Art von Information an dieser Stelle für einen vollständigen Bericht erforderlich wäre."
+      "reportPrompt": "Du bist ein Spezialist für physischen Zufahrtsschutz und erstellst einen Sicherheitsbericht für den Schutz vor Fahrzeugangriffen und unbefugtem Eindringen mit Kraftfahrzeugen (Vehicle Security Barriers / Hostile Vehicle Mitigation). Der Fokus liegt auf dem physischen Schutz von Gebäuden, Plätzen und Infrastruktur vor Terroranschlägen mit Fahrzeugen, Amokfahrten oder Unfällen. WICHTIG: Dies ist KEIN Cybersecurity-Bericht! Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Hier sind die Kontextdaten:\n\n- **Standortname**: {locationName}\n- **Zu schützendes Objekt**: {assetToProtect}\n- **Angestrebtes Sicherheitsniveau**: {securityLevel}\n- **Abgeleiteter Sicherungsgrad**: {protectionGrade}\n- **Hauptbedrohungen (Zufahrtsstraßen)**: {threatList}\n- **Art der HVM-Lösung**: {protectionPeriod}\n- **Empfohlener FSB-Typ**: {productType}\n- **Erwartete Mindestanprallleistung**: Eindringtiefe von {penetration} m und Trümmerflugweite von {debrisDistance} m.\n\nFokussiere ausschließlich auf: Fahrzeugbarrieren, Poller, physische Sperren, Fahrzeuganprallschutz, Rammangriffe, Teststandards wie PAS 68 oder IWA 14, Geschwindigkeiten, Fahrzeugmassen, Anprallwinkel, Eindringtiefen. Erwähne NIEMALS: Malware, Cyberangriffe, Netzwerksicherheit, Software, IT-Systeme. Fülle jeden der folgenden Abschnitte mit sinnvollem, professionellem Text, der auf den bereitgestellten Daten basiert."
     }
   },
   "en": {
@@ -313,6 +422,19 @@
       "loggedIn": "Logged in: BarricadiX Admin"
     },
     "sidebar": {
+      "osmLimits": {
+        "title": "OSM Speed Limits",
+        "maxspeed": "Apply OSM speed limits (recommended)",
+        "trafficCalming": "Traffic calming slows vehicles",
+        "weather": "Weather",
+        "weatherOptions": {
+          "dry": "dry",
+          "wet": "wet",
+          "snow": "snow",
+          "ice": "ice"
+        },
+        "surface": "Consider surface (OSM surface)"
+      },
       "trafficData": "Traffic Data",
       "vehicleSelect": "Vehicle Selection",
       "accessRoads": "Access Roads",
@@ -459,6 +581,9 @@
           },
           "vehicleType": {
             "all": "All Vehicle Types"
+          },
+          "speed": {
+            "all": "All Speeds"
           }
         },
         "productDatabase": {
@@ -470,26 +595,35 @@
           "manufacturer": "Manufacturer",
           "type": "Type",
           "standard": "Standard",
-          "vehicleWeight": "Vehicle Weight (kg)",
-          "vehicleType": "Vehicle Type",
-          "speed": "Speed (km/h)",
-          "impactAngle": "Impact Angle (°)",
-          "penetration": "Penetration (m)",
-                      "debrisDistance": "Debris Distance (m)",
-            "actions": "Actions",
-            "material": "Material",
-            "performance": "Performance",
-            "dimensions": "Dimensions",
-            "foundation": "Foundation",
+          "performance": "Performance Rating",
+          "dimensions": "Dimensions",
+          "foundation": "Foundation Depth",
+          "material": "Material",
+          "actions": "Actions",
           "noProducts": "No products found",
           "loading": "Loading products...",
           "technicalSpecs": "Technical Specifications",
           "performanceData": "Performance Data",
           "certification": "Certification",
+          "toggleToTable": "Switch to Table View",
+          "toggleToGrid": "Switch to Grid View",
+          "viewDetails": "View Details",
           "viewDetails": "View Details",
           "closeDetails": "Close",
           "exportData": "Export Data",
           "printSpecs": "Print Specifications",
+          "modal": {
+            "title": "Product Details",
+            "technicalSpecs": "Technical Specifications",
+            "performanceData": "Performance Data",
+            "certification": "Certification",
+            "exportData": "Export Data",
+            "printSpecs": "Print Specifications"
+          }
+        },
+        "productDatabase": {
+          "toggleToTable": "Switch to Table View",
+          "toggleToGrid": "Switch to Grid View",
           "modal": {
             "title": "Product Details",
             "technicalSpecs": "Technical Specifications",
@@ -559,7 +693,12 @@
       "showMore": "Show more products",
       "dbError": "Product DB Error",
       "recommendation": "Recommendation:",
-      "noRecommendation": "No suitable recommendation found"
+      "noRecommendation": "No suitable recommendation found",
+      "noSuitableProduct": "No suitable product found in database. Please contact a certified security consultant",
+      "contactAdvice": "Contact Recommendation",
+      "requiredSpeed": "Required Speed",
+      "pinned": "Pinned",
+      "clickToPin": "Click to pin"
     },
     "alerts": {
       "noPolygon": "Please mark a security area first under the 'Mark Security Area' tab.",
@@ -573,7 +712,7 @@
       "geminiError": "The AI-powered analysis could not be generated due to an error."
     },
     "ai": {
-      "reportPrompt": "You are a professional security consultant creating a risk report for Hostile Vehicle Mitigation (HVM). Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFill each of the following sections with meaningful, professional text based on the provided data. If a value is a placeholder in square brackets (e.g., '[No threat analysis performed]'), acknowledge that this information is missing and instead formulate a general description of what kind of information would be required in this section for a complete report."
+      "reportPrompt": "You are a specialist for physical vehicle access protection creating a security report for protection against vehicle attacks and unauthorized vehicle intrusion (Vehicle Security Barriers / Hostile Vehicle Mitigation). The focus is on physical protection of buildings, squares and infrastructure against vehicle terrorist attacks, rampage attacks or accidents. IMPORTANT: This is NOT a cybersecurity report! Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFocus exclusively on: vehicle barriers, bollards, physical barriers, vehicle impact protection, ram attacks, test standards like PAS 68 or IWA 14, speeds, vehicle masses, impact angles, penetration depths. NEVER mention: malware, cyber attacks, network security, software, IT systems. Fill each of the following sections with meaningful, professional text based on the provided data."
     }
   }
 }
