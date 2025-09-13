@@ -822,18 +822,29 @@ html, body {
 }
 
 .osm-controls h4 {
-    margin: 0 0 8px 0;
+    margin: 0 0 2px 0 !important;
     font-size: 14px;
     font-weight: 600;
     color: var(--primary-text);
     display: block;
+    line-height: 1.3 !important;
+}
+
+/* CACHE BUSTER - Force browser to reload styles */
+.osm-controls[data-compact="true"] .checkbox-label,
+.osm-controls .checkbox-label[data-compact="true"] {
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+    height: auto !important;
 }
 
 .checkbox-group {
-    margin: 8px 0;
+    margin: 0;
     background: transparent;
     border: none;
-    padding: 4px 0;
+    padding: 1px 0;
 }
 
 .checkbox-label {
@@ -842,7 +853,7 @@ html, body {
     cursor: pointer;
     font-size: 14px;
     color: var(--primary-text);
-    padding: 4px 0;
+    padding: 0;
 }
 
 .checkbox-label span {
@@ -867,16 +878,89 @@ html, body {
 .osm-controls .checkbox-group {
     background: transparent !important;
     background-color: transparent !important;
+    margin: 2px 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
 }
 
 .osm-controls .checkbox-label {
     background: transparent !important;
     background-color: transparent !important;
+    padding: 1px 0 !important;
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
 }
 
 .checkbox-label input[type="checkbox"] {
     margin-right: 8px;
     transform: scale(1.1);
+}
+
+/* Compact spacing for OSM speed controls */
+.osm-controls {
+    line-height: 1.3 !important;
+}
+
+.osm-controls * {
+    line-height: 1.3 !important;
+}
+
+/* FORCE compact spacing - highest specificity */
+.sidebar-section .form-group.osm-controls .checkbox-group {
+    margin: 2px 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+}
+
+.sidebar-section .form-group.osm-controls .checkbox-label {
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+}
+
+/* ULTIMATE OVERRIDE - Force compact spacing on all OSM elements */
+div[class*="osm-controls"] .checkbox-group,
+.form-group.osm-controls .checkbox-group {
+    margin: 2px 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+}
+
+div[class*="osm-controls"] .checkbox-label,
+.form-group.osm-controls .checkbox-label {
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+}
+
+/* NUCLEAR OPTION - Maximum specificity for OSM controls */
+.sidebar-section .form-group.osm-controls .checkbox-group.checkbox-group {
+    margin: 2px 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+}
+
+.sidebar-section .form-group.osm-controls .checkbox-label.checkbox-label {
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+    height: auto !important;
+}
+
+/* Force override any default browser styles */
+.osm-controls label,
+.osm-controls .checkbox-label,
+.osm-controls .checkbox-group {
+    margin: 0 !important;
+    padding: 1px 0 !important;
+    line-height: 1.3 !important;
+    min-height: auto !important;
+    box-sizing: border-box !important;
 }
 
 .osm-status {
@@ -1870,7 +1954,7 @@ div.search-marker.leaflet-marker-icon {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.minimize-btn, .close-btn {
+.edit-btn, .minimize-btn, .close-btn {
     background: none;
     border: none;
     color: rgba(255, 255, 255, 0.7);
@@ -1881,9 +1965,18 @@ div.search-marker.leaflet-marker-icon {
     margin-left: 8px;
 }
 
-.minimize-btn:hover, .close-btn:hover {
+.edit-btn:hover, .minimize-btn:hover, .close-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     color: white;
+}
+
+.edit-btn.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.edit-btn.active:hover {
+    background: var(--accent-color-dark);
 }
 
 .close-btn:hover {

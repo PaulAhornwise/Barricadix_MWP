@@ -240,6 +240,15 @@ let osmLoadingController: AbortController | null = null;
 let osmDebounceTimeout: number | null = null;
 let generatedPdf: any = null; // To hold the generated PDF object
 let generatedPdfUrl: string | null = null; // Object URL for iframe preview
+
+// Street highlighting system
+let highlightedStreetName: string | null = null;
+let originalStreetStyles = new Map<string, any[]>(); // Store original styles for reset
+
+// Manual threat editing system
+let isEditMode = false;
+let manuallyRemovedThreats = new Set<string>(); // Track manually removed threats
+let manuallyAddedThreats = new Map<string, any>(); // Track manually added threats
 let productDatabase: any[] = []; // To cache the product data
 let pinnedTooltips: Array<{element: HTMLElement, marker: any, latLng: any}> = []; // Track pinned tooltips for map movement
 
@@ -251,7 +260,7 @@ let translations: any = {};
 const embeddedTranslations = {
     "de": {
         "header": {
-            "planning": "Planung",
+            "planning": "Planer",
             "manufacturer": "Hersteller"
         },
         "nav": {
@@ -273,9 +282,9 @@ const embeddedTranslations = {
         },
         "sidebar": {
             "osmLimits": {
-                "title": "OSM Geschwindigkeitsbegrenzungen",
-                "maxspeed": "Tempolimits aus OSM anwenden (empfohlen)",
-                "trafficCalming": "Verkehrsberuhiger bremsen Fahrzeuge",
+                "title": "Einfluss auf Geschwindigkeit:",
+                "maxspeed": "Tempolimit",
+                "trafficCalming": "Verkehrsberuhiger",
                 "weather": "Wetter",
                 "weatherOptions": {
                     "dry": "trocken",
@@ -283,9 +292,9 @@ const embeddedTranslations = {
                     "snow": "Schnee",
                     "ice": "Eis"
                 },
-                "surface": "Belag berücksichtigen (OSM surface)"
+                "surface": "Fahrbahnbelag"
             },
-            "trafficData": "Verkehrsdaten",
+            "trafficData": "Parameterwahl",
             "vehicleSelect": "Fahrzeugauswahl",
             "accessRoads": "Zufahrten",
             "curbs": "Bordsteinkanten",
@@ -616,7 +625,8 @@ const embeddedTranslations = {
             "loading": "Lade Gefahrenanalyse...",
             "minimize": "Minimieren",
             "maximize": "Maximieren",
-            "close": "Schließen"
+            "close": "Schließen",
+            "editMode": "Zufahrten bearbeiten"
         },
         "map": {
             "createReport": "Bericht erstellen",
@@ -648,7 +658,7 @@ const embeddedTranslations = {
     },
     "en": {
         "header": {
-            "planning": "Planning",
+            "planning": "Planner",
             "manufacturer": "Manufacturer"
         },
         "nav": {
@@ -670,9 +680,9 @@ const embeddedTranslations = {
         },
         "sidebar": {
             "osmLimits": {
-                "title": "OSM Speed Limits",
-                "maxspeed": "Apply OSM speed limits (recommended)",
-                "trafficCalming": "Traffic calming slows vehicles",
+                "title": "Speed Influence:",
+                "maxspeed": "Speed limit",
+                "trafficCalming": "Traffic calming",
                 "weather": "Weather",
                 "weatherOptions": {
                     "dry": "dry",
@@ -680,9 +690,9 @@ const embeddedTranslations = {
                     "snow": "snow",
                     "ice": "ice"
                 },
-                "surface": "Consider surface (OSM surface)"
+                "surface": "Road surface"
             },
-            "trafficData": "Traffic Data",
+            "trafficData": "Parameter Selection",
             "vehicleSelect": "Vehicle Selection",
             "accessRoads": "Access Roads",
             "curbs": "Curbs",
@@ -1012,7 +1022,8 @@ const embeddedTranslations = {
             "loading": "Loading threat analysis...",
             "minimize": "Minimize",
             "maximize": "Maximize",
-            "close": "Close"
+            "close": "Close",
+            "editMode": "Edit access points"
         },
         "map": {
             "createReport": "Create Report",
@@ -2345,7 +2356,7 @@ function t(key: string, replacements?: { [key: string]: string | number }): stri
  */
 function getFallbackText(key: string): string | null {
     const fallbackMap: { [key: string]: string } = {
-        'sidebar.trafficData': 'Verkehrsdaten',
+        'sidebar.trafficData': 'Parameterwahl',
         'sidebar.vehicleSelect': 'Fahrzeugauswahl',
         'sidebar.accessRoads': 'Zufahrten',
         'sidebar.curbs': 'Bordsteinkanten',
@@ -2751,6 +2762,25 @@ function initOpenStreetMap(): void {
         console.log('Map zoom event triggered');
         updatePinnedTooltipPositions();
     });
+    
+    // Additional protection against zoom animation errors
+    map.on('zoomstart', () => {
+        // Temporarily disable problematic popup animations during zoom
+        console.log('Zoom started - protecting popups');
+    });
+    
+    map.on('zoomend', () => {
+        // Re-enable popup functionality after zoom completes
+        console.log('Zoom ended - re-enabling popups');
+        updatePinnedTooltipPositions();
+        
+        // Reset street highlighting when zooming out significantly
+        const currentZoom = map.getZoom();
+        if (currentZoom < 14 && highlightedStreetName) {
+            console.log(`🔍 Zoom level ${currentZoom} - resetting street highlighting`);
+            resetStreetHighlighting();
+        }
+    });
     map.on('resize', () => {
         console.log('Map resize event triggered');
         updatePinnedTooltipPositions();
@@ -2763,6 +2793,24 @@ function initOpenStreetMap(): void {
  * Clears the threat markers (red circles and lines) and the list from the map and UI.
  */
 const clearThreatAnalysis = () => {
+    // Reset any street highlighting
+    resetStreetHighlighting();
+    
+    // Exit edit mode if active
+    if (isEditMode) {
+        isEditMode = false;
+        const editBtn = document.getElementById('edit-threats-btn');
+        if (editBtn) {
+            editBtn.classList.remove('active');
+            editBtn.title = 'Zufahrten bearbeiten';
+        }
+        disableMapClickForThreatAddition();
+    }
+    
+    // Clear manual editing data
+    manuallyRemovedThreats.clear();
+    manuallyAddedThreats.clear();
+    
     // Remove grouped layers if present
     if (threatLayerGroup) {
         try {
@@ -2972,12 +3020,379 @@ function calculateVelocity(acceleration: number, distance: number): number {
 }
 
 /**
+ * Calculates extended acceleration distance by considering connected road segments
+ * @param wayNodes - Nodes of the current way
+ * @param startIndex - Starting index for calculation
+ * @param allWays - All available ways for connection analysis
+ * @param maxDistance - Maximum additional distance to consider
+ * @returns Additional acceleration distance in meters
+ */
+function calculateExtendedAccelerationDistance(
+    wayNodes: any[], 
+    startIndex: number, 
+    allWays: any, 
+    maxDistance: number = 1000
+): number {
+    let additionalDistance = 0;
+    
+    // Try to find connected ways that could provide additional acceleration distance
+    if (startIndex > 0) {
+        const startNode = wayNodes[0];
+        
+        // Look for ways that connect to our start node
+        for (const [, wayData] of Object.entries(allWays)) {
+            const otherWay = wayData as any;
+            if (otherWay.nodes && otherWay.nodes.length > 1) {
+                const otherWayNodes = otherWay.nodes;
+                
+                // Check if this way connects to our start
+                const lastNodeOfOther = otherWayNodes[otherWayNodes.length - 1];
+                const firstNodeOfOther = otherWayNodes[0];
+                
+                if (lastNodeOfOther === startNode.id || firstNodeOfOther === startNode.id) {
+                    // This way connects - calculate its length up to reasonable limit
+                    let connectionDistance = 0;
+                    for (let i = 0; i < Math.min(otherWayNodes.length - 1, 10); i++) {
+                        // Estimate distance (simplified calculation)
+                        connectionDistance += 50; // Average segment length estimate
+                        if (connectionDistance >= maxDistance) break;
+                    }
+                    additionalDistance = Math.max(additionalDistance, connectionDistance);
+                    break; // Use first good connection found
+                }
+            }
+        }
+    }
+    
+    return Math.min(additionalDistance, maxDistance);
+}
+
+/**
+ * Highlights a specific street by making its markers thicker
+ * @param streetName - Name of the street to highlight
+ */
+function highlightStreet(streetName: string) {
+    // Reset any previously highlighted street
+    resetStreetHighlighting();
+    
+    const streetMarkers = threatMarkersMap.get(streetName);
+    if (!streetMarkers || streetMarkers.length === 0) return;
+    
+    highlightedStreetName = streetName;
+    const originalStyles: any[] = [];
+    
+    streetMarkers.forEach((marker) => {
+        // Store original style
+        const originalStyle = {
+            weight: marker.options.weight || 5,
+            opacity: marker.options.opacity || 0.9
+        };
+        originalStyles.push(originalStyle);
+        
+        // Apply highlighted style (thicker and more opaque)
+        if (marker.setStyle) {
+            marker.setStyle({
+                weight: (originalStyle.weight || 5) * 2, // Double the thickness
+                opacity: Math.min((originalStyle.opacity || 0.9) + 0.2, 1.0) // Increase opacity
+            });
+        }
+    });
+    
+    // Store original styles for later reset
+    originalStreetStyles.set(streetName, originalStyles);
+    
+    console.log(`🎯 Highlighted street: ${streetName}`);
+}
+
+/**
+ * Resets street highlighting to normal thickness
+ */
+function resetStreetHighlighting() {
+    if (!highlightedStreetName) return;
+    
+    const streetMarkers = threatMarkersMap.get(highlightedStreetName);
+    const originalStyles = originalStreetStyles.get(highlightedStreetName);
+    
+    if (streetMarkers && originalStyles) {
+        streetMarkers.forEach((marker, index) => {
+            const originalStyle = originalStyles[index];
+            if (marker.setStyle && originalStyle) {
+                marker.setStyle({
+                    weight: originalStyle.weight,
+                    opacity: originalStyle.opacity
+                });
+            }
+        });
+    }
+    
+    // Clean up
+    originalStreetStyles.delete(highlightedStreetName);
+    highlightedStreetName = null;
+    
+    console.log('🔄 Reset street highlighting');
+}
+
+/**
+ * Toggle edit mode for manual threat editing
+ */
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const editBtn = document.getElementById('edit-threats-btn');
+    
+    if (editBtn) {
+        if (isEditMode) {
+            editBtn.classList.add('active');
+            editBtn.title = 'Edit-Modus beenden';
+            console.log('🔧 Edit-Modus aktiviert - Klicken Sie auf Zufahrten zum Entfernen oder auf die Karte zum Hinzufügen');
+            
+            // Enable map click for adding new threats
+            setupMapClickForThreatAddition();
+            
+            // Add delete buttons to existing threats
+            addDeleteButtonsToThreats();
+            
+        } else {
+            editBtn.classList.remove('active');
+            editBtn.title = 'Zufahrten bearbeiten';
+            console.log('🔧 Edit-Modus deaktiviert');
+            
+            // Disable map click handler
+            disableMapClickForThreatAddition();
+            
+            // Remove delete buttons
+            removeDeleteButtonsFromThreats();
+        }
+    }
+}
+
+/**
+ * Add delete buttons to existing threat list items
+ */
+function addDeleteButtonsToThreats() {
+    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
+    if (!threatList) return;
+    
+    threatList.querySelectorAll('li').forEach((li) => {
+        if (!li.querySelector('.delete-threat-btn')) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-threat-btn';
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.title = 'Zufahrt entfernen';
+            deleteBtn.style.cssText = `
+                float: right;
+                background: rgba(239, 68, 68, 0.2);
+                border: none;
+                color: #ef4444;
+                padding: 2px 6px;
+                border-radius: 3px;
+                cursor: pointer;
+                margin-left: 8px;
+                font-size: 12px;
+            `;
+            
+            // Extract street name from li text
+            const streetName = li.textContent?.split(' (')[0]?.replace(/^[🔴🟠🟡🟢⚪]\s/, '') || '';
+            
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeThreatManually(streetName, li);
+            });
+            
+            li.appendChild(deleteBtn);
+        }
+    });
+}
+
+/**
+ * Remove delete buttons from threat list items
+ */
+function removeDeleteButtonsFromThreats() {
+    document.querySelectorAll('.delete-threat-btn').forEach(btn => btn.remove());
+}
+
+/**
+ * Remove a threat manually
+ */
+function removeThreatManually(streetName: string, listItem: HTMLLIElement) {
+    console.log(`🗑️ Manually removing threat: ${streetName}`);
+    
+    // Add to manually removed set
+    manuallyRemovedThreats.add(streetName);
+    
+    // Remove from threats map
+    if (threatsMap.has(streetName)) {
+        threatsMap.delete(streetName);
+    }
+    
+    // Remove visual markers
+    const markers = threatMarkersMap.get(streetName);
+    if (markers) {
+        markers.forEach(marker => {
+            if (threatLayerGroup && threatLayerGroup.hasLayer(marker)) {
+                threatLayerGroup.removeLayer(marker);
+            }
+        });
+        threatMarkersMap.delete(streetName);
+    }
+    
+    // Remove from list
+    listItem.remove();
+    
+    // Update threat list title
+    updateThreatListTitle(threatsMap.size > 0);
+    
+    console.log(`✅ Threat "${streetName}" removed manually`);
+}
+
+/**
+ * Setup map click handler for adding new threats
+ */
+function setupMapClickForThreatAddition() {
+    if (map) {
+        map.getContainer().style.cursor = 'crosshair';
+        map.on('click', handleMapClickForThreatAddition);
+    }
+}
+
+/**
+ * Disable map click handler for adding threats
+ */
+function disableMapClickForThreatAddition() {
+    if (map) {
+        map.getContainer().style.cursor = '';
+        map.off('click', handleMapClickForThreatAddition);
+    }
+}
+
+/**
+ * Handle map click for adding new threats
+ */
+function handleMapClickForThreatAddition(e: any) {
+    const { lat, lng } = e.latlng;
+    console.log(`🎯 Adding new threat at: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    
+    // Create a new threat entry
+    const threatName = `Manueller Zufahrtspunkt ${Date.now()}`;
+    
+    // Calculate acceleration distance from click point to security area
+    const clickPoint = { lat, lon: lng };
+    const accelerationDistance = calculateAccelerationDistanceToSecurityArea(clickPoint);
+    
+    // Create threat data
+    const threatData = {
+        entryPoints: [{
+            lat: lat,
+            lon: lng,
+            distance: accelerationDistance
+        }],
+        pathSegments: [[clickPoint]], // Simple single-point segment
+        totalLength: accelerationDistance,
+        threatLevel: 5, // Default threat level
+        roadType: 'manual',
+        maxSpeed: 50 // Default speed limit
+    };
+    
+    // Add to threats map
+    threatsMap.set(threatName, threatData);
+    manuallyAddedThreats.set(threatName, threatData);
+    
+    // Create visual markers
+    createThreatMarkers(threatName, threatData);
+    
+    // Re-render threat list
+    renderThreatList();
+    
+    console.log(`✅ Manual threat "${threatName}" added with ${accelerationDistance}m acceleration distance`);
+}
+
+/**
+ * Calculate acceleration distance from a point to the security area
+ */
+function calculateAccelerationDistanceToSecurityArea(point: {lat: number, lon: number}): number {
+    if (!drawnPolygon) return 100; // Default if no security area defined
+    
+    const polygonVertices = drawnPolygon.getLatLngs()[0].map((ll: any) => ({lat: ll.lat, lon: ll.lng}));
+    
+    // Find closest point on polygon boundary
+    let minDistance = Infinity;
+    
+    for (let i = 0; i < polygonVertices.length; i++) {
+        const p1 = polygonVertices[i];
+        const p2 = polygonVertices[(i + 1) % polygonVertices.length];
+        
+        // Calculate distance from point to line segment
+        const distance = getDistanceToLineSegment(point, p1, p2);
+        minDistance = Math.min(minDistance, distance);
+    }
+    
+    return Math.max(minDistance, 10); // Minimum 10m
+}
+
+/**
+ * Calculate distance from point to line segment
+ */
+function getDistanceToLineSegment(point: {lat: number, lon: number}, lineStart: {lat: number, lon: number}, lineEnd: {lat: number, lon: number}): number {
+    // Simplified distance calculation using Haversine
+    const distToStart = getHaversineDistance(point, lineStart);
+    const distToEnd = getHaversineDistance(point, lineEnd);
+    const distToMidpoint = getHaversineDistance(point, {
+        lat: (lineStart.lat + lineEnd.lat) / 2,
+        lon: (lineStart.lon + lineEnd.lon) / 2
+    });
+    
+    return Math.min(distToStart, distToEnd, distToMidpoint);
+}
+
+/**
+ * Create visual markers for a threat
+ */
+function createThreatMarkers(streetName: string, threatData: any) {
+    if (!threatLayerGroup) return;
+    
+    const markers: any[] = [];
+    
+    // Create entry point markers
+    threatData.entryPoints.forEach((point: any) => {
+        const circle = L.circle([point.lat, point.lon], {
+            radius: 6,
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.8,
+            weight: 3
+        });
+        
+        const popupContent = `
+            <b>Manueller Zufahrtspunkt</b><br>
+            <b>Name:</b> ${streetName}<br>
+            <b>Beschleunigungsweg:</b> ${Math.round(point.distance)}m
+        `;
+        
+        circle.bindPopup(popupContent);
+        threatLayerGroup.addLayer(circle);
+        markers.push(circle);
+    });
+    
+    // Store markers
+    threatMarkersMap.set(streetName, markers);
+}
+
+/**
  * Setup minimize/close functionality for threat panel
  */
 function setupThreatPanelControls() {
+    const editBtn = document.getElementById('edit-threats-btn');
     const minimizeBtn = document.getElementById('minimize-threats-btn');
     const closeBtn = document.getElementById('close-threats-btn');
     const threatPanel = document.getElementById('floating-threats');
+    
+    // Edit mode toggle
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleEditMode();
+        });
+    }
     
     if (minimizeBtn && threatPanel) {
         minimizeBtn.addEventListener('click', (e) => {
@@ -3119,6 +3534,9 @@ function renderThreatList() {
             if (markersToZoom && markersToZoom.length > 0) {
                 const featureGroup = L.featureGroup(markersToZoom);
                 map.fitBounds(featureGroup.getBounds().pad(0.5));
+                
+                // Highlight the selected street
+                highlightStreet(name);
             }
         });
          li.addEventListener('keydown', (e) => {
@@ -3138,6 +3556,11 @@ function renderThreatList() {
     
     // Update the title to show analysis format
     updateThreatListTitle(true);
+    
+    // Add delete buttons if in edit mode
+    if (isEditMode) {
+        addDeleteButtonsToThreats();
+    }
 }
 
 /**
@@ -3328,22 +3751,8 @@ const analyzeAndMarkThreats = async () => {
         console.log(`📊 THREAT ANALYSIS: Found ${nodeCount} nodes, ${wayCount} ways (highways/railways), ${skippedWayCount} other ways`);
         console.log(`📊 THREAT ANALYSIS: Ways object contains ${Object.keys(ways).length} entries`);
 
-        // Define threat priority levels based on road type
-        const threatPriority = {
-            'motorway': 10,     // Höchste Bedrohung - Autobahnen
-            'trunk': 10,        // Höchste Bedrohung - Schnellstraßen  
-            'primary': 9,       // Sehr hohe Bedrohung - Bundesstraßen
-            'secondary': 8,     // Hohe Bedrohung - Landstraßen
-            'tertiary': 7,      // Mittlere Bedrohung - Kreisstraßen
-            'unclassified': 6,  // Mittlere Bedrohung - Nebenstraßen
-            'residential': 5,   // Niedrigere Bedrohung - Wohnstraßen
-            'living_street': 4, // Niedrige Bedrohung - verkehrsberuhigt
-            'service': 3,       // Geringe Bedrohung - Erschließungsstraßen
-            'track': 2,         // Sehr geringe Bedrohung - Feldwege
-            'cycleway': 1,      // Minimale Bedrohung - Radwege
-            'footway': 1,       // Minimale Bedrohung - Fußwege
-            'path': 1           // Minimale Bedrohung - Pfade
-        };
+        // REMOVED: threat priority levels - all road types treated equally for access identification
+        // Speed limits will still be used for velocity calculations
 
         // exclusionPatterns bereits oben definiert
 
@@ -3569,34 +3978,64 @@ const analyzeAndMarkThreats = async () => {
                     }
                     
                     if (intersectionPoint) {
-                        // Calculate the distance along the road from the start to this entry point
+                        // Calculate FULL acceleration distance - not just to intersection point
+                        // This includes the entire road segment that can be used for acceleration
                         let approachDistance = 0;
+                        
+                        // Calculate total distance from start of way to intersection point
+                        for (let k = 0; k < i; k++) {
+                            approachDistance += getHaversineDistance(wayNodes[k], wayNodes[k + 1]);
+                        }
+                        // Add distance from prevNode to intersection point
+                        approachDistance += getHaversineDistance(prevNode, intersectionPoint);
+                        
+                        // ENHANCEMENT: Add additional acceleration distance beyond intersection
+                        // Vehicles don't stop at intersections - they continue accelerating
+                        let additionalAccelerationDistance = 0;
+                        
                         if (isCurrIn) {
-                            // Entry point is between prevNode (outside) and currNode (inside)
-                            // Calculate distance from start of way to prevNode, then to intersection
-                            for (let k = 0; k < i; k++) {
-                                approachDistance += getHaversineDistance(wayNodes[k], wayNodes[k + 1]);
+                            // Coming from outside - calculate how much road continues inside security area
+                            for (let k = i + 1; k < wayNodes.length - 1; k++) {
+                                const nextNode = wayNodes[k];
+                                const afterNext = wayNodes[k + 1];
+                                
+                                // Check if still inside security area
+                                const isNextIn = isPointInPolygon(nextNode, polygonVertices);
+                                const isAfterNextIn = isPointInPolygon(afterNext, polygonVertices);
+                                
+                                if (isNextIn) {
+                                    additionalAccelerationDistance += getHaversineDistance(nextNode, afterNext);
+                                    // Continue until we exit the security area or reach reasonable limit
+                                    if (!isAfterNextIn || additionalAccelerationDistance > 1000) { // Max 1km additional
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
                             }
-                            // Add distance from prevNode to intersection point
-                            approachDistance += getHaversineDistance(prevNode, intersectionPoint);
                         } else {
-                            // Entry point is between prevNode (inside) and currNode (outside)
-                            // Calculate distance from start of way to intersection point
-                            for (let k = 0; k < i; k++) {
-                                approachDistance += getHaversineDistance(wayNodes[k], wayNodes[k + 1]);
-                            }
-                            // Add distance from prevNode to intersection point
-                            approachDistance += getHaversineDistance(prevNode, intersectionPoint);
+                            // Going from inside to outside - add distance before intersection
+                            // This represents the full available acceleration path before reaching security area
+                            // (Distance calculation already included in approachDistance above)
+                            
+                            // Add potential approach distance from connected roads
+                            // This simulates continuous acceleration from further away
+                            const estimatedApproachExtension = Math.min(approachDistance * 0.5, 500); // Max 500m extension
+                            const connectedRoadDistance = calculateExtendedAccelerationDistance(wayNodes, i, ways, 800);
+                            additionalAccelerationDistance = Math.max(estimatedApproachExtension, connectedRoadDistance);
                         }
                         
-                        // Create entry point with distance property
+                        // Total acceleration distance includes intersection crossing
+                        const totalAccelerationDistance = approachDistance + additionalAccelerationDistance;
+                        
+                        // Create entry point with enhanced distance calculation
                         const entryPointWithDistance = {
                             lat: intersectionPoint.lat,
                             lon: intersectionPoint.lon,
-                            distance: Math.max(approachDistance, 10) // Minimum 10m to avoid zero speed
+                            distance: Math.max(totalAccelerationDistance, 10) // Use full acceleration distance, minimum 10m
                         };
                         
-                        console.log(`📍 ENTRY POINT: Creating entry point for way "${way.name}" at distance ${Math.round(approachDistance)}m along road (${entryPointWithDistance.distance}m after min)`);
+                        console.log(`📍 ENHANCED ENTRY POINT: Creating entry point for way "${way.name}" - Base: ${Math.round(approachDistance)}m, Additional: ${Math.round(additionalAccelerationDistance)}m, Total: ${Math.round(totalAccelerationDistance)}m`);
                         
                         wayEntryPoints.push(entryPointWithDistance);
                         const pathSegment: { lat: number, lon: number }[] = [intersectionPoint];
@@ -3634,18 +4073,18 @@ const analyzeAndMarkThreats = async () => {
                 // Find highway type from original OSM data
                 const wayElement = data.elements.find((el: any) => el.id === way.id);
                 
-                // Check if this way should be excluded (recreational paths, bikeparks, etc.)
-                if (shouldExcludeWay(way.name, wayElement, wayNodes)) {
-                    console.log(`🚫 Skipping recreational/restricted way: ${way.name}`);
-                    excludedWays++;
-                    continue; // Skip this way entirely
-                }
+                // DISABLED: way exclusion - include all ways initially
+                // if (shouldExcludeWay(way.name, wayElement, wayNodes)) {
+                //     console.log(`🚫 Skipping recreational/restricted way: ${way.name}`);
+                //     excludedWays++;
+                //     continue; // Skip this way entirely
+                // }
                 
                 if (!threats.has(way.name)) {
                     const roadType = wayElement?.tags?.highway || 'unknown';
-                    const baseThreatLevel = (threatPriority as any)[roadType] || 3;
+                    // REMOVED: baseThreatLevel calculation - all roads treated equally for access identification
                     
-                    // Extract max speed from way tags if available
+                    // Extract max speed from way tags if available - still used for velocity calculations
                     let maxSpeed = 50; // Default speed
                     const wayData = data.elements.find((el: any) => el.id === way.id);
                     if (wayData?.tags?.maxspeed) {
@@ -3655,20 +4094,16 @@ const analyzeAndMarkThreats = async () => {
                         }
                     }
                     
-                    // Adjust threat level based on speed
-                    let adjustedThreatLevel = baseThreatLevel;
-                    if (maxSpeed >= 100) adjustedThreatLevel += 2;      // Autobahn speeds
-                    else if (maxSpeed >= 80) adjustedThreatLevel += 1.5; // Landstraße speeds  
-                    else if (maxSpeed >= 50) adjustedThreatLevel += 1;   // Standard speeds
-                    else if (maxSpeed <= 30) adjustedThreatLevel -= 1;   // Zone 30
+                    // Set uniform threat level for all road types (no road type discrimination)
+                    const uniformThreatLevel = 5; // Neutral threat level for all roads
                     
                     threats.set(way.name, { 
                         entryPoints: [], 
                         pathSegments: [], 
                         totalLength: 0,
-                        threatLevel: Math.round(adjustedThreatLevel * 10) / 10, // Round to 1 decimal
-                        roadType: roadType,
-                        maxSpeed: maxSpeed
+                        threatLevel: uniformThreatLevel, // Uniform level for all roads
+                        roadType: roadType, // Keep for informational purposes
+                        maxSpeed: maxSpeed // Keep for velocity calculations
                     });
                     validThreats++;
                 }
@@ -4554,6 +4989,19 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
             isPinned = true;
             
             const popupContent = createNoProductContent();
+            
+            // Safely get marker coordinates with validation
+            const markerLatLng = marker.getLatLng ? marker.getLatLng() : 
+                                 marker._latlng || marker.latlng || 
+                                 { lat: 0, lng: 0 };
+            
+            // Validate coordinates before creating popup
+            if (!markerLatLng || typeof markerLatLng.lat !== 'number' || typeof markerLatLng.lng !== 'number') {
+                console.error('Invalid marker coordinates for no-product popup:', markerLatLng);
+                return;
+            }
+            
+            try {
             leafletPopup = L.popup({
                 closeButton: true,
                 autoClose: false,
@@ -4561,9 +5009,25 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
                 className: 'product-popup no-product-popup',
                 offset: [10, -10]
             })
-            .setLatLng(marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng)
+                .setLatLng(markerLatLng)
             .setContent(popupContent)
             .openOn(map);
+                
+                // Override the _animateZoom method to handle errors gracefully
+                const originalAnimateZoom = leafletPopup._animateZoom;
+                leafletPopup._animateZoom = function(e: any) {
+                    try {
+                        if (this._latlng && this._latlng.lat && this._latlng.lng) {
+                            return originalAnimateZoom.call(this, e);
+                        }
+                    } catch (error) {
+                        console.warn('No-product popup zoom animation error prevented:', error);
+                    }
+                };
+            } catch (error) {
+                console.error('Error creating no-product popup:', error);
+                return;
+            }
             
             console.log(`No-product popup pinned for ${streetName} (${maxSpeed} km/h)`);
             
@@ -4713,6 +5177,19 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
             
             // Create pinned tooltip using Leaflet popup
             const popupContent = createTooltipContent();
+            
+            // Safely get marker coordinates with validation
+            const markerLatLng = marker.getLatLng ? marker.getLatLng() : 
+                                 marker._latlng || marker.latlng || 
+                                 { lat: 0, lng: 0 };
+            
+            // Validate coordinates before creating popup
+            if (!markerLatLng || typeof markerLatLng.lat !== 'number' || typeof markerLatLng.lng !== 'number') {
+                console.error('Invalid marker coordinates for popup:', markerLatLng);
+                return;
+            }
+            
+            try {
             leafletPopup = L.popup({
                 closeButton: true,
                 autoClose: false,
@@ -4720,11 +5197,27 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
                 className: 'product-popup',
                 offset: [10, -10]
             })
-            .setLatLng(marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng)
+                .setLatLng(markerLatLng)
             .setContent(popupContent)
             .openOn(map);
             
-            console.log(`Popup pinned using Leaflet API at:`, marker.getLatLng ? marker.getLatLng() : marker._latlng || marker.latlng);
+                // Override the _animateZoom method to handle errors gracefully
+                const originalAnimateZoom = leafletPopup._animateZoom;
+                leafletPopup._animateZoom = function(e: any) {
+                    try {
+                        if (this._latlng && this._latlng.lat && this._latlng.lng) {
+                            return originalAnimateZoom.call(this, e);
+                        }
+                    } catch (error) {
+                        console.warn('Popup zoom animation error prevented:', error);
+                    }
+                };
+            } catch (error) {
+                console.error('Error creating popup:', error);
+                return;
+            }
+            
+            console.log(`Popup pinned using Leaflet API at:`, markerLatLng);
             
             // Add close event handler for popup
             leafletPopup.on('remove', () => {
@@ -5027,8 +5520,20 @@ function clearProductTooltips() {
 function updatePinnedTooltipPositions() {
     console.log(`Updating ${pinnedTooltips.length} pinned tooltips`);
     
+    if (!map || !map.latLngToContainerPoint) {
+        console.warn('Map not available for tooltip position update');
+        return;
+    }
+    
     pinnedTooltips.forEach((pinnedTooltip, index) => {
+        try {
         const { element, marker, latLng } = pinnedTooltip;
+            
+            // Validate latLng before using it
+            if (!latLng || typeof latLng.lat !== 'number' || typeof latLng.lng !== 'number') {
+                console.warn(`Invalid latLng for pinned tooltip ${index}:`, latLng);
+                return;
+            }
         
         // Calculate new position based on marker's lat/lng
         const containerPoint = map.latLngToContainerPoint(latLng);
@@ -5043,6 +5548,9 @@ function updatePinnedTooltipPositions() {
         // Update tooltip position
         element.style.left = newLeft;
         element.style.top = newTop;
+        } catch (error) {
+            console.error(`Error updating pinned tooltip position ${index}:`, error);
+        }
     });
 }
 
@@ -6099,8 +6607,42 @@ async function initializeApp() {
     createReportBtn.addEventListener('click', generateRiskReport);
     downloadReportBtn.addEventListener('click', downloadRiskReport);
 
-    // Set initial state
-    document.getElementById('nav-param-input')?.click();
+// Set initial state
+document.getElementById('nav-marking-area')?.click();
+
+// FORCE compact spacing for OSM controls after DOM load
+const forceCompactSpacing = () => {
+    const osmControls = document.querySelector('.osm-controls');
+    if (osmControls) {
+        // Force re-apply compact spacing styles
+        const checkboxLabels = osmControls.querySelectorAll('.checkbox-label');
+        checkboxLabels.forEach(label => {
+            (label as HTMLElement).style.cssText += `
+                margin: 0 !important;
+                padding: 1px 0 !important;
+                line-height: 1.3 !important;
+                min-height: auto !important;
+                height: auto !important;
+            `;
+        });
+        
+        const checkboxGroups = osmControls.querySelectorAll('.checkbox-group');
+        checkboxGroups.forEach(group => {
+            (group as HTMLElement).style.cssText += `
+                margin: 2px 0 !important;
+                padding: 1px 0 !important;
+                line-height: 1.3 !important;
+            `;
+        });
+        
+        console.log('✅ Compact spacing forcefully applied to OSM controls');
+    }
+};
+
+// Apply immediately and on DOM changes
+setTimeout(forceCompactSpacing, 100);
+setTimeout(forceCompactSpacing, 500);
+setTimeout(forceCompactSpacing, 1000);
 
     // ===============================
 
