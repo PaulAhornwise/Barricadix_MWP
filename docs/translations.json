@@ -2,7 +2,7 @@
 {
   "de": {
     "header": {
-      "planning": "Planung",
+      "planning": "Planer",
       "manufacturer": "Hersteller"
     },
     "nav": {
@@ -23,7 +23,7 @@
       "loggedIn": "Angemeldet: BarricadiX Admin"
     },
     "sidebar": {
-      "trafficData": "Verkehrsdaten",
+      "trafficData": "Parameterwahl",
       "vehicleSelect": "Fahrzeugauswahl",
       "accessRoads": "Zufahrten",
       "curbs": "Bordsteinkanten",
@@ -294,9 +294,9 @@
     },
     "sidebar": {
       "osmLimits": {
-        "title": "OSM Geschwindigkeitsbegrenzungen",
-        "maxspeed": "Tempolimits aus OSM anwenden (empfohlen)",
-        "trafficCalming": "Verkehrsberuhiger bremsen Fahrzeuge",
+        "title": "Einfluss auf Geschwindigkeit:",
+        "maxspeed": "Tempolimit",
+        "trafficCalming": "Verkehrsberuhiger",
         "weather": "Wetter",
         "weatherOptions": {
           "dry": "trocken",
@@ -304,9 +304,9 @@
           "snow": "Schnee",
           "ice": "Eis"
         },
-        "surface": "Belag berücksichtigen (OSM surface)"
+        "surface": "Fahrbahnbelag"
       },
-      "trafficData": "Verkehrsdaten",
+      "trafficData": "Parameterwahl",
       "vehicleSelect": "Fahrzeugauswahl",
       "options": {
         "vehicle": {
@@ -401,7 +401,7 @@
   },
   "en": {
     "header": {
-      "planning": "Planning",
+      "planning": "Planner",
       "manufacturer": "Manufacturer"
     },
     "nav": {
@@ -423,9 +423,9 @@
     },
     "sidebar": {
       "osmLimits": {
-        "title": "OSM Speed Limits",
-        "maxspeed": "Apply OSM speed limits (recommended)",
-        "trafficCalming": "Traffic calming slows vehicles",
+        "title": "Speed Influence:",
+        "maxspeed": "Speed limit",
+        "trafficCalming": "Traffic calming",
         "weather": "Weather",
         "weatherOptions": {
           "dry": "dry",
@@ -433,9 +433,9 @@
           "snow": "snow",
           "ice": "ice"
         },
-        "surface": "Consider surface (OSM surface)"
+        "surface": "Road surface"
       },
-      "trafficData": "Traffic Data",
+      "trafficData": "Parameter Selection",
       "vehicleSelect": "Vehicle Selection",
       "accessRoads": "Access Roads",
       "curbs": "Curbs",

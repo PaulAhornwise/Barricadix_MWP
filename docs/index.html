@@ -24,8 +24,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-CARhycK6.js"></script>
-  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-DhGM8oSy.css">
+            <link rel="stylesheet" href="./index.css?v=2025-01-20-DATABASE-FIX-FINAL">
 </head>
 <body>
     <!-- =============================================== -->
@@ -36,7 +35,7 @@
             <div class="welcome-header">
                 <div class="welcome-title-row">
                     <h1 class="welcome-title">Willkommen bei</h1>
-                    <img src="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg" class="welcome-logo" alt="BarricadiX Logo" />
+                    <img src="./Logo_BarricadiX_White.svg" class="welcome-logo" alt="BarricadiX Logo" />
                 </div>
                 <p class="welcome-subtitle">Professionelle Lösung für Zufahrt- und Perimeterschutz</p>
             </div>
@@ -86,7 +85,7 @@
         <!-- =============================================== -->
         <header class="app-header">
             <div class="logo" aria-label="BarricadiX">
-                <img src="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg" class="logo-img" alt="BarricadiX Logo" />
+                <img src="./Logo_BarricadiX_White.svg" class="logo-img" alt="BarricadiX Logo" />
             </div>
             <div class="view-selector">
                 <button id="planning-view-btn" class="view-btn active" data-view="planning" data-translate-key="header.planning">Planer</button>
@@ -250,8 +249,8 @@
                 <div class="map-area">
                     <!-- Top tabs positioned over the map -->
                     <div class="map-tabs">
-                        <a href="#" id="tab-param-input" data-target="nav-param-input" class="active" data-translate-key="nav.paramInput">Parameter</a>
-                        <a href="#" id="tab-marking-area" data-target="nav-marking-area" data-translate-key="nav.markingArea">Sicherheitsbereich</a>
+                        <a href="#" id="tab-marking-area" data-target="nav-marking-area" class="active" data-translate-key="nav.markingArea">Sicherheitsbereich</a>
+                        <a href="#" id="tab-param-input" data-target="nav-param-input" data-translate-key="nav.paramInput">Parameter</a>
                         <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a>
                         <a href="#" id="tab-risk-report" data-target="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a>
                         <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a>
@@ -290,6 +289,9 @@
                     <div id="floating-threats" class="drop-panel threat-list-panel view-hidden">
                         <div class="threat-panel-header">
                             <h4 data-translate-key="threats.title" style="margin:0; flex-grow:1;">Eindringungsgefahren</h4>
+                            <button id="edit-threats-btn" class="edit-btn" data-translate-key-tooltip="threats.editMode" title="Zufahrten bearbeiten">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button id="minimize-threats-btn" class="minimize-btn" data-translate-key-tooltip="threats.minimize" title="Minimieren">
                                 <i class="fas fa-minus"></i>
                             </button>
@@ -520,5 +522,6 @@
     <div id="tooltip" class="tooltip" role="tooltip"></div>
     <!-- Application Logic -->
     
+<script type="module" src="./index.tsx"></script>
 </body>
 </html>
