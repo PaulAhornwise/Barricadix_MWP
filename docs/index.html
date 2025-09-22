@@ -122,124 +122,6 @@
         </header>
 
         <div class="content-wrapper">
-            <!-- =============================================== -->
-            <!-- LEFT SIDEBAR -->
-            <!-- =============================================== -->
-            <aside class="sidebar">
-                <section class="sidebar-section">
-                    <h3 data-translate-key="sidebar.trafficData">Parameterwahl</h3>
-                    
-                    <!-- 1. Schutzzeitraum -->
-                    <div class="form-group">
-                        <label for="protection-period-select" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum</label>
-                        <select id="protection-period-select" name="protection-period-select">
-                            <option value="dauerhaft" data-translate-key="sidebar.options.period.permanent">dauerhaft</option>
-                            <option value="temporär" data-translate-key="sidebar.options.period.temporary">temporär</option>
-                            <option value="eventuell" data-translate-key="sidebar.options.period.eventual">eventuell</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 2. Produkteigenschaften -->
-                    <div class="form-group">
-                        <label for="product-property-select" data-translate-key="sidebar.productProperty">Produkteigenschaft</label>
-                        <select id="product-property-select" name="product-property-select">
-                            <option value="aut./starr" data-translate-key="sidebar.options.property.automatic_rigid">aut./starr</option>
-                            <option value="versenkbar" data-translate-key="sidebar.options.property.retractable">versenkbar</option>
-                            <option value="entfernbar" data-translate-key="sidebar.options.property.removable">entfernbar</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 3. Fahrzeugauswahl -->
-                    <div class="form-group">
-                        <label for="vehicle-select" data-translate-key="sidebar.vehicleSelect">Fahrzeugauswahl</label>
-                        <select id="vehicle-select" name="vehicle-select">
-                            <option value="alle" data-translate-key="sidebar.options.vehicle.all">alle</option>
-                            <option value="500" data-translate-key="sidebar.options.vehicle.motorcycle">Motorrad</option>
-                            <option value="3500" data-translate-key="sidebar.options.vehicle.car_light">KFZ &lt;3.5t</option>
-                            <option value="7500" data-translate-key="sidebar.options.vehicle.truck_light">LKW &lt;7.5t</option>
-                            <option value="12000" data-translate-key="sidebar.options.vehicle.truck_medium">LKW &lt;12t</option>
-                            <option value="40000" data-translate-key="sidebar.options.vehicle.truck_heavy">LKW &lt;40t</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 4. OSM Geschwindigkeitsbegrenzungen -->
-                    <div class="form-group osm-controls" data-compact="true">
-                        <h4 data-translate-key="sidebar.osmLimits.title">Geschwindigkeitsbegrenzungen</h4>
-                        
-                        <div class="checkbox-group">
-                            <label class="checkbox-label" data-compact="true">
-                                <input type="checkbox" id="osm-maxspeed" checked>
-                                <span data-translate-key="sidebar.osmLimits.maxspeed">Tempolimits</span>
-                            </label>
-                        </div>
-                        
-                        <div class="checkbox-group">
-                            <label class="checkbox-label" data-compact="true">
-                                <input type="checkbox" id="osm-traffic-calming" checked>
-                                <span data-translate-key="sidebar.osmLimits.trafficCalming">Verkehrsberuhiger</span>
-                            </label>
-                        </div>
-                        
-                        <div class="checkbox-group">
-                            <label class="checkbox-label" data-compact="true">
-                                <input type="checkbox" id="osm-surface">
-                                <span data-translate-key="sidebar.osmLimits.surface">Straßenbelag</span>
-                            </label>
-                        </div>
-                        
-                        <div id="osm-status" class="osm-status" style="display: none;">
-                            <span class="status-indicator"></span>
-                            <span class="status-text"></span>
-                        </div>
-                    </div>
-                    
-                    <!-- 5. Witterung -->
-                    <div class="form-group">
-                        <label for="weather-select" data-translate-key="sidebar.osmLimits.weather">Witterung</label>
-                        <select id="weather-select" name="weather-select">
-                            <option value="dry" data-translate-key="sidebar.osmLimits.weatherOptions.dry">trocken</option>
-                            <option value="wet" data-translate-key="sidebar.osmLimits.weatherOptions.wet">nass</option>
-                            <option value="snow" data-translate-key="sidebar.osmLimits.weatherOptions.snow">Schnee</option>
-                            <option value="ice" data-translate-key="sidebar.osmLimits.weatherOptions.ice">Eis</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 6. Schutzprodukte -->
-                    <div class="form-group">
-                        <label for="protection-product-select" data-translate-key="sidebar.protectionProducts">Schutzprodukte</label>
-                        <select id="protection-product-select" name="protection-product-select">
-                            <option value="Poller" data-translate-key="sidebar.options.products.bollard">Poller</option>
-                            <option value="Barriere" data-translate-key="sidebar.options.products.barrier">Barriere</option>
-                            <option value="Pfosten" data-translate-key="sidebar.options.products.post">Pfosten</option>
-                            <option value="Graben" data-translate-key="sidebar.options.products.ditch">Graben</option>
-                        </select>
-                    </div>
-                </section>
-
-                <section class="sidebar-section">
-                    <div class="form-group slider-group">
-                        <label for="security-risk-slider" data-translate-key="sidebar.securityRisk">Sicherheitsrisiko
-                            <i class="fas fa-info-circle info-icon" data-translate-key-tooltip="tooltips.securityRisk"></i>
-                        </label>
-                        <div class="slider-wrapper">
-                            <span data-translate-key="sidebar.low">niedrig</span>
-                            <input type="range" id="security-risk-slider" min="0" max="100" value="75">
-                            <span data-translate-key="sidebar.high">hoch</span>
-                        </div>
-                    </div>
-                    <div class="form-group slider-group">
-                        <label for="product-class-slider" data-translate-key="sidebar.recommendedProductClass">Empfohlene Produktklasse
-                            <i class="fas fa-info-circle info-icon" data-translate-key-tooltip="tooltips.productClass"></i>
-                        </label>
-                        <div class="slider-wrapper">
-                            <span data-translate-key="sidebar.low">niedrig</span>
-                            <input type="range" id="product-class-slider" min="0" max="100" value="60">
-                            <span data-translate-key="sidebar.high">hoch</span>
-                        </div>
-                    </div>
-                </section>
-
-            </aside>
 
             <!-- =============================================== -->
             <!-- MAIN CONTENT -->
@@ -261,7 +143,7 @@
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
                             <input type="text" id="map-search-input" placeholder="Paderborn, Domplatz" data-translate-key="map.searchPlaceholder">
-                            <button id="map-search-button" data-translate-key="map.searchButton">Suchen</button>
+                            <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
                             <button id="toggle-draw-mode" class="map-action-btn hidden" >
@@ -285,6 +167,139 @@
                     <div id="map" class="relative"></div>
                     <!-- React Chatbot overlay root -->
                     <div id="chatbot-react-root" class="map-overlay"></div>
+                    
+                    
+                    <!-- Vertical Collapsed Strip -->
+                    <div id="parameter-strip" style="position: fixed !important; top: 130px !important; left: 8px !important; width: 40px !important; height: 200px !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 0 16px 16px 0 !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; display: block !important; cursor: pointer !important; transition: all 0.3s ease !important;">
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px;">
+                            <i class="fas fa-sliders-h" style="font-size: 16px; transform: rotate(90deg);"></i>
+                            <span style="font-size: 12px; font-weight: 600; letter-spacing: 1px; writing-mode: vertical-rl; text-orientation: mixed;">PARAMETER</span>
+                            <i class="fas fa-chevron-right" style="font-size: 12px;"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Floating Parameter Selection Bubble -->
+                    <div id="parameter-bubble" style="position: fixed !important; top: 130px !important; left: 8px !important; width: 320px !important; max-width: calc(100vw - 32px) !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 16px !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; max-height: calc(100vh - 140px) !important; overflow-y: auto !important; display: block !important; visibility: visible !important; opacity: 0 !important; transform: translateX(-100%) !important; transition: all 0.3s ease !important;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: linear-gradient(135deg, rgba(30, 144, 255, 0.2), rgba(30, 144, 255, 0.1)); border-bottom: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px 16px 0 0; cursor: move;">
+                            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.5px;" data-translate-key="sidebar.trafficData">Parameterwahl</h3>
+                            <button id="toggle-parameter-bubble" style="background: none; border: none; color: white; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                        </div>
+                        <div id="parameter-bubble-content" style="padding: 12px;">
+                            <!-- 1. Schutzzeitraum -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="protection-period-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum:</label>
+                                <select id="protection-period-select" name="protection-period-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                    <option value="dauerhaft" data-translate-key="sidebar.options.period.permanent">dauerhaft</option>
+                                    <option value="temporär" data-translate-key="sidebar.options.period.temporary">temporär</option>
+                                    <option value="eventuell" data-translate-key="sidebar.options.period.eventual">eventuell</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 2. Produkteigenschaften -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="product-property-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.productProperty">Produkteigenschaft:</label>
+                                <select id="product-property-select" name="product-property-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                    <option value="aut./starr" data-translate-key="sidebar.options.property.automatic_rigid">aut./starr</option>
+                                    <option value="versenkbar" data-translate-key="sidebar.options.property.retractable">versenkbar</option>
+                                    <option value="entfernbar" data-translate-key="sidebar.options.property.removable">entfernbar</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 3. Fahrzeugauswahl -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="vehicle-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.vehicleSelect">Fahrzeugauswahl:</label>
+                                <select id="vehicle-select" name="vehicle-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px !important; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 4px; background-color: rgba(10, 45, 74, 0.8) !important; color: white !important; font-size: 13px; outline: none; height: 32px !important; min-height: 32px !important; max-height: 32px !important; line-height: normal !important; -webkit-appearance: none !important; -moz-appearance: none !important; appearance: none !important;">
+                                    <option value="alle" data-translate-key="sidebar.options.vehicle.all">alle</option>
+                                    <option value="500" data-translate-key="sidebar.options.vehicle.motorcycle">Motorrad</option>
+                                    <option value="3500" data-translate-key="sidebar.options.vehicle.car_light">KFZ &lt;3.5t</option>
+                                    <option value="7500" data-translate-key="sidebar.options.vehicle.truck_light">LKW &lt;7.5t</option>
+                                    <option value="12000" data-translate-key="sidebar.options.vehicle.truck_medium">LKW &lt;12t</option>
+                                    <option value="40000" data-translate-key="sidebar.options.vehicle.truck_heavy">LKW &lt;40t</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 4. OSM Geschwindigkeitsbegrenzungen -->
+                            <div style="margin-bottom: 4px; background-color: rgba(10, 45, 74, 0.6); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 8px; width: calc(100% - 2px); box-sizing: border-box;">
+                                <h4 style="font-size: 13px; margin-bottom: 4px; color: white; font-weight: 600;" data-translate-key="sidebar.osmLimits.title">Einfluss auf Geschwindigkeit:</h4>
+                                
+                                <div style="margin: 1px 0; padding: 0;">
+                                    <label style="display: flex; align-items: center; font-size: 12px; padding: 1px 0; color: white;">
+                                        <input type="checkbox" id="osm-maxspeed" checked style="margin-right: 8px; transform: scale(1.1);">
+                                        <span data-translate-key="sidebar.osmLimits.maxspeed">Tempolimits</span>
+                                    </label>
+                                </div>
+                                
+                                <div style="margin: 1px 0; padding: 0;">
+                                    <label style="display: flex; align-items: center; font-size: 12px; padding: 1px 0; color: white;">
+                                        <input type="checkbox" id="osm-traffic-calming" checked style="margin-right: 8px; transform: scale(1.1);">
+                                        <span data-translate-key="sidebar.osmLimits.trafficCalming">Verkehrsberuhiger</span>
+                                    </label>
+                                </div>
+                                
+                                <div style="margin: 1px 0; padding: 0;">
+                                    <label style="display: flex; align-items: center; font-size: 12px; padding: 1px 0; color: white;">
+                                        <input type="checkbox" id="osm-surface" style="margin-right: 8px; transform: scale(1.1);">
+                                        <span data-translate-key="sidebar.osmLimits.surface">Straßenbelag</span>
+                                    </label>
+                                </div>
+                                
+                                <div id="osm-status" style="display: none;">
+                                    <span class="status-indicator"></span>
+                                    <span class="status-text"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- 5. Witterung -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="weather-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.osmLimits.weather">Witterung:</label>
+                                <select id="weather-select" name="weather-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                    <option value="dry" data-translate-key="sidebar.osmLimits.weatherOptions.dry">trocken</option>
+                                    <option value="wet" data-translate-key="sidebar.osmLimits.weatherOptions.wet">nass</option>
+                                    <option value="snow" data-translate-key="sidebar.osmLimits.weatherOptions.snow">Schnee</option>
+                                    <option value="ice" data-translate-key="sidebar.osmLimits.weatherOptions.ice">Eis</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 6. Schutzprodukte -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="protection-product-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.protectionProducts">Schutzprodukte:</label>
+                                <select id="protection-product-select" name="protection-product-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                    <option value="Poller" data-translate-key="sidebar.options.products.bollard">Poller</option>
+                                    <option value="Barriere" data-translate-key="sidebar.options.products.barrier">Barriere</option>
+                                    <option value="Pfosten" data-translate-key="sidebar.options.products.post">Pfosten</option>
+                                    <option value="Graben" data-translate-key="sidebar.options.products.ditch">Graben</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 7. Sicherheitsrisiko Slider -->
+                            <div style="margin-bottom: 4px;">
+                                <label for="security-risk-slider" style="display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: white;" data-translate-key="sidebar.securityRisk">
+                                    Sicherheitsrisiko
+                                    <i class="fas fa-info-circle" style="color: rgba(255, 255, 255, 0.6); cursor: help;" data-translate-key-tooltip="tooltips.securityRisk"></i>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: rgba(255, 255, 255, 0.7);">
+                                    <span data-translate-key="sidebar.low">niedrig</span>
+                                    <input type="range" id="security-risk-slider" min="0" max="100" value="75" style="flex-grow: 1; height: 8px; background: linear-gradient(90deg, #2ecc71 0%, #f1c40f 50%, #e74c3c 100%); border-radius: 999px; outline: none;">
+                                    <span data-translate-key="sidebar.high">hoch</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 8. Produktklasse Slider -->
+                            <div style="margin-bottom: 4px;">
+                                <label for="product-class-slider" style="display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: white;" data-translate-key="sidebar.recommendedProductClass">
+                                    Empfohlene Produktklasse
+                                    <i class="fas fa-info-circle" style="color: rgba(255, 255, 255, 0.6); cursor: help;" data-translate-key-tooltip="tooltips.productClass"></i>
+                                </label>
+                                <div style="display: flex; align-items: center; gap: 12px; font-size: 11px; color: rgba(255, 255, 255, 0.7);">
+                                    <span data-translate-key="sidebar.low">niedrig</span>
+                                    <input type="range" id="product-class-slider" min="0" max="100" value="60" style="flex-grow: 1; height: 8px; background: linear-gradient(90deg, #2ecc71 0%, #f1c40f 50%, #e74c3c 100%); border-radius: 999px; outline: none;">
+                                    <span data-translate-key="sidebar.high">hoch</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- Floating threat list panel (appears after analysis) -->
                     <div id="floating-threats" class="drop-panel threat-list-panel view-hidden">

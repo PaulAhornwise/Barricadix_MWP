@@ -637,6 +637,7 @@ const embeddedTranslations = {
             "setWaypointsActive": "Zeichnen aktiv",
             "reset": "Zurücksetzen",
             "securityAreaLabel": "Sicherheitsbereich",
+            "securityArea": "Sicherheitsbereich",
             "analyzeAccess": "Zugang analysieren"
         },
         "placeholders": {
@@ -651,7 +652,8 @@ const embeddedTranslations = {
             "polygonCoordinateError": "Fehler beim Verarbeiten der Polygon-Koordinaten.",
             "locationNotFound": "Standort nicht gefunden. Bitte überprüfen Sie die Eingabe.",
             "noThreatsFound": "Keine Bedrohungen in diesem Bereich gefunden.",
-            "reportGenerationError": "Fehler beim Erstellen des Berichts. Bitte versuchen Sie es erneut."
+            "reportGenerationError": "Fehler beim Erstellen des Berichts. Bitte versuchen Sie es erneut.",
+            "reportCreationError": "Fehler bei der Berichtserstellung. Bitte versuchen Sie es erneut."
         },
 
 
@@ -1034,6 +1036,7 @@ const embeddedTranslations = {
             "setWaypointsActive": "Drawing Active",
             "reset": "Reset",
             "securityAreaLabel": "Security Area",
+            "securityArea": "Security Area",
             "analyzeAccess": "Analyze Access"
         },
         "placeholders": {
@@ -5002,6 +5005,10 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
             }
             
             try {
+                // Store current map view before opening popup
+                const currentCenter = map.getCenter();
+                const currentZoom = map.getZoom();
+                
             leafletPopup = L.popup({
                 closeButton: true,
                 autoClose: false,
@@ -5010,8 +5017,17 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
                 offset: [10, -10]
             })
                 .setLatLng(markerLatLng)
-            .setContent(popupContent)
-            .openOn(map);
+                .setContent(popupContent);
+                
+                // Add popup to map without auto-centering
+                leafletPopup.addTo(map);
+                
+                // Restore original map view to prevent jumping
+                setTimeout(() => {
+                    if (map && currentCenter && typeof currentZoom === 'number') {
+                        map.setView(currentCenter, currentZoom, { animate: false });
+                    }
+                }, 10);
                 
                 // Override the _animateZoom method to handle errors gracefully
                 const originalAnimateZoom = leafletPopup._animateZoom;
@@ -5190,6 +5206,10 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
             }
             
             try {
+                // Store current map view before opening popup
+                const currentCenter = map.getCenter();
+                const currentZoom = map.getZoom();
+                
             leafletPopup = L.popup({
                 closeButton: true,
                 autoClose: false,
@@ -5198,8 +5218,17 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
                 offset: [10, -10]
             })
                 .setLatLng(markerLatLng)
-            .setContent(popupContent)
-            .openOn(map);
+                .setContent(popupContent);
+                
+                // Add popup to map without auto-centering
+                leafletPopup.addTo(map);
+                
+                // Restore original map view to prevent jumping
+                setTimeout(() => {
+                    if (map && currentCenter && typeof currentZoom === 'number') {
+                        map.setView(currentCenter, currentZoom, { animate: false });
+                    }
+                }, 10);
             
                 // Override the _animateZoom method to handle errors gracefully
                 const originalAnimateZoom = leafletPopup._animateZoom;
@@ -5326,7 +5355,9 @@ function recommendProductTypes(context: {
  */
 function generateLocationContext(): string {
     // Try to get context from current map view or user inputs
-    const assetToProtect = (document.getElementById('asset-to-protect') as HTMLInputElement)?.value || '';
+    // Get asset to protect from chatbot planning state
+    const planningState = (window as any).planningState || {};
+    const assetToProtect = planningState.schutzgüter || planningState.schutzgueter || '';
     
     // Analyze threats to understand location type
     const threats = Array.from(threatsMap.entries());
@@ -5721,8 +5752,9 @@ async function generateRiskReport() {
 
         const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : t('report.undefinedLocation');
         
-        const assetInput = document.getElementById('asset-to-protect') as HTMLInputElement;
-        const assetToProtect = assetInput.value.trim() || t('report.undefinedAsset');
+        // Get asset to protect from chatbot planning state or fallback
+        const planningState = (window as any).planningState || {};
+        const assetToProtect = planningState.schutzgüter || planningState.schutzgueter || t('report.undefinedAsset');
         
         // Generate threat list in table format
         let threatList = t('report.noThreatAnalysis');
@@ -6084,6 +6116,296 @@ function setupOsmEventListeners(): void {
 }
 
 /**
+ * Setup parameter bubble toggle functionality
+ */
+function setupParameterBubbleToggle(): void {
+    console.log('🔧 Setting up parameter bubble toggle...');
+    
+    const toggleBtn = document.getElementById('toggle-parameter-bubble') as HTMLButtonElement;
+    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+    
+    console.log('🔧 Toggle button found:', !!toggleBtn);
+    console.log('🔧 Parameter bubble found:', !!parameterBubble);
+    console.log('🔧 Parameter strip found:', !!parameterStrip);
+    
+    if (!toggleBtn || !parameterBubble || !parameterStrip) {
+        console.warn('Parameter bubble, strip, or toggle button not found');
+        console.log('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+        return;
+    }
+    
+    // Function to collapse the bubble
+    const collapseBubble = () => {
+        console.log('🔧 Collapsing bubble - setting transform to translateX(-100%)');
+        parameterBubble.style.transform = 'translateX(-100%)';
+        parameterBubble.style.opacity = '0';
+        parameterStrip.style.display = 'block';
+        console.log('🔧 Bubble collapsed - strip now visible');
+    };
+    
+    // Function to expand the bubble
+    const expandBubble = () => {
+        console.log('🔧 Expanding bubble - setting transform to translateX(0)');
+        parameterBubble.style.transform = 'translateX(0)';
+        parameterBubble.style.opacity = '1';
+        parameterStrip.style.display = 'none';
+        console.log('🔧 Bubble expanded - strip now hidden');
+    };
+    
+    // Remove any existing event listeners to prevent conflicts
+    const newToggleBtn = toggleBtn.cloneNode(true) as HTMLButtonElement;
+    toggleBtn.parentNode?.replaceChild(newToggleBtn, toggleBtn);
+    
+    // Toggle button click handler
+    newToggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('🔧 Toggle button clicked!');
+        const isCollapsed = parameterBubble.style.transform === 'translateX(-100%)';
+        const icon = newToggleBtn.querySelector('i');
+        
+        console.log('🔧 Current state - isCollapsed:', isCollapsed);
+        
+        if (isCollapsed) {
+            console.log('🔧 Expanding bubble');
+            expandBubble();
+            if (icon) icon.className = 'fas fa-chevron-left';
+        } else {
+            console.log('🔧 Collapsing bubble');
+            collapseBubble();
+            if (icon) icon.className = 'fas fa-chevron-right';
+        }
+    });
+    
+    // Strip click handler to expand
+    parameterStrip.addEventListener('click', () => {
+        console.log('🔧 Strip clicked - expanding bubble');
+        expandBubble();
+        const icon = newToggleBtn.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-left';
+    });
+    
+    // Header "Parameter" button click handler to expand (both nav and tab versions)
+    const headerParameterBtn = document.getElementById('nav-param-input');
+    const tabParameterBtn = document.getElementById('tab-param-input');
+    
+    const expandBubbleHandler = (e: Event) => {
+        e.preventDefault();
+        console.log('🔧 Parameter button clicked - expanding bubble');
+        expandBubble();
+        const icon = newToggleBtn.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-left';
+    };
+    
+    if (headerParameterBtn) {
+        headerParameterBtn.addEventListener('click', expandBubbleHandler);
+        console.log('🔧 Header Parameter button event listener added');
+    } else {
+        console.warn('🔧 Header Parameter button not found');
+    }
+    
+    if (tabParameterBtn) {
+        tabParameterBtn.addEventListener('click', expandBubbleHandler);
+        console.log('🔧 Tab Parameter button event listener added');
+    } else {
+        console.warn('🔧 Tab Parameter button not found');
+    }
+    
+    // Set initial state as collapsed
+    console.log('🔧 Setting initial state as collapsed');
+    collapseBubble();
+    
+    // Make the bubble draggable (optional enhancement)
+    makeParameterBubbleDraggable(parameterBubble);
+}
+
+/**
+ * Setup parameter bubble expansion handlers after navigation system is ready
+ */
+function setupParameterBubbleExpansionHandlers(): void {
+    console.log('🔧 Setting up parameter bubble expansion handlers...');
+    
+    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+    
+    if (!parameterBubble || !parameterStrip) {
+        console.warn('🔧 Parameter elements not found for expansion handlers');
+        return;
+    }
+    
+    // Function to expand the bubble
+    const expandBubble = () => {
+        console.log('🔧 Expanding bubble via header button');
+        parameterBubble.style.transform = 'translateX(0)';
+        parameterBubble.style.opacity = '1';
+        parameterStrip.style.display = 'none';
+        
+        // Update toggle button icon
+        const toggleBtn = document.getElementById('toggle-parameter-bubble');
+        const icon = toggleBtn?.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-left';
+    };
+    
+    // Add event listeners to both Parameter buttons with high priority
+    const headerParameterBtn = document.getElementById('nav-param-input');
+    const tabParameterBtn = document.getElementById('tab-param-input');
+    
+    if (headerParameterBtn) {
+        // Use capture phase to ensure our handler runs first
+        headerParameterBtn.addEventListener('click', (e) => {
+            console.log('🔧 Header Parameter button clicked - expanding bubble');
+            expandBubble();
+        }, true); // Capture phase
+        
+        // Also add normal phase listener as backup
+        headerParameterBtn.addEventListener('click', (e) => {
+            console.log('🔧 Header Parameter button clicked (backup) - expanding bubble');
+            expandBubble();
+        });
+        
+        console.log('🔧 Header Parameter button handlers added');
+    }
+    
+    if (tabParameterBtn) {
+        // Use capture phase to ensure our handler runs first
+        tabParameterBtn.addEventListener('click', (e) => {
+            console.log('🔧 Tab Parameter button clicked - expanding bubble');
+            expandBubble();
+        }, true); // Capture phase
+        
+        // Also add normal phase listener as backup
+        tabParameterBtn.addEventListener('click', (e) => {
+            console.log('🔧 Tab Parameter button clicked (backup) - expanding bubble');
+            expandBubble();
+        });
+        
+        console.log('🔧 Tab Parameter button handlers added');
+    }
+}
+
+/**
+ * Override navigation handlers to add parameter bubble expansion
+ */
+function overrideParameterNavigationHandlers(): void {
+    console.log('🔧 Overriding navigation handlers for parameter expansion...');
+    
+    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+    
+    if (!parameterBubble || !parameterStrip) {
+        console.warn('🔧 Parameter elements not found for navigation override');
+        return;
+    }
+    
+    // Function to expand the bubble
+    const forceExpandBubble = () => {
+        console.log('🔧 FORCE expanding bubble via navigation override');
+        parameterBubble.style.transform = 'translateX(0) !important';
+        parameterBubble.style.opacity = '1';
+        parameterStrip.style.display = 'none';
+        
+        // Update toggle button icon
+        const toggleBtn = document.getElementById('toggle-parameter-bubble');
+        const icon = toggleBtn?.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-left';
+        
+        console.log('🔧 Bubble expansion completed');
+    };
+    
+    // Replace both Parameter buttons completely
+    const headerParameterBtn = document.getElementById('nav-param-input');
+    const tabParameterBtn = document.getElementById('tab-param-input');
+    
+    if (headerParameterBtn) {
+        const newHeaderBtn = headerParameterBtn.cloneNode(true) as HTMLElement;
+        headerParameterBtn.parentNode?.replaceChild(newHeaderBtn, headerParameterBtn);
+        
+        newHeaderBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔧 NEW Header Parameter button clicked - force expanding');
+            forceExpandBubble();
+        });
+        
+        console.log('🔧 Header Parameter button completely replaced');
+    }
+    
+    if (tabParameterBtn) {
+        const newTabBtn = tabParameterBtn.cloneNode(true) as HTMLElement;
+        tabParameterBtn.parentNode?.replaceChild(newTabBtn, tabParameterBtn);
+        
+        newTabBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔧 NEW Tab Parameter button clicked - force expanding');
+            forceExpandBubble();
+        });
+        
+        console.log('🔧 Tab Parameter button completely replaced');
+    }
+}
+
+/**
+ * Make the parameter bubble draggable
+ */
+function makeParameterBubbleDraggable(bubble: HTMLElement): void {
+    const header = bubble.querySelector('div[style*="cursor: move"]') as HTMLElement;
+    if (!header) return;
+    
+    let isDragging = false;
+    let currentX: number;
+    let currentY: number;
+    let initialX: number;
+    let initialY: number;
+    let xOffset = 0;
+    let yOffset = 0;
+    
+    header.addEventListener('mousedown', dragStart);
+    document.addEventListener('mousemove', dragMove);
+    document.addEventListener('mouseup', dragEnd);
+    
+    function dragStart(e: MouseEvent) {
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+        
+        if (e.target === header || header.contains(e.target as Node)) {
+            isDragging = true;
+            header.style.cursor = 'grabbing';
+        }
+    }
+    
+    function dragMove(e: MouseEvent) {
+        if (isDragging) {
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+            
+            xOffset = currentX;
+            yOffset = currentY;
+            
+            // Constrain to viewport
+            const rect = bubble.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+            
+            xOffset = Math.max(0, Math.min(maxX, xOffset));
+            yOffset = Math.max(0, Math.min(maxY, yOffset));
+            
+            bubble.style.transform = `translate(${xOffset}px, ${yOffset}px)`;
+        }
+    }
+    
+    function dragEnd() {
+        initialX = currentX;
+        initialY = currentY;
+        isDragging = false;
+        header.style.cursor = 'move';
+    }
+}
+
+/**
  * Update OSM speed limiter configuration
  */
 function updateOsmConfig(): void {
@@ -6281,6 +6603,16 @@ function calculateVelocityWithOsm(acceleration: number, distance: number, pathCo
 async function initializeApp() {
     console.log('🚀 INITIALIZE APP CALLED!');
     
+    // DEBUG: List all elements with IDs immediately
+    console.log('🔍 DEBUG: All elements with IDs at app start:', 
+        Array.from(document.querySelectorAll('[id]')).map(el => ({
+            id: el.id,
+            tagName: el.tagName,
+            className: el.className,
+            visible: window.getComputedStyle(el).display !== 'none'
+        }))
+    );
+    
     // Step 1: Initialize basic UI components
     console.log('🔥 About to call initViewSwitcher from initializeApp...');
     initViewSwitcher();
@@ -6359,6 +6691,53 @@ async function initializeApp() {
     const searchButton = document.getElementById('map-search-button') as HTMLButtonElement;
     const toggleSidebarBtn = document.getElementById('toggle-sidebar') as HTMLButtonElement | null;
     const sidebarEl = document.querySelector('.sidebar') as HTMLElement | null;
+    
+    // Setup parameter bubble toggle functionality
+    console.log('🔧 About to call setupParameterBubbleToggle...');
+    setTimeout(() => {
+        setupParameterBubbleToggle();
+    }, 500);
+    
+    // Additional setup after navigation system is initialized
+    setTimeout(() => {
+        console.log('🔧 Setting up parameter bubble expansion handlers after navigation init...');
+        setupParameterBubbleExpansionHandlers();
+    }, 1000);
+    
+    // Even later setup to override navigation system
+    setTimeout(() => {
+        console.log('🔧 Final setup - overriding navigation system for parameter expansion...');
+        overrideParameterNavigationHandlers();
+    }, 2000);
+    
+    // Ultimate fallback: Monitor for Parameter button clicks globally
+    document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const isParameterButton = target.id === 'nav-param-input' || 
+                                 target.id === 'tab-param-input' ||
+                                 target.closest('#nav-param-input') ||
+                                 target.closest('#tab-param-input');
+        
+        if (isParameterButton) {
+            console.log('🔧 GLOBAL: Parameter button detected - expanding bubble');
+            setTimeout(() => {
+                const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+                const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+                
+                if (parameterBubble && parameterStrip) {
+                    parameterBubble.style.transform = 'translateX(0)';
+                    parameterBubble.style.opacity = '1';
+                    parameterStrip.style.display = 'none';
+                    
+                    const toggleBtn = document.getElementById('toggle-parameter-bubble');
+                    const icon = toggleBtn?.querySelector('i');
+                    if (icon) icon.className = 'fas fa-chevron-left';
+                    
+                    console.log('🔧 GLOBAL: Bubble expanded successfully');
+                }
+            }, 100);
+        }
+    }, true); // Use capture phase
     
     const handleSearch = async () => {
         const query = searchInput.value.trim();
@@ -6610,6 +6989,204 @@ async function initializeApp() {
 // Set initial state
 document.getElementById('nav-marking-area')?.click();
 
+// ===============================================
+// POLYGON PERSISTENCE FOR TAB SWITCHING
+// ===============================================
+
+/**
+ * Saves the current security area polygon state
+ */
+function saveSecurityAreaState() {
+    if (drawnPolygon && map) {
+        const polygonData = drawnPolygon.getLatLngs()[0];
+        const bounds = drawnPolygon.getBounds();
+        
+        (window as any).savedSecurityArea = {
+            polygonData: polygonData,
+            bounds: bounds,
+            center: bounds.getCenter(),
+            hasPolygon: true
+        };
+        
+        console.log('🔒 Security area state saved:', (window as any).savedSecurityArea);
+    } else {
+        (window as any).savedSecurityArea = {
+            hasPolygon: false
+        };
+        console.log('🔒 No security area to save');
+    }
+}
+
+/**
+ * Restores the security area polygon state
+ */
+function restoreSecurityAreaState() {
+    const savedState = (window as any).savedSecurityArea;
+    
+    if (savedState && savedState.hasPolygon && savedState.polygonData && map) {
+        console.log('🔓 Restoring security area state:', savedState);
+        
+        // Remove existing polygon if any
+        if (drawnPolygon) {
+            map.removeLayer(drawnPolygon);
+        }
+        if (polygonLabel) {
+            map.removeLayer(polygonLabel);
+        }
+        
+        // Recreate the polygon
+        drawnPolygon = L.polygon(savedState.polygonData, {
+            color: '#2563eb',
+            weight: 3,
+            fillOpacity: 0.1
+        }).addTo(map);
+        
+        // Recreate the label
+        polygonLabel = L.marker(savedState.center, {
+            icon: L.divIcon({
+                className: 'polygon-label',
+                html: `<div class="polygon-label-content">${t('map.securityArea')}</div>`,
+                iconSize: [100, 20],
+                iconAnchor: [50, 10]
+            })
+        }).addTo(map);
+        
+        console.log('🔓 Security area polygon restored successfully');
+    } else {
+        console.log('🔓 No saved security area state to restore');
+    }
+}
+
+/**
+ * Auto-save polygon when it's created or modified
+ */
+function autoSavePolygonOnChange() {
+    // Monitor for polygon creation/changes
+    const originalAddTo = L.Polygon.prototype.addTo;
+    L.Polygon.prototype.addTo = function(map: any) {
+        const result = originalAddTo.call(this, map);
+        
+        // If this is the main drawnPolygon, auto-save it
+        if (this === drawnPolygon) {
+            console.log('🔄 Auto-saving polygon on creation/change');
+            setTimeout(() => {
+                saveSecurityAreaState();
+            }, 100);
+        }
+        
+        return result;
+    };
+    
+    console.log('🔄 Auto-save polygon monitoring enabled');
+}
+
+/**
+ * Initialize navigation with polygon persistence using direct event override
+ */
+function initNavigationWithPersistence() {
+    console.log('🔄 Initializing navigation with polygon persistence...');
+    
+    // DIRECT APPROACH: Override click handlers completely
+    const navMarkingArea = document.getElementById('nav-marking-area');
+    const navParamInput = document.getElementById('nav-param-input');
+    
+    if (navMarkingArea) {
+        // Remove ALL existing event listeners by cloning the node
+        const newNavMarkingArea = navMarkingArea.cloneNode(true);
+        navMarkingArea.parentNode?.replaceChild(newNavMarkingArea, navMarkingArea);
+        
+        newNavMarkingArea.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('📥 DIRECT: Clicking security area tab - restoring state');
+            
+            // Update active states
+            document.querySelectorAll('.main-nav a').forEach(link => {
+                link.classList.remove('active');
+                link.removeAttribute('aria-current');
+            });
+            
+            (newNavMarkingArea as HTMLElement).classList.add('active');
+            (newNavMarkingArea as HTMLElement).setAttribute('aria-current', 'page');
+            
+            // Update map tabs
+            document.querySelectorAll('.map-tabs a').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById('tab-marking-area')?.classList.add('active');
+            
+            // Restore polygon state
+            setTimeout(() => {
+                restoreSecurityAreaState();
+            }, 100);
+            
+            console.log('🔄 DIRECT: Navigation switched to nav-marking-area');
+        });
+        
+        console.log('✅ nav-marking-area handler installed');
+    }
+    
+    if (navParamInput) {
+        // Remove ALL existing event listeners by cloning the node
+        const newNavParamInput = navParamInput.cloneNode(true);
+        navParamInput.parentNode?.replaceChild(newNavParamInput, navParamInput);
+        
+        newNavParamInput.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('📤 DIRECT: Leaving security area - saving state');
+            
+            // Save polygon state BEFORE switching
+            saveSecurityAreaState();
+            
+            // Update active states
+            document.querySelectorAll('.main-nav a').forEach(link => {
+                link.classList.remove('active');
+                link.removeAttribute('aria-current');
+            });
+            
+            (newNavParamInput as HTMLElement).classList.add('active');
+            (newNavParamInput as HTMLElement).setAttribute('aria-current', 'page');
+            
+            // Update map tabs
+            document.querySelectorAll('.map-tabs a').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById('tab-param-input')?.classList.add('active');
+            
+            console.log('🔄 DIRECT: Navigation switched to nav-param-input');
+        });
+        
+        console.log('✅ nav-param-input handler installed');
+    }
+    
+    // Handle map tabs (trigger nav links)
+    const tabMarkingArea = document.getElementById('tab-marking-area');
+    const tabParamInput = document.getElementById('tab-param-input');
+    
+    if (tabMarkingArea) {
+        const newTabMarkingArea = tabMarkingArea.cloneNode(true);
+        tabMarkingArea.parentNode?.replaceChild(newTabMarkingArea, tabMarkingArea);
+        
+        newTabMarkingArea.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('🗺️ DIRECT: Map tab clicked - triggering nav-marking-area');
+            document.getElementById('nav-marking-area')?.click();
+        });
+    }
+    
+    if (tabParamInput) {
+        const newTabParamInput = tabParamInput.cloneNode(true);
+        tabParamInput.parentNode?.replaceChild(newTabParamInput, tabParamInput);
+        
+        newTabParamInput.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('🗺️ DIRECT: Map tab clicked - triggering nav-param-input');
+            document.getElementById('nav-param-input')?.click();
+        });
+    }
+    
+    console.log('🔄 Direct navigation with polygon persistence initialized');
+}
+
 // FORCE compact spacing for OSM controls after DOM load
 const forceCompactSpacing = () => {
     const osmControls = document.querySelector('.osm-controls');
@@ -6643,6 +7220,14 @@ const forceCompactSpacing = () => {
 setTimeout(forceCompactSpacing, 100);
 setTimeout(forceCompactSpacing, 500);
 setTimeout(forceCompactSpacing, 1000);
+
+// Initialize auto-save for polygons
+autoSavePolygonOnChange();
+
+// Initialize navigation with polygon persistence (delay to ensure DOM is ready)
+setTimeout(() => {
+    initNavigationWithPersistence();
+}, 1000); // Longer delay to ensure all existing handlers are attached first
 
     // ===============================
 
