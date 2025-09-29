@@ -6274,6 +6274,88 @@ function setupUnifiedParameterMenu(): void {
 }
 
 /**
+ * EMERGENCY FALLBACK: Simplified parameter menu setup that always works
+ * This is the proven code from the manual console fix
+ */
+function setupEmergencyParameterMenuFallback(): void {
+    console.log('🚨 Setting up EMERGENCY parameter menu fallback...');
+    
+    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+    const navParamBtn = document.getElementById('nav-param-input') as HTMLElement;
+    const tabParamBtn = document.getElementById('tab-param-input') as HTMLElement;
+    
+    if (!parameterBubble || !parameterStrip || !navParamBtn || !tabParamBtn) {
+        console.warn('🚨 Emergency fallback: Missing elements, retrying in 2s...');
+        setTimeout(() => setupEmergencyParameterMenuFallback(), 2000);
+        return;
+    }
+    
+    console.log('🚨 Emergency fallback: All elements found, setting up...');
+    
+    // Define expand function (proven working code)
+    const emergencyExpandMenu = () => {
+        console.log('🚀 EMERGENCY EXPAND');
+        parameterBubble.style.setProperty('transform', 'translateX(0px)', 'important');
+        parameterBubble.style.setProperty('opacity', '1', 'important');
+        parameterBubble.style.setProperty('visibility', 'visible', 'important');
+        parameterStrip.style.display = 'none';
+        console.log('✅ Emergency menu expanded!');
+    };
+    
+    // Define collapse function
+    const emergencyCollapseMenu = () => {
+        console.log('🔽 EMERGENCY COLLAPSE');
+        parameterBubble.style.setProperty('transform', 'translateX(-100%)', 'important');
+        parameterBubble.style.setProperty('opacity', '0', 'important');
+        parameterStrip.style.display = 'block';
+        console.log('✅ Emergency menu collapsed!');
+    };
+    
+    // Remove existing event listeners by cloning (proven method)
+    const newNavBtn = navParamBtn.cloneNode(true) as HTMLElement;
+    const newTabBtn = tabParamBtn.cloneNode(true) as HTMLElement;
+    const newStrip = parameterStrip.cloneNode(true) as HTMLElement;
+    
+    if (navParamBtn.parentNode) navParamBtn.parentNode.replaceChild(newNavBtn, navParamBtn);
+    if (tabParamBtn.parentNode) tabParamBtn.parentNode.replaceChild(newTabBtn, tabParamBtn);
+    if (parameterStrip.parentNode) parameterStrip.parentNode.replaceChild(newStrip, parameterStrip);
+    
+    // Add proven event listeners
+    newNavBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Emergency: Nav Parameter clicked');
+        emergencyExpandMenu();
+    });
+    
+    newTabBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Emergency: Tab Parameter clicked');
+        emergencyExpandMenu();
+    });
+    
+    newStrip.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎯 Emergency: Strip clicked');
+        emergencyExpandMenu();
+    });
+    
+    // Make functions globally available for debugging
+    (window as any).emergencyExpandMenu = emergencyExpandMenu;
+    (window as any).emergencyCollapseMenu = emergencyCollapseMenu;
+    (window as any).emergencyParameterMenuActive = true;
+    
+    // Set initial collapsed state
+    emergencyCollapseMenu();
+    
+    console.log('✅ EMERGENCY parameter menu fallback setup complete!');
+    console.log('✅ Available commands: emergencyExpandMenu(), emergencyCollapseMenu()');
+}
+
+/**
  * Setup parameter bubble expansion handlers after navigation system is ready
  */
 function setupParameterBubbleExpansionHandlers(): void {
@@ -6755,6 +6837,11 @@ async function initializeApp() {
     setTimeout(() => {
         setupUnifiedParameterMenu();
     }, 500);
+    
+    // EMERGENCY FALLBACK: Ensure parameter menu works even if main setup fails
+    setTimeout(() => {
+        setupEmergencyParameterMenuFallback();
+    }, 1000);
     
     // Ultimate fallback: Monitor for Parameter button clicks globally
     document.addEventListener('click', (e) => {
