@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parameter Menu Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .debug-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .debug-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .debug-button:hover {
+            background: #0056b3;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .parameter-test {
+            position: fixed;
+            top: 100px;
+            left: 10px;
+            width: 40px;
+            height: 200px;
+            background: rgba(12, 47, 77, 0.95);
+            border-radius: 0 16px 16px 0;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 9999;
+        }
+        .parameter-bubble-test {
+            position: fixed;
+            top: 100px;
+            left: 10px;
+            width: 320px;
+            background: rgba(12, 47, 77, 0.95);
+            border-radius: 16px;
+            color: white;
+            padding: 20px;
+            transform: translateX(-100%);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 9998;
+        }
+        .parameter-expanded {
+            transform: translateX(0px) !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🔧 Parameter Menu Debug Test</h1>
+        <p>Diese Seite testet die Parameter-Menü Funktionalität isoliert.</p>
+        
+        <div>
+            <button class="debug-button" onclick="testExpansion()">🚀 Test Expansion</button>
+            <button class="debug-button" onclick="testCollapse()">🔽 Test Collapse</button>
+            <button class="debug-button" onclick="debugState()">🔍 Debug State</button>
+            <button class="debug-button" onclick="clearConsole()">🧹 Clear Console</button>
+        </div>
+    </div>
+
+    <div class="debug-container">
+        <h3>Console Output:</h3>
+        <div id="console-output" class="console-output">Bereit für Tests...\n</div>
+    </div>
+
+    <!-- Test Elements -->
+    <div id="parameter-strip-test" class="parameter-test" onclick="expandMenu()">
+        PARAMETER
+    </div>
+    
+    <div id="parameter-bubble-test" class="parameter-bubble-test">
+        <h3>Parameter Test</h3>
+        <p>Dies ist ein Test der Parameter-Bubble.</p>
+        <button onclick="collapseMenu()" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Schließen</button>
+    </div>
+
+    <script>
+        const consoleOutput = document.getElementById('console-output');
+        const parameterStrip = document.getElementById('parameter-strip-test');
+        const parameterBubble = document.getElementById('parameter-bubble-test');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            consoleOutput.textContent += `[${timestamp}] ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            console.log(message);
+        }
+
+        function expandMenu() {
+            log('🚀 Expanding parameter menu...');
+            
+            // Method 1: Direct style manipulation
+            parameterBubble.style.setProperty('transform', 'translateX(0px)', 'important');
+            parameterBubble.style.setProperty('opacity', '1', 'important');
+            parameterBubble.style.setProperty('visibility', 'visible', 'important');
+            parameterStrip.style.display = 'none';
+            
+            // Method 2: CSS classes
+            parameterBubble.classList.add('parameter-expanded');
+            
+            log('✅ Parameter menu expanded!');
+            log(`Transform: ${parameterBubble.style.transform}`);
+            log(`Opacity: ${parameterBubble.style.opacity}`);
+        }
+
+        function collapseMenu() {
+            log('🔽 Collapsing parameter menu...');
+            
+            parameterBubble.style.setProperty('transform', 'translateX(-100%)', 'important');
+            parameterBubble.style.setProperty('opacity', '0', 'important');
+            parameterStrip.style.display = 'flex';
+            
+            parameterBubble.classList.remove('parameter-expanded');
+            
+            log('✅ Parameter menu collapsed!');
+        }
+
+        function testExpansion() {
+            log('🧪 Testing expansion functionality...');
+            expandMenu();
+        }
+
+        function testCollapse() {
+            log('🧪 Testing collapse functionality...');
+            collapseMenu();
+        }
+
+        function debugState() {
+            log('🔍 Current state:');
+            log(`Strip display: ${parameterStrip.style.display}`);
+            log(`Bubble transform: ${parameterBubble.style.transform}`);
+            log(`Bubble opacity: ${parameterBubble.style.opacity}`);
+            log(`Bubble classes: ${parameterBubble.className}`);
+            log(`Bubble computed style: ${getComputedStyle(parameterBubble).transform}`);
+        }
+
+        function clearConsole() {
+            consoleOutput.textContent = 'Console cleared...\n';
+        }
+
+        // Initialize
+        log('🔧 Parameter Menu Debug Test initialized');
+        log('Click on the PARAMETER strip on the left to test expansion');
+    </script>
+</body>
+</html>

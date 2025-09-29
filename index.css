@@ -1112,6 +1112,20 @@ select[id*="-select"] {
     height: 32px !important;
     min-height: 32px !important;
     max-height: 32px !important;
+}
+
+/* Parameter Menu Fallback CSS Classes for Debugging */
+.parameter-expanded {
+    transform: translateX(0px) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
+
+.parameter-collapsed {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
     line-height: normal !important;
     padding: 6px 8px !important;
     box-sizing: border-box !important;

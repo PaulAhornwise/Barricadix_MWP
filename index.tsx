@@ -6118,29 +6118,37 @@ function setupOsmEventListeners(): void {
     }
 }
 
+// Global flag to prevent multiple parameter menu setups
+let parameterMenuSetupComplete = false;
+
 /**
- * Setup parameter bubble toggle functionality
+ * UNIFIED Parameter Menu Handler - Single source of truth
  */
-function setupParameterBubbleToggle(): void {
-    console.log('🔧 Setting up parameter bubble toggle...');
+function setupUnifiedParameterMenu(): void {
+    if (parameterMenuSetupComplete) {
+        console.log('🔧 Parameter menu already set up, skipping...');
+        return;
+    }
+    
+    console.log('🔧 Setting up UNIFIED parameter menu...');
     
     const toggleBtn = document.getElementById('toggle-parameter-bubble') as HTMLButtonElement;
     const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
     const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+    const headerParameterBtn = document.getElementById('nav-param-input') as HTMLElement;
+    const tabParameterBtn = document.getElementById('tab-param-input') as HTMLElement;
     
-    console.log('🔧 Toggle button found:', !!toggleBtn);
-    console.log('🔧 Parameter bubble found:', !!parameterBubble);
-    console.log('🔧 Parameter strip found:', !!parameterStrip);
+    console.log('🔧 Elements found:', {
+        toggleBtn: !!toggleBtn,
+        parameterBubble: !!parameterBubble,
+        parameterStrip: !!parameterStrip,
+        headerParameterBtn: !!headerParameterBtn,
+        tabParameterBtn: !!tabParameterBtn
+    });
     
-    if (!toggleBtn || !parameterBubble || !parameterStrip) {
-        console.warn('Parameter bubble, strip, or toggle button not found');
-        console.log('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
-        
-        // Retry after a short delay if elements are not found
-        setTimeout(() => {
-            console.log('🔧 Retrying parameter bubble setup...');
-            setupParameterBubbleToggle();
-        }, 1000);
+    if (!parameterBubble || !parameterStrip) {
+        console.warn('🔧 Critical parameter elements missing, retrying in 1s...');
+        setTimeout(() => setupUnifiedParameterMenu(), 1000);
         return;
     }
     
@@ -6225,6 +6233,41 @@ function setupParameterBubbleToggle(): void {
     // Set initial state as collapsed
     console.log('🔧 Setting initial state as collapsed');
     collapseBubble();
+    
+    // ENHANCED expand function with multiple fallbacks
+    const expandBubble = () => {
+        console.log('🚀 ENHANCED EXPAND - Starting...');
+        
+        // Method 1: Direct style manipulation
+        parameterBubble.style.setProperty('transform', 'translateX(0px)', 'important');
+        parameterBubble.style.setProperty('opacity', '1', 'important');
+        parameterBubble.style.setProperty('visibility', 'visible', 'important');
+        parameterStrip.style.display = 'none';
+        
+        // Method 2: CSS classes
+        parameterBubble.classList.add('parameter-expanded');
+        parameterBubble.classList.remove('parameter-collapsed');
+        
+        console.log('🚀 ENHANCED EXPAND - Completed!');
+        console.log('🚀 Final transform:', parameterBubble.style.transform);
+        console.log('🚀 Final opacity:', parameterBubble.style.opacity);
+    };
+    
+    // Override the original expandBubble function
+    (window as any).expandParameterMenu = expandBubble;
+    (window as any).debugParameterMenu = () => {
+        console.log('🔍 DEBUG Parameter Menu State:');
+        console.log('🔍 Parameter Bubble:', parameterBubble);
+        console.log('🔍 Parameter Strip:', parameterStrip);
+        console.log('🔍 Toggle Button:', toggleBtn);
+        console.log('🔍 Bubble Transform:', parameterBubble?.style.transform);
+        console.log('🔍 Bubble Opacity:', parameterBubble?.style.opacity);
+        console.log('🔍 Bubble Classes:', parameterBubble?.className);
+        console.log('🔍 Strip Display:', parameterStrip?.style.display);
+        
+        console.log('🔧 Attempting manual expansion...');
+        expandBubble();
+    };
     
     // Make the bubble draggable (optional enhancement)
     makeParameterBubbleDraggable(parameterBubble);
@@ -6707,23 +6750,11 @@ async function initializeApp() {
     const toggleSidebarBtn = document.getElementById('toggle-sidebar') as HTMLButtonElement | null;
     const sidebarEl = document.querySelector('.sidebar') as HTMLElement | null;
     
-    // Setup parameter bubble toggle functionality
-    console.log('🔧 About to call setupParameterBubbleToggle...');
+    // Setup UNIFIED parameter menu functionality
+    console.log('🔧 About to call setupUnifiedParameterMenu...');
     setTimeout(() => {
-        setupParameterBubbleToggle();
+        setupUnifiedParameterMenu();
     }, 500);
-    
-    // Additional setup after navigation system is initialized
-    setTimeout(() => {
-        console.log('🔧 Setting up parameter bubble expansion handlers after navigation init...');
-        setupParameterBubbleExpansionHandlers();
-    }, 1000);
-    
-    // Even later setup to override navigation system
-    setTimeout(() => {
-        console.log('🔧 Final setup - overriding navigation system for parameter expansion...');
-        overrideParameterNavigationHandlers();
-    }, 2000);
     
     // Ultimate fallback: Monitor for Parameter button clicks globally
     document.addEventListener('click', (e) => {
