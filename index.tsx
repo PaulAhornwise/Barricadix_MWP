@@ -6353,6 +6353,118 @@ function setupEmergencyParameterMenuFallback(): void {
 }
 
 /**
+ * ULTIMATE FALLBACK: Force parameter menu to work (proven working code from console)
+ * This is the exact code that worked when manually executed
+ */
+function setupUltimateParameterMenuFix(): void {
+    console.log('🚨 Setting up ULTIMATE parameter menu fix...');
+    
+    const parameterBubble = document.getElementById('parameter-bubble');
+    const parameterStrip = document.getElementById('parameter-strip');
+    const navParamBtn = document.getElementById('nav-param-input');
+    const tabParamBtn = document.getElementById('tab-param-input');
+    
+    if (!parameterBubble || !parameterStrip || !navParamBtn || !tabParamBtn) {
+        console.warn('🚨 Ultimate fix: Missing elements, retrying in 3s...');
+        setTimeout(() => setupUltimateParameterMenuFix(), 3000);
+        return;
+    }
+    
+    console.log('🚨 Ultimate fix: All elements found, applying proven fix...');
+    
+    // Entferne ALLE existierenden Event-Listener durch Klonen
+    const newNav = navParamBtn.cloneNode(true) as HTMLElement;
+    const newTab = tabParamBtn.cloneNode(true) as HTMLElement;
+    const newStrip = parameterStrip.cloneNode(true) as HTMLElement;
+    
+    navParamBtn.parentNode?.replaceChild(newNav, navParamBtn);
+    tabParamBtn.parentNode?.replaceChild(newTab, tabParamBtn);
+    parameterStrip.parentNode?.replaceChild(newStrip, parameterStrip);
+    
+    // Hole neue Referenzen
+    const newNavBtn = document.getElementById('nav-param-input') as HTMLElement;
+    const newTabBtn = document.getElementById('tab-param-input') as HTMLElement;
+    const newStripEl = document.getElementById('parameter-strip') as HTMLElement;
+    
+    // Definiere die bewährte Expand-Funktion
+    const forceExpandMenu = () => {
+        console.log('🚀 FORCE EXPANDING...');
+        const bubble = document.getElementById('parameter-bubble');
+        const strip = document.getElementById('parameter-strip');
+        
+        if (bubble) {
+            // Entferne ALLE Inline-Styles und setze neu (bewährte Methode)
+            bubble.removeAttribute('style');
+            bubble.setAttribute('style', 
+                'position: fixed !important;' +
+                'top: 130px !important;' +
+                'left: 8px !important;' +
+                'width: 320px !important;' +
+                'max-width: calc(100vw - 32px) !important;' +
+                'background: rgba(12, 47, 77, 0.95) !important;' +
+                'backdrop-filter: blur(10px) !important;' +
+                'border: 1px solid rgba(255, 255, 255, 0.2) !important;' +
+                'border-radius: 16px !important;' +
+                'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;' +
+                'z-index: 9999 !important;' +
+                'color: white !important;' +
+                'max-height: calc(100vh - 140px) !important;' +
+                'overflow-y: auto !important;' +
+                'display: block !important;' +
+                'visibility: visible !important;' +
+                'opacity: 1 !important;' +
+                'transform: translateX(0px) !important;' +
+                'transition: all 0.3s ease !important;'
+            );
+        }
+        
+        if (strip) {
+            strip.style.display = 'none';
+        }
+        
+        console.log('✅ MENU FORCED OPEN!');
+    };
+    
+    // Füge bewährte Event-Listener hinzu
+    if (newNavBtn) {
+        newNavBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('NAV clicked - ultimate fix');
+            forceExpandMenu();
+            return false;
+        };
+    }
+    
+    if (newTabBtn) {
+        newTabBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('TAB clicked - ultimate fix');
+            forceExpandMenu();
+            return false;
+        };
+    }
+    
+    if (newStripEl) {
+        newStripEl.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('STRIP clicked - ultimate fix');
+            forceExpandMenu();
+            return false;
+        };
+    }
+    
+    // Globale Funktionen verfügbar machen
+    (window as any).forceExpandMenu = forceExpandMenu;
+    (window as any).ultimateParameterMenuActive = true;
+    
+    console.log('✅ ULTIMATE parameter menu fix applied!');
+    console.log('✅ Available commands: forceExpandMenu()');
+}
+
+/**
  * Setup parameter bubble expansion handlers after navigation system is ready
  */
 function setupParameterBubbleExpansionHandlers(): void {
@@ -6839,6 +6951,11 @@ async function initializeApp() {
     setTimeout(() => {
         setupEmergencyParameterMenuFallback();
     }, 1000);
+    
+    // ULTIMATE FALLBACK: Force parameter menu to work (proven working code)
+    setTimeout(() => {
+        setupUltimateParameterMenuFix();
+    }, 2000);
     
     // Ultimate fallback: Monitor for Parameter button clicks globally
     document.addEventListener('click', (e) => {
