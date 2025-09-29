@@ -2758,8 +2758,11 @@ function initOpenStreetMap(): void {
         if (moveTimeout) clearTimeout(moveTimeout);
         moveTimeout = window.setTimeout(() => {
             // console.log('Map move event triggered'); // Reduced logging
-        updatePinnedTooltipPositions();
-        }, 100);
+            // Use requestAnimationFrame for better performance
+            requestAnimationFrame(() => {
+                updatePinnedTooltipPositions();
+            });
+        }, 150); // Increased debounce time for better performance
     });
     map.on('zoom', () => {
         console.log('Map zoom event triggered');
@@ -6132,6 +6135,12 @@ function setupParameterBubbleToggle(): void {
     if (!toggleBtn || !parameterBubble || !parameterStrip) {
         console.warn('Parameter bubble, strip, or toggle button not found');
         console.log('Available elements with IDs:', Array.from(document.querySelectorAll('[id]')).map(el => el.id));
+        
+        // Retry after a short delay if elements are not found
+        setTimeout(() => {
+            console.log('🔧 Retrying parameter bubble setup...');
+            setupParameterBubbleToggle();
+        }, 1000);
         return;
     }
     
@@ -6495,21 +6504,27 @@ async function loadOsmDataForCurrentPolygon(): Promise<void> {
         }
         osmLoadingController = new AbortController();
         
-        // Fetch new data
-        const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
-        
-        // Cache the result
-        osmCache.set(cacheKey, osmData);
-        
-        // Update global state
-        currentOsmData = osmData;
-        osmSpeedLimiter.setOsmData(osmData);
+        // Fetch new data with error handling
+        try {
+            const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
+            
+            // Cache the result
+            osmCache.set(cacheKey, osmData);
+            
+            // Update global state
+            currentOsmData = osmData;
+            osmSpeedLimiter.setOsmData(osmData);
+        } catch (error) {
+            console.error('OSM Data Loading Error:', error);
+            updateOsmStatus('error', error instanceof Error ? error.message : 'Fehler beim Laden der OSM-Daten');
+            return;
+        }
         
         // Log statistics
-        const maxspeedWays = osmData.ways.filter(w => w.tags.maxspeed).length;
-        console.log(`📊 OSM Data loaded: ${osmData.ways.length} ways (${maxspeedWays} with maxspeed), ${osmData.calming.length} traffic calming nodes`);
+        const maxspeedWays = currentOsmData.ways.filter(w => w.tags.maxspeed).length;
+        console.log(`📊 OSM Data loaded: ${currentOsmData.ways.length} ways (${maxspeedWays} with maxspeed), ${currentOsmData.calming.length} traffic calming nodes`);
         
-        updateOsmStatus('success', `${osmData.ways.length} Straßen, ${osmData.calming.length} Verkehrsberuhiger`);
+        updateOsmStatus('success', `${currentOsmData.ways.length} Straßen, ${currentOsmData.calming.length} Verkehrsberuhiger`);
         
     } catch (error: any) {
         if (error.name === 'AbortError') {

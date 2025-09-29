@@ -45,7 +45,7 @@ export async function fetchOsmBundleForPolygon(
   console.log('🗺️ OSM Query polygon coords:', poly);
   
   const query = `
-    [out:json][timeout:25];
+    [out:json][timeout:15];
     (
       way["highway"](poly:"${poly}");
       node["traffic_calming"](poly:"${poly}");
@@ -56,46 +56,72 @@ export async function fetchOsmBundleForPolygon(
   
   console.log('🗺️ OSM Query:', query.trim());
   
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: query,
-    headers: { "Content-Type": "text/plain" },
-    signal
-  });
-  
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => 'Unknown error');
-    console.error('Overpass API Error:', res.status, errorText);
-    throw new Error(`Overpass ${res.status}: ${errorText}`);
-  }
-  
-  const data = await res.json();
-  
-  // Parse: ways + nodes (nur benötigte Felder)
-  const nodes: Record<number, {lat:number;lon:number}> = {};
-  for (const el of data.elements) {
-    if (el.type === 'node') nodes[el.id] = {lat: el.lat, lon: el.lon};
-  }
-  
-  const ways: OsmWayLite[] = [];
-  const calming: OsmTrafficNode[] = [];
-  
-  for (const el of data.elements) {
-    if (el.type === 'way') {
-      ways.push({
-        id: el.id,
-        nodes: (el.nodes || []).map((nid:number)=>nodes[nid]).filter(Boolean),
-        tags: el.tags || {}
-      });
-    } else if (el.type === 'node' && el.tags?.traffic_calming) {
-      const kind = String(el.tags.traffic_calming) as OsmTrafficCalming;
-      if (['hump', 'table', 'chicane', 'cushion', 'rumble_strip', 'island'].includes(kind)) {
-        calming.push({ id: el.id, lat: el.lat, lon: el.lon, kind });
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: query,
+      headers: { "Content-Type": "text/plain" },
+      signal
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      console.error('Overpass API Error:', res.status, errorText);
+      
+      // Handle specific error cases
+      if (res.status === 504) {
+        throw new Error('Overpass API timeout - Server ist überlastet. Bitte versuchen Sie es später erneut.');
+      } else if (res.status === 429) {
+        throw new Error('Overpass API rate limit - Zu viele Anfragen. Bitte warten Sie einen Moment.');
+      } else {
+        throw new Error(`Overpass API Fehler ${res.status}: ${errorText}`);
       }
     }
+    
+    const data = await res.json();
+    
+    // Parse: ways + nodes (nur benötigte Felder)
+    const nodes: Record<number, {lat:number;lon:number}> = {};
+    for (const el of data.elements) {
+      if (el.type === 'node') nodes[el.id] = {lat: el.lat, lon: el.lon};
+    }
+    
+    const ways: OsmWayLite[] = [];
+    const calming: OsmTrafficNode[] = [];
+    
+    for (const el of data.elements) {
+      if (el.type === 'way') {
+        ways.push({
+          id: el.id,
+          nodes: (el.nodes || []).map((nid:number)=>nodes[nid]).filter(Boolean),
+          tags: el.tags || {}
+        });
+      } else if (el.type === 'node' && el.tags?.traffic_calming) {
+        const kind = String(el.tags.traffic_calming) as OsmTrafficCalming;
+        if (['hump', 'table', 'chicane', 'cushion', 'rumble_strip', 'island'].includes(kind)) {
+          calming.push({ id: el.id, lat: el.lat, lon: el.lon, kind });
+        }
+      }
+    }
+    
+    return { ways, calming };
+    
+  } catch (error) {
+    console.error('OSM Fetch Error:', error);
+    
+    // Handle network errors gracefully
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('OSM-Abfrage wurde abgebrochen');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('Netzwerkfehler - Überprüfen Sie Ihre Internetverbindung');
+      } else {
+        throw error; // Re-throw the original error with its message
+      }
+    }
+    
+    throw new Error('Unbekannter Fehler beim Laden der OSM-Daten');
   }
-  
-  return { ways, calming };
 }
 
 /**
