@@ -6205,9 +6205,6 @@ function setupUnifiedParameterMenu(): void {
     });
     
     // Header "Parameter" button click handler to expand (both nav and tab versions)
-    const headerParameterBtn = document.getElementById('nav-param-input');
-    const tabParameterBtn = document.getElementById('tab-param-input');
-    
     const expandBubbleHandler = (e: Event) => {
         e.preventDefault();
         console.log('🔧 Parameter button clicked - expanding bubble');
@@ -6234,8 +6231,8 @@ function setupUnifiedParameterMenu(): void {
     console.log('🔧 Setting initial state as collapsed');
     collapseBubble();
     
-    // ENHANCED expand function with multiple fallbacks
-    const expandBubble = () => {
+    // ENHANCED expand function with multiple fallbacks (override the original)
+    const enhancedExpandBubble = () => {
         console.log('🚀 ENHANCED EXPAND - Starting...');
         
         // Method 1: Direct style manipulation
@@ -6254,7 +6251,7 @@ function setupUnifiedParameterMenu(): void {
     };
     
     // Override the original expandBubble function
-    (window as any).expandParameterMenu = expandBubble;
+    (window as any).expandParameterMenu = enhancedExpandBubble;
     (window as any).debugParameterMenu = () => {
         console.log('🔍 DEBUG Parameter Menu State:');
         console.log('🔍 Parameter Bubble:', parameterBubble);
@@ -6266,7 +6263,7 @@ function setupUnifiedParameterMenu(): void {
         console.log('🔍 Strip Display:', parameterStrip?.style.display);
         
         console.log('🔧 Attempting manual expansion...');
-        expandBubble();
+        enhancedExpandBubble();
     };
     
     // Make the bubble draggable (optional enhancement)
