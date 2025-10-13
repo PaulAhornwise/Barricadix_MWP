@@ -87,3 +87,5 @@ Falls nach dem Upload (und 5 Min Wartezeit) immer noch Probleme:
 ---
 
 **Der Emergency-Code ist bewährt und funktioniert - jetzt muss er nur noch auf GitHub Pages aktiv werden! 🚀**
+
+

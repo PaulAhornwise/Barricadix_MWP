@@ -431,6 +431,10 @@ export default function ZufahrtsschutzChatbot({
   useEffect(() => {
     if (completed) return;
     if (currentQ) return;
+    
+    // Warten bis die Willkommensnachricht angezeigt wurde (mindestens 1 Nachricht)
+    if (messages.length === 0) return;
+    
     const next = findNextQuestion();
     if (next) {
       setCurrentQ(next);
@@ -443,7 +447,7 @@ export default function ZufahrtsschutzChatbot({
       setCompleted(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planningState, open, currentQ, completed]);
+  }, [planningState, open, currentQ, completed, messages.length]);
 
     // Chatbot neu rendern bei Sprachänderung
   useEffect(() => {

@@ -19,6 +19,8 @@ import { createRoot } from "react-dom/client";
 import { fetchOsmBundleForPolygon, osmCache, OsmBundle } from './src/utils/osm.js';
 import { OsmSpeedLimiter, SpeedLimitConfig } from './src/utils/osmSpeedLimits.js';
 import { WeatherCondition } from './src/utils/osmParse.js';
+// Entry Detection System Integration
+import { integrateEntryDetectionWithExistingOSM, addEntryDetectionStyles } from './src/features/map/integration/entryDetectionIntegration.js';
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -219,6 +221,9 @@ function logout() {
 // Make logout available globally
 (window as any).logout = logout;
 
+// Make current tab available globally for debugging
+(window as any).getCurrentTab = () => currentActiveTab;
+
 // App state
 let map: any; // Module-scoped map object
 let tileLayer: any; // Module-scoped tile layer object
@@ -226,6 +231,7 @@ let threatLayerGroup: any = null; // Group for all threat overlays to clear in o
 let searchMarker: any = null; // To keep track of the current search marker
 let isDrawingMode = false;
 let waypoints: any[] = [];
+let currentActiveTab = 'nav-marking-area'; // Track current active tab
 let waypointMarkers: any[] = [];
 let pathLine: any = null;
 let drawnPolygon: any = null;
@@ -631,7 +637,7 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Paderborn, Domplatz",
+            "searchPlaceholder": "Soest, Marktplatz",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
@@ -1030,7 +1036,7 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Paderborn, Domplatz",
+            "searchPlaceholder": "Soest, Marktplatz",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
@@ -1162,6 +1168,12 @@ function showPlanningView() {
     if (manufacturerView) {
         (manufacturerView as HTMLElement).style.display = 'none';
         console.log('Manufacturer view hidden');
+    }
+    
+    // Clear manufacturer sidebar content
+    const manufacturerSidebar = document.querySelector('.manufacturer-sidebar');
+    if (manufacturerSidebar) {
+        manufacturerSidebar.innerHTML = '';
     }
     
     // Show planning view
@@ -1311,12 +1323,223 @@ function showManufacturerView() {
         mapToolbar.classList.add('view-hidden'); // CSS-Klasse hinzufügen
     }
     
+    // Populate manufacturer sidebar with filters
+    populateManufacturerSidebarWithFilters();
+    
     // Translate manufacturer view after showing it
     setTimeout(() => {
         translateUI(); // Use the main translation function
     }, 50);
     
     showNotification('Hersteller-Ansicht aktiviert', 'success');
+}
+
+/**
+ * Populate manufacturer sidebar with filter content
+ */
+function populateManufacturerSidebarWithFilters() {
+    console.log('Populating manufacturer sidebar with filters...');
+    
+    const sidebar = document.querySelector('.manufacturer-sidebar');
+    if (!sidebar) {
+        console.warn('Manufacturer sidebar not found');
+        return;
+    }
+    
+    // Calculate real product counts
+    const counts = calculateProductCounts();
+
+    // Clear existing content
+    sidebar.innerHTML = '';
+
+    // Get German labels if current language is German
+    const isGerman = currentLanguage === 'de';
+    
+    const labels = {
+        vehicleMass: isGerman ? 'Fahrzeuggewicht (kg)' : 'Vehicle Mass (kg)',
+        impactSpeed: isGerman ? 'Anprallgeschwindigkeit (km/h)' : 'Impact Speed (Km/h)',
+        impactAngle: isGerman ? 'Anprallwinkel (°)' : 'Impact Angle (°)',
+        penetrationDistance: isGerman ? 'Eindringtiefe (m)' : 'Penetration Distance (m)',
+        standard: isGerman ? 'Standard' : 'Standard',
+        foundation: isGerman ? 'Fundament' : 'Foundation',
+        operation: isGerman ? 'Betrieb' : 'Operation',
+        deployment: isGerman ? 'Einsatz' : 'Deployment',
+        categories: isGerman ? 'Kategorien / VSB-Art' : 'Categories / Style of VSB',
+        manufacturer: isGerman ? 'Hersteller' : 'Manufacturer',
+        to: isGerman ? 'bis' : 'to',
+        reset: isGerman ? 'Zurücksetzen' : 'Reset',
+        allManufacturers: isGerman ? 'Alle Hersteller' : 'All Manufacturers'
+    };
+
+    // Create filter content that matches the existing sidebar style
+    const filterContentHTML = `
+        <section class="sidebar-section">
+            <div class="filter-content">
+            
+        <!-- Vehicle Mass Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('vehicle-mass')">
+                <label>${labels.vehicleMass}</label>
+                <span class="dropdown-icon" id="vehicle-mass-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="vehicle-mass-content" style="display: none;">
+                <div class="checkbox-group">
+                    ${generateVehicleMassOptions(counts.vehicleMass)}
+                </div>
+            </div>
+        </div>
+
+            <!-- Impact Speed Filter -->
+            <div class="form-group collapsible-range-group">
+                <div class="range-header" onclick="toggleRangeInput('impact-speed')">
+                    <label>${labels.impactSpeed}</label>
+                    <span class="dropdown-icon" id="impact-speed-icon">▼</span>
+                </div>
+                <div class="range-content" id="impact-speed-content" style="display: none;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="min-speed" value="16" min="0" max="200" class="form-control" style="flex: 1;">
+                        <span style="font-size: 12px; color: var(--secondary-text);">${labels.to}</span>
+                        <input type="number" id="max-speed" value="112" min="0" max="200" class="form-control" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact Angle Filter -->
+            <div class="form-group collapsible-range-group">
+                <div class="range-header" onclick="toggleRangeInput('impact-angle')">
+                    <label>${labels.impactAngle}</label>
+                    <span class="dropdown-icon" id="impact-angle-icon">▼</span>
+                </div>
+                <div class="range-content" id="impact-angle-content" style="display: none;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="min-angle" value="15" min="0" max="180" class="form-control" style="flex: 1;">
+                        <span style="font-size: 12px; color: var(--secondary-text);">${labels.to}</span>
+                        <input type="number" id="max-angle" value="90" min="0" max="180" class="form-control" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Penetration Distance Filter -->
+            <div class="form-group collapsible-range-group">
+                <div class="range-header" onclick="toggleRangeInput('penetration-distance')">
+                    <label>${labels.penetrationDistance}</label>
+                    <span class="dropdown-icon" id="penetration-distance-icon">▼</span>
+                </div>
+                <div class="range-content" id="penetration-distance-content" style="display: none;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="min-distance" value="0" min="0" max="100" step="0.1" class="form-control" style="flex: 1;">
+                        <span style="font-size: 12px; color: var(--secondary-text);">${labels.to}</span>
+                        <input type="number" id="max-distance" value="60" min="0" max="100" step="0.1" class="form-control" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+
+        <!-- Standards Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('standards')">
+                <label>${labels.standard}</label>
+                <span class="dropdown-icon" id="standards-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="standards-content" style="display: none;">
+                <div class="checkbox-group">
+                    ${generateStandardOptions(counts.standard)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Foundation Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('foundation')">
+                <label>${labels.foundation}</label>
+                <span class="dropdown-icon" id="foundation-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="foundation-content" style="display: none;">
+                <div class="checkbox-group">
+                    ${generateFoundationOptions(counts.foundation)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Operation Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('operation')">
+                <label>${labels.operation}</label>
+                <span class="dropdown-icon" id="operation-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="operation-content" style="display: none;">
+                <div class="checkbox-group">
+                    ${generateOperationOptions(counts.operation)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Deployment Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('deployment')">
+                <label>${labels.deployment}</label>
+                <span class="dropdown-icon" id="deployment-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="deployment-content" style="display: none;">
+                <div class="checkbox-group">
+                    ${generateDeploymentOptions(counts.deployment)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('categories')">
+                <label>${labels.categories}</label>
+                <span class="dropdown-icon" id="categories-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="categories-content" style="display: none;">
+                <div class="hierarchical-checkbox">
+                    ${generateCategoriesOptions(counts.category)}
+                </div>
+            </div>
+        </div>
+
+        <!-- Manufacturer Filter -->
+        <div class="form-group collapsible-dropdown-group">
+            <div class="dropdown-header" onclick="toggleDropdown('manufacturer')">
+                <label>${labels.manufacturer}</label>
+                <span class="dropdown-icon" id="manufacturer-icon">▼</span>
+            </div>
+            <div class="dropdown-content" id="manufacturer-content" style="display: none;">
+                <select id="manufacturer-select" class="form-control">
+                    <option value="">${labels.allManufacturers}</option>
+                    ${generateManufacturerOptions(counts.manufacturer)}
+                </select>
+            </div>
+        </div>
+            
+            <!-- Reset Button immediately below menu items -->
+            <button id="reset-all-filters" class="reset-button" style="
+                background: var(--accent-color);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                margin-top: 16px;
+                width: 100%;
+            ">${labels.reset}</button>
+            </div>
+        </section>
+    `;
+
+    sidebar.innerHTML = filterContentHTML;
+
+    // Add event listeners
+    setupFilterSidebarEvents();
+
+    // Apply initial filters and display products
+    setTimeout(() => {
+        applyFiltersAndUpdateDisplay();
+    }, 100);
+
+    console.log('Manufacturer sidebar populated with filters successfully');
 }
 
 // Function to restore map state
@@ -1947,6 +2170,17 @@ function initProductSearchAndFilters() {
         speedFilter.addEventListener('change', filterProducts);
     }
     
+    // Parameter menu filters
+    const productPropertySelect = document.getElementById('product-property-select');
+    if (productPropertySelect) {
+        productPropertySelect.addEventListener('change', filterProducts);
+    }
+    
+    const vehicleSelect = document.getElementById('vehicle-select');
+    if (vehicleSelect) {
+        vehicleSelect.addEventListener('change', filterProducts);
+    }
+    
     // Initialize view toggle functionality
     initViewToggle();
 }
@@ -2060,6 +2294,20 @@ async function filterProducts() {
     const vehicleType = (document.getElementById('vehicle-type-filter') as HTMLSelectElement)?.value || '';
     const minSpeed = (document.getElementById('speed-filter') as HTMLSelectElement)?.value || '';
     
+    // Get parameter selections from parameter menu
+    const productProperty = (document.getElementById('product-property-select') as HTMLSelectElement)?.value || '';
+    const vehicleSelect = (document.getElementById('vehicle-select') as HTMLSelectElement)?.value || '';
+    
+    // Get maximum detected speed from threat analysis
+    const detectedMaxSpeed = getMaxDetectedSpeed();
+    
+    console.log('🔍 Filter Parameters:', {
+        productProperty,
+        vehicleSelect,
+        detectedMaxSpeed,
+        minSpeed
+    });
+    
     const filteredProducts = products.filter((product: any) => {
         const matchesSearch = !searchTerm || 
             product.manufacturer?.toLowerCase().includes(searchTerm) ||
@@ -2071,9 +2319,9 @@ async function filterProducts() {
         // Updated to use material filter for new database structure
         const matchesVehicleType = !vehicleType || product.technical_data?.material === vehicleType;
         
-        // Speed filter based on test speed
-        const matchesSpeed = !minSpeed || (() => {
-            const requiredSpeed = parseFloat(minSpeed);
+        // Speed filter - use detected speed if available, otherwise use manual filter
+        const requiredSpeed = detectedMaxSpeed > 0 ? detectedMaxSpeed : (minSpeed ? parseFloat(minSpeed) : 0);
+        const matchesSpeed = requiredSpeed === 0 || (() => {
             let productSpeed = 0;
             
             // Get product speed from the new technical data fields
@@ -2093,10 +2341,50 @@ async function filterProducts() {
             return !isNaN(productSpeed) && productSpeed >= requiredSpeed;
         })();
         
-        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType && matchesSpeed;
+        // Vehicle selection filter based on parameter menu
+        const matchesVehicleSelection = !vehicleSelect || vehicleSelect === 'alle' || (() => {
+            const selectedMass = parseFloat(vehicleSelect);
+            if (isNaN(selectedMass)) return true;
+            
+            const productMass = product.technical_data?.pr_mass_kg;
+            if (!productMass) return false;
+            
+            // Product must be able to handle at least the selected vehicle mass
+            return productMass >= selectedMass;
+        })();
+        
+        // Product property filter - if "entfernbar" is selected, only show freestanding products
+        const matchesProductProperty = !productProperty || productProperty === 'aut./starr' || productProperty === 'versenkbar' || (() => {
+            if (productProperty === 'entfernbar') {
+                const foundationDepth = product.technical_data?.foundation_depth || '';
+                // Only show products that are freestanding (no ground fixings)
+                return foundationDepth.includes('A - Free standing (no ground fixings)');
+            }
+            return true;
+        })();
+        
+        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType && matchesSpeed && matchesVehicleSelection && matchesProductProperty;
     });
     
+    console.log(`✅ Filtered ${filteredProducts.length} products from ${products.length} total`);
+    
     await displayProducts(filteredProducts);
+}
+
+/**
+ * Get maximum detected speed from threat analysis
+ */
+function getMaxDetectedSpeed(): number {
+    if (threatsMap.size === 0) return 0;
+    
+    let maxSpeed = 0;
+    threatsMap.forEach((threatData) => {
+        if (threatData.maxSpeed && threatData.maxSpeed > maxSpeed) {
+            maxSpeed = threatData.maxSpeed;
+        }
+    });
+    
+    return maxSpeed;
 }
 
 /**
@@ -2585,6 +2873,8 @@ async function setLanguage(lang: string) {
     const manufacturerView = document.getElementById('manufacturer-view');
     if (manufacturerView && manufacturerView.style.display !== 'none') {
         translateUI(); // Use the main translation function
+        // Refresh the filter sidebar with new language labels
+        populateManufacturerSidebarWithFilters();
     }
     
     // Always translate chatbot when language changes
@@ -2722,7 +3012,7 @@ function initOpenStreetMap(): void {
     
     console.log('Map container prepared for initialization');
     
-    const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn, Domplatz
+    const mapCenter: [number, number] = [51.5711, 8.1060]; // Soest
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -2760,13 +3050,15 @@ function initOpenStreetMap(): void {
             // console.log('Map move event triggered'); // Reduced logging
             // Use requestAnimationFrame for better performance
             requestAnimationFrame(() => {
-                updatePinnedTooltipPositions();
+        updatePinnedTooltipPositions();
+                updateDeletionBubblePosition();
             });
         }, 150); // Increased debounce time for better performance
     });
     map.on('zoom', () => {
         console.log('Map zoom event triggered');
         updatePinnedTooltipPositions();
+        updateDeletionBubblePosition();
     });
     
     // Additional protection against zoom animation errors
@@ -2794,6 +3086,525 @@ function initOpenStreetMap(): void {
     
     console.log('Map initialized successfully');
 }
+
+/**
+ * Restores threat analysis display if analysis data exists
+ */
+const restoreThreatAnalysis = () => {
+    // Only restore if we have threat data
+    if (threatsMap.size === 0 && (!(window as any).entryDetectionManager || !(window as any).entryDetectionManager.candidates || (window as any).entryDetectionManager.candidates.length === 0)) {
+        return;
+    }
+    
+    // Recreate threat markers if we have threat data
+    if (threatsMap.size > 0) {
+        // Recreate threat layer group
+        if (threatLayerGroup) {
+            try { threatLayerGroup.clearLayers(); map.removeLayer(threatLayerGroup); } catch {}
+        }
+        threatLayerGroup = L.layerGroup().addTo(map);
+        
+        // Recreate markers for each threat
+        threatsMap.forEach((data, name) => {
+            if (data.entryPoints.length === 0) return;
+            
+            // Choose color by estimated speed (worst-case acceleration)
+            const vehicleSelectEl = document.getElementById('vehicle-select') as HTMLSelectElement;
+            const selectedWeightVal = vehicleSelectEl?.value || 'alle';
+            const accRange = getAccelerationRange(selectedWeightVal);
+            const usedAcc = accRange ? accRange[1] : 3.0;
+            
+            let circleColor, fillColor, radius;
+            const threatLevel = Math.min(Math.round(usedAcc * 10), 10);
+            
+            if (threatLevel >= 8) {
+                // High threat - Red circles
+                circleColor = '#DC143C';  // Crimson
+                fillColor = '#FF6347';    // Tomato
+                radius = 6;
+            } else if (threatLevel >= 5) {
+                // Medium threat - Orange circles
+                circleColor = '#FF8C00';  // Dark orange
+                fillColor = '#FFA500';    // Orange
+                radius = 5;
+            } else {
+                // Minimal threat - Yellow circles
+                circleColor = '#DAA520';  // Goldenrod
+                fillColor = '#FFD700';    // Gold
+                radius = 4;
+            }
+            
+            const currentStreetMarkers: any[] = [];
+            data.entryPoints.forEach(point => {
+                const threatDescription = `
+                    <b>${t('threats.popupHeader')}</b><br>
+                    <b>Straße:</b> ${name}<br>
+                    <b>Straßentyp:</b> ${data.roadType || 'unbekannt'}<br>
+                    <b>Bedrohungslevel:</b> ${threatLevel}/10<br>
+                    <b>Max. Geschwindigkeit:</b> ${data.maxSpeed || 'unbekannt'} km/h
+                `;
+                
+                const threatCircle = L.circle([point.lat, point.lon], {
+                    radius: radius, 
+                    color: circleColor, 
+                    fillColor: fillColor, 
+                    fillOpacity: 0.8, 
+                    weight: 3
+                }).bindPopup(threatDescription);
+                threatLayerGroup.addLayer(threatCircle);
+                currentStreetMarkers.push(threatCircle);
+            });
+            
+            // Store markers
+            threatMarkersMap.set(name, currentStreetMarkers);
+        });
+    }
+    
+    // Recreate Entry Detection markers if they exist
+    if ((window as any).entryDetectionManager && (window as any).entryDetectionManager.candidates && (window as any).entryDetectionManager.candidates.length > 0) {
+        createEntryDetectionMarkers();
+    }
+    
+    // Recreate threat list
+    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
+    if (threatList) {
+        // Clear existing content first
+        threatList.innerHTML = '';
+        
+        // Render threat list if we have threat data
+        if (threatsMap.size > 0) {
+            renderThreatList();
+        }
+        
+        // Add Entry Detection results if they exist
+        if ((window as any).entryDetectionManager && (window as any).entryDetectionManager.candidates && (window as any).entryDetectionManager.candidates.length > 0) {
+            addEntryDetectionResultsToThreatList(threatList);
+        }
+        
+        // Update title
+        updateThreatListTitle(threatsMap.size > 0 || ((window as any).entryDetectionManager && (window as any).entryDetectionManager.candidates && (window as any).entryDetectionManager.candidates.length > 0));
+    }
+    
+    // Show threat panel if we have data
+    const threatPanel = document.getElementById('floating-threats');
+    if (threatPanel && (threatsMap.size > 0 || ((window as any).entryDetectionManager && (window as any).entryDetectionManager.candidates && (window as any).entryDetectionManager.candidates.length > 0))) {
+        threatPanel.classList.remove('view-hidden');
+    }
+    
+    console.log('✅ Threat analysis restored');
+};
+
+/**
+ * Updates the threat list after entry point deletion
+ */
+const updateThreatListAfterDeletion = () => {
+    const threatList = document.querySelector('.threat-list') as HTMLOListElement;
+    if (threatList) {
+        // Clear and rebuild threat list
+        threatList.innerHTML = '';
+        if (threatsMap.size > 0) {
+            renderThreatList();
+        }
+        addEntryDetectionResultsToThreatList(threatList);
+        
+        // Update title
+        const manager = (window as any).entryDetectionManager;
+        updateThreatListTitle(threatsMap.size > 0 || (manager && manager.candidates && manager.candidates.length > 0));
+    }
+};
+
+/**
+ * Creates a local deletion bubble next to an entry point marker
+ */
+const createDeletionBubble = (marker: any, candidate: any, isErschliessung: boolean) => {
+    // Remove any existing deletion bubble
+    const existingBubble = document.getElementById('deletion-bubble');
+    if (existingBubble) {
+        existingBubble.remove();
+    }
+
+    // Get marker position
+    const markerLatLng = marker.getLatLng();
+    const markerPoint = map.latLngToContainerPoint(markerLatLng);
+    
+    // Create bubble element
+    const bubble = document.createElement('div');
+    bubble.id = 'deletion-bubble';
+    bubble.style.cssText = `
+        position: absolute;
+        left: ${markerPoint.x + 15}px;
+        top: ${markerPoint.y - 10}px;
+        background: rgba(12, 47, 77, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        z-index: 10000;
+        color: white;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        min-width: 200px;
+        max-width: 250px;
+        pointer-events: auto;
+    `;
+
+    // Create bubble content
+    bubble.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="font-weight: 600; color: #FFD700;">
+                🗑️ Zufahrtspunkt löschen
+            </div>
+            <button id="close-deletion-bubble" style="
+                background: none;
+                border: none;
+                color: #ccc;
+                font-size: 18px;
+                cursor: pointer;
+                padding: 0;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">×</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button id="confirm-deletion" style="
+                background: #dc3545;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                flex: 1;
+                transition: background-color 0.2s;
+            " onmouseover="this.style.background='#c82333'" onmouseout="this.style.background='#dc3545'">
+                Entfernen
+            </button>
+        </div>
+    `;
+
+    // Add to map container
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        mapContainer.appendChild(bubble);
+    }
+
+    // Add event listeners
+    const closeBtn = document.getElementById('close-deletion-bubble');
+    const confirmBtn = document.getElementById('confirm-deletion');
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            bubble.remove();
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            // Delete the entry point
+            deleteEntryPoint(marker, candidate);
+            bubble.remove();
+        });
+    }
+
+    // Close bubble when clicking outside
+    const closeOnOutsideClick = (e: MouseEvent) => {
+        if (!bubble.contains(e.target as Node)) {
+            bubble.remove();
+            document.removeEventListener('click', closeOnOutsideClick);
+        }
+    };
+
+    // Delay the outside click listener to prevent immediate closure
+    setTimeout(() => {
+        document.addEventListener('click', closeOnOutsideClick);
+    }, 100);
+
+    return bubble;
+};
+
+/**
+ * Updates the position of the deletion bubble when map is moved or zoomed
+ */
+const updateDeletionBubblePosition = () => {
+    const bubble = document.getElementById('deletion-bubble');
+    if (!bubble || !map) return;
+
+    // Find the marker that this bubble belongs to
+    const entryMarkers = threatMarkersMap.get('entry-detection');
+    if (!entryMarkers || entryMarkers.length === 0) return;
+
+    // For now, we'll just remove the bubble on map move/zoom
+    // In a more sophisticated implementation, we could track which marker the bubble belongs to
+    bubble.remove();
+};
+
+/**
+ * Deletes an entry point and updates the UI
+ */
+const deleteEntryPoint = (marker: any, candidate: any) => {
+    console.log(`🗑️ Starting deletion of entry point ${candidate.id}`);
+    
+    // Get marker position for comprehensive cleanup
+    const markerLatLng = marker.getLatLng();
+    console.log(`📍 Marker position: ${markerLatLng.lat}, ${markerLatLng.lng}`);
+    
+    // 1. Delete from manager
+    const manager = (window as any).entryDetectionManager;
+    if (manager) {
+        manager.deleteCandidate(candidate.id);
+        console.log(`✅ Removed from entryDetectionManager`);
+    }
+    
+    // 2. COMPREHENSIVE LAYER CLEANUP - Remove ALL markers at this position
+    let removedCount = 0;
+    const layersToRemove: any[] = [];
+    
+    // Find all layers that might be at this position
+    map.eachLayer((layer: any) => {
+        // PROTECT: Never remove the security area polygon (drawnPolygon)
+        if (layer === drawnPolygon) {
+            console.log(`🛡️ PROTECTED: Skipping security area polygon - cannot be deleted from threat analysis tab`);
+            console.warn(`⚠️ SECURITY: Attempted to delete security area polygon from threat analysis tab - this is not allowed!`);
+            return;
+        }
+        
+        // PROTECT: Never remove the polygon label
+        if (layer === polygonLabel) {
+            console.log(`🛡️ PROTECTED: Skipping polygon label - cannot be deleted from threat analysis tab`);
+            return;
+        }
+        
+        // PROTECT: Never remove search marker
+        if (layer === searchMarker) {
+            console.log(`🛡️ PROTECTED: Skipping search marker - cannot be deleted from threat analysis tab`);
+            return;
+        }
+        
+        // PROTECT: Never remove waypoint markers
+        if (waypointMarkers.includes(layer)) {
+            console.log(`🛡️ PROTECTED: Skipping waypoint marker - cannot be deleted from threat analysis tab`);
+            return;
+        }
+        
+        if (layer instanceof L.Circle) {
+            const layerLatLng = layer.getLatLng();
+            const distance = markerLatLng.distanceTo(layerLatLng);
+            
+            // Remove circles within 2 meters of the target position
+            if (distance < 2) {
+                console.log(`🎯 Found circle at distance ${distance.toFixed(2)}m - marking for removal`);
+                layersToRemove.push(layer);
+            }
+        } else if (layer instanceof L.Polyline) {
+            // Check if this polyline is related to the entry point
+            const latLngs = layer.getLatLngs();
+            if (latLngs && latLngs.length > 0) {
+                // Check if any point of the polyline is near the marker
+                let isRelated = false;
+                for (const point of latLngs) {
+                    const pointLatLng = Array.isArray(point) ? L.latLng(point[0], point[1]) : point;
+                    const distance = markerLatLng.distanceTo(pointLatLng);
+                    if (distance < 10) { // 10m tolerance for path segments
+                        isRelated = true;
+                        break;
+                    }
+                }
+                
+                if (isRelated) {
+                    console.log(`🛣️ Found related polyline path - marking for removal`);
+                    layersToRemove.push(layer);
+                }
+            }
+        } else if (layer instanceof L.Marker) {
+            // Handle regular markers (including those with divIcon)
+            const layerLatLng = layer.getLatLng();
+            const distance = markerLatLng.distanceTo(layerLatLng);
+            
+            // Remove markers within 2 meters of the target position
+            if (distance < 2) {
+                console.log(`📍 Found marker at distance ${distance.toFixed(2)}m - marking for removal`);
+                layersToRemove.push(layer);
+            }
+        }
+    });
+    
+    // Remove all identified layers
+    layersToRemove.forEach((layer, index) => {
+        try {
+            if (threatLayerGroup && threatLayerGroup.hasLayer(layer)) {
+                threatLayerGroup.removeLayer(layer);
+            } else {
+                map.removeLayer(layer);
+            }
+            removedCount++;
+            console.log(`🗑️ Removed layer ${index + 1}/${layersToRemove.length}`);
+        } catch (error) {
+            console.warn(`⚠️ Failed to remove layer ${index + 1}:`, error);
+        }
+    });
+    
+    console.log(`✅ Removed ${removedCount} layers from map`);
+    
+    // 3. Clean up threatMarkersMap - remove ALL references to markers at this position
+    threatMarkersMap.forEach((markers, key) => {
+        const originalLength = markers.length;
+        const filteredMarkers = markers.filter(m => {
+            // PROTECT: Never remove the security area polygon (drawnPolygon)
+            if (m === drawnPolygon) {
+                console.log(`🛡️ PROTECTED: Keeping security area polygon in ${key}`);
+                return true;
+            }
+            
+            // PROTECT: Never remove the polygon label
+            if (m === polygonLabel) {
+                console.log(`🛡️ PROTECTED: Keeping polygon label in ${key}`);
+                return true;
+            }
+            
+            // PROTECT: Never remove search marker
+            if (m === searchMarker) {
+                console.log(`🛡️ PROTECTED: Keeping search marker in ${key}`);
+                return true;
+            }
+            
+            // PROTECT: Never remove waypoint markers
+            if (waypointMarkers.includes(m)) {
+                console.log(`🛡️ PROTECTED: Keeping waypoint marker in ${key}`);
+                return true;
+            }
+            
+            if (m && m.getLatLng) {
+                const mLatLng = m.getLatLng();
+                const distance = markerLatLng.distanceTo(mLatLng);
+                return distance >= 2; // Keep markers that are NOT at this position
+            } else if (m && m.getLatLngs) {
+                // Handle polylines - check if any point is near the marker
+                const latLngs = m.getLatLngs();
+                if (latLngs && latLngs.length > 0) {
+                    for (const point of latLngs) {
+                        const pointLatLng = Array.isArray(point) ? L.latLng(point[0], point[1]) : point;
+                        const distance = markerLatLng.distanceTo(pointLatLng);
+                        if (distance < 10) {
+                            return false; // Remove this polyline
+                        }
+                    }
+                }
+                return true; // Keep polyline if no points are near
+            }
+            return m !== marker; // Fallback: remove exact match
+        });
+        
+        if (filteredMarkers.length !== originalLength) {
+            threatMarkersMap.set(key, filteredMarkers);
+            console.log(`🧹 Cleaned ${key}: ${originalLength} → ${filteredMarkers.length} layers`);
+        }
+    });
+    
+    // 4. Update threat list
+    updateThreatListAfterDeletion();
+    
+    console.log(`✅ Entry point ${candidate.id} completely deleted (${removedCount} layers removed)`);
+    
+    // DEBUG: Log all remaining layers for analysis
+    console.log(`🔍 DEBUG: Analyzing all remaining layers on map:`);
+    let layerCount = 0;
+    map.eachLayer((layer: any) => {
+        layerCount++;
+        if (layer instanceof L.Circle) {
+            const pos = layer.getLatLng();
+            console.log(`  Layer ${layerCount}: L.Circle at ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} (radius: ${layer.options.radius})`);
+        } else if (layer instanceof L.Marker) {
+            const pos = layer.getLatLng();
+            console.log(`  Layer ${layerCount}: L.Marker at ${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`);
+        } else if (layer instanceof L.Polyline) {
+            const latLngs = layer.getLatLngs();
+            console.log(`  Layer ${layerCount}: L.Polyline with ${latLngs.length} points`);
+        } else if (layer instanceof L.Polygon) {
+            console.log(`  Layer ${layerCount}: L.Polygon (security area)`);
+        } else {
+            console.log(`  Layer ${layerCount}: ${layer.constructor.name} (unknown type)`);
+        }
+    });
+    console.log(`🔍 DEBUG: Total layers on map: ${layerCount}`);
+    
+    // 5. FINAL SAFETY CHECK - Ensure no orphaned markers or paths remain
+    setTimeout(() => {
+        const remainingLayers: any[] = [];
+        map.eachLayer((layer: any) => {
+            // PROTECT: Never remove the security area polygon (drawnPolygon)
+            if (layer === drawnPolygon) {
+                console.log(`🛡️ PROTECTED: Skipping security area polygon in final check`);
+                return;
+            }
+            
+            // PROTECT: Never remove the polygon label
+            if (layer === polygonLabel) {
+                console.log(`🛡️ PROTECTED: Skipping polygon label in final check`);
+                return;
+            }
+            
+            // PROTECT: Never remove search marker
+            if (layer === searchMarker) {
+                console.log(`🛡️ PROTECTED: Skipping search marker in final check`);
+                return;
+            }
+            
+            // PROTECT: Never remove waypoint markers
+            if (waypointMarkers.includes(layer)) {
+                console.log(`🛡️ PROTECTED: Skipping waypoint marker in final check`);
+                return;
+            }
+            
+            if (layer instanceof L.Circle) {
+                const layerLatLng = layer.getLatLng();
+                const distance = markerLatLng.distanceTo(layerLatLng);
+                if (distance < 2) {
+                    remainingLayers.push(layer);
+                }
+            } else if (layer instanceof L.Polyline) {
+                // Check for remaining path segments
+                const latLngs = layer.getLatLngs();
+                if (latLngs && latLngs.length > 0) {
+                    let isRelated = false;
+                    for (const point of latLngs) {
+                        const pointLatLng = Array.isArray(point) ? L.latLng(point[0], point[1]) : point;
+                        const distance = markerLatLng.distanceTo(pointLatLng);
+                        if (distance < 10) {
+                            isRelated = true;
+                            break;
+                        }
+                    }
+                    if (isRelated) {
+                        remainingLayers.push(layer);
+                    }
+                }
+            } else if (layer instanceof L.Marker) {
+                // Check for remaining markers
+                const layerLatLng = layer.getLatLng();
+                const distance = markerLatLng.distanceTo(layerLatLng);
+                if (distance < 2) {
+                    remainingLayers.push(layer);
+                }
+            }
+        });
+        
+        if (remainingLayers.length > 0) {
+            console.warn(`⚠️ Found ${remainingLayers.length} remaining layers at position - removing them`);
+            remainingLayers.forEach(layer => {
+                try {
+                    map.removeLayer(layer);
+                } catch (error) {
+                    console.warn('Failed to remove remaining layer:', error);
+                }
+            });
+        }
+    }, 100); // Small delay to ensure all operations are complete
+};
 
 /**
  * Clears the threat markers (red circles and lines) and the list from the map and UI.
@@ -2829,6 +3640,11 @@ const clearThreatAnalysis = () => {
         markers.forEach(marker => map.removeLayer(marker));
     });
     threatMarkersMap.clear();
+    
+    // Clear Entry Detection results
+    if ((window as any).entryDetectionManager) {
+        (window as any).entryDetectionManager.clearCandidates();
+    }
     threatsMap.clear();
     const threatList = document.querySelector('.threat-list') as HTMLOListElement;
     if (threatList) {
@@ -3560,6 +4376,9 @@ function renderThreatList() {
         threatList.appendChild(li);
     }
     
+    // Add Entry Detection results if available
+    addEntryDetectionResultsToThreatList(threatList);
+    
     // Update the title to show analysis format
     updateThreatListTitle(true);
     
@@ -4283,6 +5102,20 @@ const analyzeAndMarkThreats = async () => {
         threatList.appendChild(li);
     } finally {
         loadingIndicator.classList.add('hidden');
+        
+        // Trigger Entry Detection after threat analysis
+        console.log('🔍 Triggering Entry Detection after threat analysis...');
+        if ((window as any).entryDetectionManager && currentOsmData) {
+            await (window as any).entryDetectionManager.detectEntries(drawnPolygon, currentOsmData);
+            
+            // Create visual markers for Entry Detection candidates
+            console.log('🎯 Creating Entry Detection markers...');
+            createEntryDetectionMarkers();
+        }
+        
+        // Update product filter after threat analysis completes
+        console.log('🔄 Updating product filter with detected parameters...');
+        await filterProducts();
     }
 };
 
@@ -4973,7 +5806,7 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
     let isPinned = false;
     
     // Add CSS class to marker for hover effects
-    const markerIcon = marker.getElement();
+    const markerIcon = marker.getElement?.();
     if (markerIcon) {
         markerIcon.classList.add('has-tooltip', 'no-product-marker');
     }
@@ -5061,6 +5894,183 @@ function addNoProductTooltip(marker: any, streetName: string, maxSpeed: number) 
 }
 
 /**
+ * Determines if a way represents an "Erschließungsstraße" (access road) based on OSM tags
+ */
+function isErschliessungsstrasse(way: any): boolean {
+    if (!way || !way.tags) return false;
+    
+    const tags = way.tags;
+    
+    // Check for highway types that are typically access roads
+    const accessRoadTypes = [
+        'residential',      // Wohnstraße
+        'service',          // Zufahrtsstraße
+        'unclassified',     // Unklassifizierte Straße
+        'track',            // Feldweg
+        'path',             // Fußweg
+        'footway',          // Gehweg
+        'cycleway',         // Radweg
+        'pedestrian'        // Fußgängerzone
+    ];
+    
+    // Check for access-related tags
+    const accessTags = [
+        'access=private',   // Privater Zugang
+        'access=permissive', // Erlaubter Zugang
+        'access=delivery',  // Lieferzugang
+        'access=emergency', // Notfallzugang
+        'access=customers', // Kundenzugang
+        'access=residents', // Anwohnerzugang
+        'service=driveway', // Einfahrt
+        'service=parking_aisle', // Parkplatz-Zufahrt
+        'service=alley'     // Gasse
+    ];
+    
+    // Check highway type
+    if (tags.highway && accessRoadTypes.includes(tags.highway)) {
+        return true;
+    }
+    
+    // Check access tags
+    for (const accessTag of accessTags) {
+        const [key, value] = accessTag.split('=');
+        if (tags[key] === value) {
+            return true;
+        }
+    }
+    
+    // Check for residential or service area indicators
+    if (tags.landuse === 'residential' || tags.landuse === 'commercial') {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Creates visual markers for Entry Detection candidates on the map
+ */
+function createEntryDetectionMarkers() {
+    const manager = (window as any).entryDetectionManager;
+    if (!manager || !manager.candidates || manager.candidates.length === 0) {
+        return;
+    }
+    
+    if (!threatLayerGroup) {
+        threatLayerGroup = L.layerGroup().addTo(map);
+    }
+    
+    // Get OSM data to check for Erschließungsstraßen
+    const osmData = (window as any).currentOsmData;
+    const waysMap = new Map();
+    
+    if (osmData && osmData.ways) {
+        osmData.ways.forEach((way: any) => {
+            waysMap.set(way.id, way);
+        });
+    }
+    
+    console.log(`🔍 Processing ${manager.candidates.length} entry detection candidates...`);
+    
+    manager.candidates.forEach((candidate: any, index: number) => {
+        console.log(`🔍 Processing candidate ${index + 1}/${manager.candidates.length}: ${candidate.id}`);
+        
+        // Check if this candidate uses Erschließungsstraßen
+        let isErschliessung = false;
+        
+        if (candidate.wayIds && candidate.wayIds.length > 0) {
+            // Check if any of the ways used by this candidate are Erschließungsstraßen
+            for (const wayId of candidate.wayIds) {
+                const way = waysMap.get(wayId);
+                if (way && isErschliessungsstrasse(way)) {
+                    isErschliessung = true;
+                    break;
+                }
+            }
+        }
+        
+        // Determine marker color based on Erschließungsstraße status
+        let markerColor, fillColor;
+        if (isErschliessung) {
+            // Fully yellow for Erschließungsstraßen (both border and fill)
+            markerColor = '#FFD700';  // Gold border
+            fillColor = '#FFD700';    // Gold fill
+        } else {
+            // Red for regular access points
+            markerColor = '#DC143C';  // Crimson
+            fillColor = '#FF6347';    // Tomato
+        }
+        
+        // Create marker at intersection point
+        const marker = L.circle([candidate.intersectionPoint[1], candidate.intersectionPoint[0]], {
+            radius: 8,
+            color: markerColor,
+            fillColor: fillColor,
+            fillOpacity: 0.8,
+            weight: 3
+        });
+
+        // Add right-click context menu for deletion
+        console.log(`🔧 Adding right-click functionality to marker ${index + 1} (${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'})`);
+        marker.on('contextmenu', (e: any) => {
+            e.originalEvent.preventDefault();
+            
+            console.log('🖱️ Right-click detected on entry point');
+            console.log('Current active tab:', currentActiveTab);
+            console.log('Marker type:', isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt');
+            console.log('Candidate ID:', candidate.id);
+            
+            // Check if we're in the threat analysis tab
+            if (currentActiveTab !== 'nav-threat-analysis') {
+                console.log('⚠️ Entry point deletion only allowed in threat analysis tab');
+                return;
+            }
+            
+            // Show local deletion bubble
+            createDeletionBubble(marker, candidate, isErschliessung);
+        });
+        
+        // Also add click event for debugging
+        marker.on('click', (e: any) => {
+            console.log('🖱️ Left-click detected on entry point');
+            console.log('Marker type:', isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt');
+            console.log('Candidate ID:', candidate.id);
+        });
+        
+        // Create popup content
+        const popupContent = `
+            <div style="min-width: 200px;">
+                <b>🚪 Zufahrtspunkt ${index + 1}</b><br>
+                <b>Typ:</b> ${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'}<br>
+                <b>Confidence:</b> ${Math.round(candidate.confidence * 100)}%<br>
+                <b>Distanz:</b> ${Math.round(candidate.distanceMeters)}m<br>
+                <b>Geradheit:</b> ${Math.round(candidate.straightness * 100)}%<br>
+                <b>Kontinuität:</b> ${Math.round(candidate.continuity * 100)}%<br>
+                <b>Ways:</b> ${candidate.wayIds.length}
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+        threatLayerGroup?.addLayer(marker);
+        
+        console.log(`✅ Marker ${index + 1} added to map (${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'})`);
+        
+        // Store marker for potential future reference
+        if (!threatMarkersMap.has('entry-detection')) {
+            threatMarkersMap.set('entry-detection', []);
+        }
+        const entryMarkers = threatMarkersMap.get('entry-detection');
+        if (entryMarkers) {
+            entryMarkers.push(marker);
+            console.log(`📝 Marker ${index + 1} stored in threatMarkersMap (total: ${entryMarkers.length})`);
+        }
+    });
+    
+    console.log(`✅ Created ${manager.candidates.length} entry detection markers`);
+    console.log(`📊 Total markers in threatMarkersMap: ${threatMarkersMap.get('entry-detection')?.length || 0}`);
+}
+
+/**
  * Add interactive tooltip to a marker
  */
 function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number, product: any) {
@@ -5069,7 +6079,7 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
     let leafletPopup: any = null; // For pinned state using Leaflet popup
     
     // Add CSS class to marker for hover effects
-    const markerIcon = marker.getElement();
+    const markerIcon = marker.getElement?.();
     if (markerIcon) {
         markerIcon.classList.add('has-tooltip');
     }
@@ -6740,14 +7750,14 @@ async function loadOsmDataForCurrentPolygon(): Promise<void> {
         
         // Fetch new data with error handling
         try {
-            const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
-            
-            // Cache the result
-            osmCache.set(cacheKey, osmData);
-            
-            // Update global state
-            currentOsmData = osmData;
-            osmSpeedLimiter.setOsmData(osmData);
+        const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
+        
+        // Cache the result
+        osmCache.set(cacheKey, osmData);
+        
+        // Update global state
+        currentOsmData = osmData;
+        osmSpeedLimiter.setOsmData(osmData);
         } catch (error) {
             console.error('OSM Data Loading Error:', error);
             updateOsmStatus('error', error instanceof Error ? error.message : 'Fehler beim Laden der OSM-Daten');
@@ -6846,11 +7856,142 @@ function calculateVelocityWithOsm(acceleration: number, distance: number, pathCo
 }
 
 // ===============================================
+// ENTRY DETECTION INTEGRATION
+// ===============================================
+// Entry Detection is now integrated into the existing "Zugang analysieren" button
+// No separate UI setup needed - functionality is triggered automatically
+
+/**
+ * Fügt Entry Detection Ergebnisse zur Threat List hinzu
+ */
+function addEntryDetectionResultsToThreatList(threatList: HTMLOListElement): void {
+    const manager = (window as any).entryDetectionManager;
+    if (!manager || !manager.candidates || manager.candidates.length === 0) {
+        return;
+    }
+    
+    // Erstelle Header für Entry Detection Ergebnisse
+    const headerLi = document.createElement('li');
+    headerLi.className = 'entry-detection-header';
+    headerLi.style.cssText = `
+        background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), rgba(74, 222, 128, 0.05));
+        border-left: 4px solid #4ade80;
+        font-weight: 600;
+        color: #4ade80;
+        margin-top: 16px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: default;
+    `;
+    headerLi.innerHTML = `
+        <i class="fas fa-door-open" style="margin-right: 8px;"></i>
+        Zufahrtserkennung (${manager.candidates.length} gefunden)
+    `;
+    threatList.appendChild(headerLi);
+    
+    // Get OSM data to check for Erschließungsstraßen
+    const osmData = (window as any).currentOsmData;
+    const waysMap = new Map();
+    
+    if (osmData && osmData.ways) {
+        osmData.ways.forEach((way: any) => {
+            waysMap.set(way.id, way);
+        });
+    }
+    
+    // Füge jeden Entry Candidate hinzu
+    manager.candidates.forEach((candidate: any, index: number) => {
+        // Check if this candidate uses Erschließungsstraßen
+        let isErschliessung = false;
+        
+        if (candidate.wayIds && candidate.wayIds.length > 0) {
+            for (const wayId of candidate.wayIds) {
+                const way = waysMap.get(wayId);
+                if (way && isErschliessungsstrasse(way)) {
+                    isErschliessung = true;
+                    break;
+                }
+            }
+        }
+        
+        const li = document.createElement('li');
+        li.className = 'entry-candidate-item';
+        
+        const confidenceColor = candidate.confidence >= 0.7 ? '#4ade80' : 
+                               candidate.confidence >= 0.4 ? '#fbbf24' : '#f87171';
+        
+        // Different border color for Erschließungsstraßen
+        const borderColor = isErschliessung ? '#FFD700' : confidenceColor;
+        
+        li.style.cssText = `
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid ${borderColor};
+            margin: 4px 0;
+            padding: 12px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        `;
+        
+        li.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 600; color: white;">
+                    ${isErschliessung ? '🏠' : '🚗'} Zufahrt ${index + 1} ${isErschliessung ? '(Erschließung)' : ''}
+                </span>
+                <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: ${confidenceColor};">
+                    ${Math.round(candidate.confidence * 100)}% Confidence
+                </span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 11px; color: #ccc;">
+                <div>
+                    <div style="color: #aaa; font-size: 10px; margin-bottom: 2px;">Distanz:</div>
+                    <div style="font-weight: 600; color: white;">${Math.round(candidate.distanceMeters)}m</div>
+                </div>
+                <div>
+                    <div style="color: #aaa; font-size: 10px; margin-bottom: 2px;">Geradheit:</div>
+                    <div style="font-weight: 600; color: white;">${Math.round(candidate.straightness * 100)}%</div>
+                </div>
+                <div>
+                    <div style="color: #aaa; font-size: 10px; margin-bottom: 2px;">Kontinuität:</div>
+                    <div style="font-weight: 600; color: white;">${Math.round(candidate.continuity * 100)}%</div>
+                </div>
+            </div>
+        `;
+        
+        // Hover-Effekt
+        li.addEventListener('mouseenter', () => {
+            li.style.background = 'rgba(255, 255, 255, 0.1)';
+            li.style.transform = 'translateX(4px)';
+        });
+        
+        li.addEventListener('mouseleave', () => {
+            li.style.background = 'rgba(255, 255, 255, 0.05)';
+            li.style.transform = 'translateX(0)';
+        });
+        
+        // Click-Handler für Marker-Zoom (falls implementiert)
+        li.addEventListener('click', () => {
+            console.log(`Entry Candidate ${index + 1} clicked:`, candidate);
+            // Hier könnte man zu dem Entry Point zoomen oder weitere Details anzeigen
+        });
+        
+        threatList.appendChild(li);
+    });
+}
+
+// ===============================================
 // EVENT LISTENERS & INITIALIZATION
 // ===============================================
 // This initialization function will be called after authentication
 async function initializeApp() {
     console.log('🚀 INITIALIZE APP CALLED!');
+    
+    // Initialize Entry Detection System
+    console.log('🔧 Initializing Entry Detection System...');
+    integrateEntryDetectionWithExistingOSM();
+    addEntryDetectionStyles();
+    
+    // Entry Detection is now integrated into the existing "Zugang analysieren" button
     
     // DEBUG: List all elements with IDs immediately
     console.log('🔍 DEBUG: All elements with IDs at app start:', 
@@ -7123,6 +8264,16 @@ async function initializeApp() {
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
 
     const handleNavSwitch = async (newTabId: string, clickedLink?: HTMLAnchorElement) => {
+        // Update current active tab
+        currentActiveTab = newTabId;
+        console.log('🔄 Tab switched to:', currentActiveTab);
+        
+        // Close any open deletion bubble
+        const existingBubble = document.getElementById('deletion-bubble');
+        if (existingBubble) {
+            existingBubble.remove();
+        }
+        
         if (clickedLink) {
             navLinks.forEach(l => l.classList.remove('active'));
             clickedLink.classList.add('active');
@@ -7139,11 +8290,18 @@ async function initializeApp() {
             generatedPdf = null;
         }
         if (newTabId === 'nav-marking-area') {
-            clearThreatAnalysis();
+            // Don't clear threat analysis when returning to marking area
+            // Only clear when user explicitly clicks "Reset" button
             generatedPdf = null;
+            
+            // Restore threat analysis if it exists
+            restoreThreatAnalysis();
         }
         if (newTabId === 'nav-threat-analysis') {
             generatedPdf = null;
+            
+            // Restore threat analysis if it exists
+            restoreThreatAnalysis();
         }
         if (newTabId === 'nav-product-selection') {
             await updateProductRecommendations();
@@ -7195,6 +8353,24 @@ async function initializeApp() {
             event.preventDefault();
             const clickedLink = event.currentTarget as HTMLAnchorElement;
             const newTabId = clickedLink.id;
+            
+            // If clicking on threat analysis from header, show the submenu on map tab
+            if (newTabId === 'nav-threat-analysis') {
+                const mapThreatTab = document.getElementById('tab-threat-analysis');
+                const submenu = document.getElementById('threat-analysis-submenu');
+                
+                if (mapThreatTab && submenu) {
+                    const isCurrentlyOpen = submenu.classList.contains('show');
+                    
+                    if (!isCurrentlyOpen) {
+                        submenu.style.display = ''; // Clear inline style
+                        submenu.classList.add('show');
+                        mapThreatTab.classList.add('submenu-open');
+                        return; // Don't navigate, just show submenu
+                    }
+                }
+            }
+            
             await handleNavSwitch(newTabId, clickedLink);
         });
     });
@@ -7205,10 +8381,143 @@ async function initializeApp() {
             event.preventDefault();
             const link = event.currentTarget as HTMLAnchorElement;
             const targetId = link.getAttribute('data-target')!;
+            
+            // Handle Gefahrenanalyse tab with submenu
+            if (targetId === 'nav-threat-analysis') {
+                console.log('🔍 Gefahrenanalyse clicked - looking for submenu');
+                const submenu = document.getElementById('threat-analysis-submenu');
+                console.log('🔍 Submenu element found:', submenu);
+                console.log('🔍 Current display style:', submenu?.style.display);
+                const isCurrentlyOpen = submenu?.classList.contains('show');
+                console.log('🔍 Is currently open:', isCurrentlyOpen);
+                
+                // Close all other submenus if any
+                document.querySelectorAll('.threat-submenu').forEach(sm => {
+                    sm.classList.remove('show');
+                    (sm as HTMLElement).style.display = 'none';
+                });
+                
+                // Toggle this submenu using class instead of inline style
+                if (submenu) {
+                    if (isCurrentlyOpen) {
+                        submenu.classList.remove('show');
+                        submenu.style.display = 'none';
+                        console.log('🔍 Hiding submenu - removed show class');
+                    } else {
+                        submenu.style.display = ''; // Clear inline style
+                        submenu.classList.add('show');
+                        console.log('🔍 Showing submenu - added show class');
+                    }
+                    link.classList.toggle('submenu-open', !isCurrentlyOpen);
+                    console.log('🔍 Computed style display:', window.getComputedStyle(submenu).display);
+                    console.log('🔍 Computed style visibility:', window.getComputedStyle(submenu).visibility);
+                    console.log('🔍 Computed style opacity:', window.getComputedStyle(submenu).opacity);
+                    console.log('🔍 Computed style z-index:', window.getComputedStyle(submenu).zIndex);
+                    console.log('🔍 Submenu offsetHeight:', submenu.offsetHeight);
+                    console.log('🔍 Submenu getBoundingClientRect:', submenu.getBoundingClientRect());
+                    console.log('🔍 Submenu classes:', submenu.className);
+                    console.log('🔍 Submenu parent element:', submenu.parentElement);
+                }
+                
+                // If opening submenu, don't navigate
+                if (!isCurrentlyOpen) {
+                    console.log('🔍 Opening submenu - stopping navigation');
+                    return;
+                }
+            } else {
+                // Close submenu when clicking other tabs
+                document.querySelectorAll('.threat-submenu').forEach(sm => {
+                    sm.classList.remove('show');
+                    (sm as HTMLElement).style.display = 'none';
+                });
+                document.querySelectorAll('.has-submenu').forEach(hsm => {
+                    hsm.classList.remove('submenu-open');
+                });
+            }
+            
             const correspondingHeaderLink = document.getElementById(targetId) as HTMLAnchorElement | null;
             await handleNavSwitch(targetId, correspondingHeaderLink ?? undefined);
         });
     });
+
+    // Submenu items handling
+    const threatAnalysisSubmenu = document.getElementById('threat-analysis-submenu');
+    if (threatAnalysisSubmenu) {
+        threatAnalysisSubmenu.addEventListener('click', async (event) => {
+            const target = event.target as HTMLElement;
+            const submenuItem = target.closest('.submenu-item') as HTMLAnchorElement;
+            
+            if (!submenuItem) return;
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const action = submenuItem.getAttribute('data-submenu-action');
+            const isDisabled = submenuItem.classList.contains('disabled');
+            
+            if (isDisabled) {
+                // Show contact modal for disabled modules
+                const modal = document.getElementById('module-contact-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                }
+            } else if (action === 'access-analysis') {
+                // Execute the normal threat analysis
+                const threatTab = document.getElementById('tab-threat-analysis');
+                if (threatTab) {
+                    // Close the submenu
+                    threatAnalysisSubmenu.style.display = 'none';
+                    threatTab.classList.remove('submenu-open');
+                    
+                    // Trigger the normal navigation
+                    const correspondingHeaderLink = document.getElementById('nav-threat-analysis') as HTMLAnchorElement | null;
+                    await handleNavSwitch('nav-threat-analysis', correspondingHeaderLink ?? undefined);
+                }
+            }
+        });
+    }
+
+    // Close submenu when clicking outside
+    document.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.has-submenu') && !target.closest('.threat-submenu') && !target.closest('.tab-with-submenu')) {
+            document.querySelectorAll('.threat-submenu').forEach(sm => {
+                sm.classList.remove('show');
+                (sm as HTMLElement).style.display = 'none';
+            });
+            document.querySelectorAll('.has-submenu').forEach(hsm => {
+                hsm.classList.remove('submenu-open');
+            });
+        }
+    });
+
+    // Module contact modal handling
+    const moduleContactModal = document.getElementById('module-contact-modal');
+    const closeModuleModalBtn = document.getElementById('close-module-modal-btn');
+    const closeModuleModal = document.getElementById('close-module-modal');
+    
+    function closeContactModal() {
+        if (moduleContactModal) {
+            moduleContactModal.style.display = 'none';
+        }
+    }
+    
+    if (closeModuleModalBtn) {
+        closeModuleModalBtn.addEventListener('click', closeContactModal);
+    }
+    
+    if (closeModuleModal) {
+        closeModuleModal.addEventListener('click', closeContactModal);
+    }
+    
+    if (moduleContactModal) {
+        // Close modal when clicking overlay
+        moduleContactModal.querySelector('.modal-overlay')?.addEventListener('click', closeContactModal);
+        
+        // Prevent modal content clicks from closing the modal
+        moduleContactModal.querySelector('.modal-content-box')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
 
     vehicleSelect.addEventListener('change', async () => {
         if (threatsMap.size > 0) {
@@ -7346,20 +8655,8 @@ function initNavigationWithPersistence() {
             e.preventDefault();
             console.log('📥 DIRECT: Clicking security area tab - restoring state');
             
-            // Update active states
-            document.querySelectorAll('.main-nav a').forEach(link => {
-                link.classList.remove('active');
-                link.removeAttribute('aria-current');
-            });
-            
-            (newNavMarkingArea as HTMLElement).classList.add('active');
-            (newNavMarkingArea as HTMLElement).setAttribute('aria-current', 'page');
-            
-            // Update map tabs
-            document.querySelectorAll('.map-tabs a').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.getElementById('tab-marking-area')?.classList.add('active');
+            // Use the main navigation system
+            handleNavSwitch('nav-marking-area', newNavMarkingArea as HTMLAnchorElement);
             
             // Restore polygon state
             setTimeout(() => {
@@ -7384,20 +8681,8 @@ function initNavigationWithPersistence() {
             // Save polygon state BEFORE switching
             saveSecurityAreaState();
             
-            // Update active states
-            document.querySelectorAll('.main-nav a').forEach(link => {
-                link.classList.remove('active');
-                link.removeAttribute('aria-current');
-            });
-            
-            (newNavParamInput as HTMLElement).classList.add('active');
-            (newNavParamInput as HTMLElement).setAttribute('aria-current', 'page');
-            
-            // Update map tabs
-            document.querySelectorAll('.map-tabs a').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.getElementById('tab-param-input')?.classList.add('active');
+            // Use the main navigation system
+            handleNavSwitch('nav-param-input', newNavParamInput as HTMLAnchorElement);
             
             console.log('🔄 DIRECT: Navigation switched to nav-param-input');
         });
@@ -7416,7 +8701,12 @@ function initNavigationWithPersistence() {
         newTabMarkingArea.addEventListener('click', (e) => {
             e.preventDefault();
             console.log('🗺️ DIRECT: Map tab clicked - triggering nav-marking-area');
-            document.getElementById('nav-marking-area')?.click();
+            
+            // Use the main navigation system
+            const navMarkingArea = document.getElementById('nav-marking-area') as HTMLAnchorElement;
+            if (navMarkingArea) {
+                handleNavSwitch('nav-marking-area', navMarkingArea);
+            }
         });
     }
     
@@ -7427,7 +8717,12 @@ function initNavigationWithPersistence() {
         newTabParamInput.addEventListener('click', (e) => {
             e.preventDefault();
             console.log('🗺️ DIRECT: Map tab clicked - triggering nav-param-input');
-            document.getElementById('nav-param-input')?.click();
+            
+            // Use the main navigation system
+            const navParamInput = document.getElementById('nav-param-input') as HTMLAnchorElement;
+            if (navParamInput) {
+                handleNavSwitch('nav-param-input', navParamInput);
+            }
         });
     }
     
@@ -7798,6 +9093,609 @@ function setupLogoLogout() {
         (logo as HTMLElement).style.cursor = 'pointer';
     });
 }
+
+// ===============================================
+// FILTER SIDEBAR FUNCTIONS
+// ===============================================
+
+/**
+ * Toggle range input visibility
+ */
+function toggleRangeInput(rangeId: string) {
+    const content = document.getElementById(`${rangeId}-content`);
+    const icon = document.getElementById(`${rangeId}-icon`);
+    
+    if (content && icon) {
+        const isVisible = content.style.display !== 'none';
+        
+        if (isVisible) {
+            content.style.display = 'none';
+            icon.classList.remove('expanded');
+        } else {
+            content.style.display = 'block';
+            icon.classList.add('expanded');
+        }
+    }
+}
+
+/**
+ * Toggle dropdown visibility
+ */
+function toggleDropdown(dropdownId: string) {
+    const content = document.getElementById(`${dropdownId}-content`);
+    const icon = document.getElementById(`${dropdownId}-icon`);
+    
+    if (content && icon) {
+        const isVisible = content.style.display !== 'none';
+        
+        if (isVisible) {
+            content.style.display = 'none';
+            icon.classList.remove('expanded');
+        } else {
+            content.style.display = 'block';
+            icon.classList.add('expanded');
+        }
+    }
+}
+
+/**
+ * Setup event listeners for filter sidebar elements
+ */
+function setupFilterSidebarEvents() {
+    console.log('Setting up filter sidebar events...');
+    
+    // Reset button
+    const resetButton = document.getElementById('reset-all-filters');
+    if (resetButton) {
+        resetButton.addEventListener('click', () => {
+            resetAllFilters();
+            applyFiltersAndUpdateDisplay();
+        });
+    }
+    
+    // All select dropdowns
+    const selectElements = document.querySelectorAll('.manufacturer-sidebar select');
+    selectElements.forEach(select => {
+        select.addEventListener('change', () => {
+            applyFiltersAndUpdateDisplay();
+        });
+    });
+    
+    // All number inputs for ranges
+    const numberInputs = document.querySelectorAll('.manufacturer-sidebar input[type="number"]');
+    numberInputs.forEach(input => {
+        input.addEventListener('input', () => {
+            applyFiltersAndUpdateDisplay();
+        });
+    });
+    
+    // All checkboxes
+    const checkboxes = document.querySelectorAll('.manufacturer-sidebar input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            applyFiltersAndUpdateDisplay();
+        });
+    });
+    
+    console.log('Filter sidebar events setup completed');
+}
+
+/**
+ * Get current filter values
+ */
+function getCurrentFilters() {
+    const filters = {
+        vehicleMass: getSelectedCheckboxes('vehicle-mass-content'),
+        impactSpeed: {
+            min: parseInt((document.getElementById('min-speed') as HTMLInputElement)?.value || '16'),
+            max: parseInt((document.getElementById('max-speed') as HTMLInputElement)?.value || '112')
+        },
+        impactAngle: {
+            min: parseInt((document.getElementById('min-angle') as HTMLInputElement)?.value || '15'),
+            max: parseInt((document.getElementById('max-angle') as HTMLInputElement)?.value || '90')
+        },
+        penetrationDistance: {
+            min: parseFloat((document.getElementById('min-distance') as HTMLInputElement)?.value || '0'),
+            max: parseFloat((document.getElementById('max-distance') as HTMLInputElement)?.value || '60')
+        },
+        standard: getSelectedCheckboxes('standards-content'),
+        foundation: getSelectedCheckboxes('foundation-content'),
+        operation: getSelectedCheckboxes('operation-content'),
+        deployment: getSelectedCheckboxes('deployment-content'),
+        category: getSelectedCheckboxes('categories-content'),
+        manufacturer: (document.getElementById('manufacturer-select') as HTMLSelectElement)?.value || ''
+    };
+    
+    return filters;
+}
+
+/**
+ * Get selected checkbox values from a container
+ */
+function getSelectedCheckboxes(containerId: string): string[] {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => (cb as HTMLInputElement).value);
+}
+
+/**
+ * Generate Vehicle Mass options with real counts
+ */
+function generateVehicleMassOptions(counts: any): string {
+    const vehicleMassOptions = [
+        { mass: 1500, category: 'M1' },
+        { mass: 2500, category: 'IT' },
+        { mass: 2500, category: 'N1G' },
+        { mass: 3500, category: 'N1' },
+        { mass: 7200, category: 'N2A' },
+        { mass: 7200, category: 'N2B' },
+        { mass: 7200, category: 'N3C' },
+        { mass: 7500, category: 'N2' },
+        { mass: 7500, category: 'N3' },
+        { mass: 12000, category: 'N3D' },
+        { mass: 30000, category: 'N3F' }
+    ];
+    
+    return vehicleMassOptions.map(option => {
+        const key = `${option.mass} [${option.category}]`;
+        const count = counts[key] || 0;
+        return `<label><input type="checkbox" value="${option.mass} [${option.category}]" data-category="${option.category}"> ${option.mass} [${option.category}] (${count})</label>`;
+    }).join('');
+}
+
+/**
+ * Generate Standard options with real counts
+ */
+function generateStandardOptions(counts: any): string {
+    const isGerman = currentLanguage === 'de';
+    const standardOptions = [
+        { 
+            value: 'Development test meeting PAS 68:2005', 
+            label: isGerman ? 'Virtuell getestet nach PAS 68:2005' : 'Development test meeting PAS 68:2005' 
+        },
+        { value: 'ISO 22343-1:2023', label: 'ISO 22343-1:2023' },
+        { value: 'IWA 14-1:2013', label: 'IWA 14-1:2013' },
+        { value: 'PAS 68:2005', label: 'PAS 68:2005' },
+        { value: 'PAS 68:2007', label: 'PAS 68:2007' },
+        { value: 'PAS 68:2010', label: 'PAS 68:2010' },
+        { value: 'PAS 68:2013', label: 'PAS 68:2013' }
+    ];
+    
+    return standardOptions.map(standard => {
+        const count = counts[standard.value] || 0;
+        return `<label><input type="checkbox" value="${standard.value}"> ${standard.label} (${count})</label>`;
+    }).join('');
+}
+
+/**
+ * Generate Foundation options with real counts
+ */
+function generateFoundationOptions(counts: any): string {
+    const isGerman = currentLanguage === 'de';
+    const foundationOptions = [
+        { 
+            value: 'A - Free standing (no ground fixings)', 
+            label: isGerman ? 'Freistehend (ohne Bodenbefestigung)' : 'Free standing (no ground fixings)' 
+        },
+        { 
+            value: 'Ap - Surface mounted (pinned or bolted to ground)', 
+            label: isGerman ? 'Oberflächenmontiert (gedübbelt oder geschraubt)' : 'Surface mounted (pinned or bolted to ground)' 
+        },
+        { 
+            value: 'B - Depth <= 0.5m below ground level', 
+            label: isGerman ? 'Tiefe <= 0,5m unter Geländeoberkante' : 'Depth <= 0.5m below ground level' 
+        },
+        { 
+            value: 'C - Depth >0.5m below ground level', 
+            label: isGerman ? 'Tiefe >0,5m unter Geländeoberkante' : 'Depth >0.5m below ground level' 
+        }
+    ];
+    
+    return foundationOptions.map(foundation => {
+        const count = counts[foundation.value] || 0;
+        return `<label><input type="checkbox" value="${foundation.value}"> ${foundation.label} (${count})</label>`;
+    }).join('');
+}
+
+/**
+ * Generate Operation options with real counts
+ */
+function generateOperationOptions(counts: any): string {
+    const isGerman = currentLanguage === 'de';
+    const operationOptions = [
+        { value: 'active', label: isGerman ? 'Aktiv' : 'active' },
+        { value: 'passive', label: isGerman ? 'Passiv' : 'passive' }
+    ];
+    
+    return operationOptions.map(operation => {
+        const count = counts[operation.value] || 0;
+        return `<label><input type="checkbox" value="${operation.value}"> ${operation.label} (${count})</label>`;
+    }).join('');
+}
+
+/**
+ * Generate Deployment options with real counts
+ */
+function generateDeploymentOptions(counts: any): string {
+    const isGerman = currentLanguage === 'de';
+    const deploymentOptions = [
+        { value: 'permanent', label: isGerman ? 'Permanent' : 'permanent' },
+        { value: 'temporary', label: isGerman ? 'Temporär' : 'temporary' }
+    ];
+    
+    return deploymentOptions.map(deployment => {
+        const count = counts[deployment.value] || 0;
+        return `<label><input type="checkbox" value="${deployment.value}"> ${deployment.label} (${count})</label>`;
+    }).join('');
+}
+
+/**
+ * Generate Categories options with real counts
+ */
+function generateCategoriesOptions(counts: any): string {
+    const isGerman = currentLanguage === 'de';
+    
+    // Map German product types to categories for display
+    const categoryMapping = {
+        'Poller': isGerman ? 'Poller' : 'Bollards',
+        'Zaun': isGerman ? 'Zaun' : 'Perimeter Barriers', 
+        'Tor': isGerman ? 'Tor' : 'Gates',
+        'Haltestelle': isGerman ? 'Straßenmöbel' : 'Street Furniture',
+        'Durchfahrtsperre': isGerman ? 'Sperrblocker' : 'Blockers',
+        'Unknown': isGerman ? 'Sonstige' : 'Other'
+    };
+    
+    // Group products by mapped categories
+    const categoryGroups: { [key: string]: string[] } = {};
+    Object.entries(categoryMapping).forEach(([germanType, displayCategory]) => {
+        if (!categoryGroups[displayCategory]) {
+            categoryGroups[displayCategory] = [];
+        }
+        categoryGroups[displayCategory].push(germanType);
+    });
+    
+    return Object.entries(categoryGroups).map(([categoryName, germanTypes]) => {
+        const categoryCount = germanTypes.reduce((sum, type) => sum + (counts[type] || 0), 0);
+        const childrenHTML = germanTypes.map(germanType => {
+            const childCount = counts[germanType] || 0;
+            // Use the translated display name for the sub-category
+            const subCategoryDisplayName = categoryMapping[germanType] || germanType;
+            return `<label><input type="checkbox" value="${germanType}" data-category="${categoryName}"> ${subCategoryDisplayName} (${childCount})</label>`;
+        }).join('');
+        
+        return `
+            <div class="category-item">
+                <div class="category-header">
+                    <label><input type="checkbox" value="${categoryName}" data-category="${categoryName}"> ${categoryName} (${categoryCount})</label>
+                </div>
+                <div class="category-children">
+                    ${childrenHTML}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Generate Manufacturer options with real counts
+ */
+function generateManufacturerOptions(counts: any): string {
+    const manufacturers = [
+        'ATGAccess', 'Avon-Barrier', 'Barkers Fencing', 'Blockaxess', 'Delta Scientific',
+        'Eagle Auto Gate', 'Frontier Pitts', 'Heald', 'Highway Care', 'Marshalls',
+        'Perimeter Protection', 'Reidsteel', 'Securiscape', 'Smith Ltd', 'Tiso Production',
+        'Urbaco', 'Zaun'
+    ];
+    
+    return manufacturers.map(manufacturer => {
+        const count = counts[manufacturer] || 0;
+        return `<option value="${manufacturer}">${manufacturer} (${count})</option>`;
+    }).join('');
+}
+
+/**
+ * Calculate real product counts for filter categories
+ */
+function calculateProductCounts() {
+    const allProducts = (window as any).productDatabase || [];
+    console.log('📊 Calculating product counts from', allProducts.length, 'products');
+    
+    const counts: {
+        vehicleMass: { [key: string]: number };
+        standard: { [key: string]: number };
+        foundation: { [key: string]: number };
+        operation: { [key: string]: number };
+        deployment: { [key: string]: number };
+        category: { [key: string]: number };
+        manufacturer: { [key: string]: number };
+    } = {
+        vehicleMass: {},
+        standard: {},
+        foundation: {},
+        operation: {},
+        deployment: {},
+        category: {},
+        manufacturer: {}
+    };
+    
+    allProducts.forEach((product: any) => {
+        const techData = product.technical_data;
+        if (!techData) return;
+        
+        // Vehicle Mass counts
+        const vehicleMass = techData.pr_mass_kg;
+        const vehicleCategory = techData.pr_veh;
+        if (vehicleMass && vehicleCategory) {
+            const key = `${vehicleMass} [${vehicleCategory}]`;
+            counts.vehicleMass[key] = (counts.vehicleMass[key] || 0) + 1;
+        }
+        
+        // Standard counts
+        const standard = techData.standard;
+        if (standard) {
+            counts.standard[standard] = (counts.standard[standard] || 0) + 1;
+        }
+        
+        // Foundation counts
+        const foundation = techData.foundation_depth;
+        if (foundation) {
+            counts.foundation[foundation] = (counts.foundation[foundation] || 0) + 1;
+        }
+        
+        // Operation counts (if available in data)
+        // const operation = techData.operation;
+        // if (operation) {
+        //     counts.operation[operation] = (counts.operation[operation] || 0) + 1;
+        // }
+        
+        // Deployment counts based on foundation type
+        // All free-standing products are suitable for temporary deployment
+        const isFreeStanding = techData.foundation_depth === 'A - Free standing (no ground fixings)';
+        if (isFreeStanding) {
+            counts.deployment['temporary'] = (counts.deployment['temporary'] || 0) + 1;
+        }
+        // All products can be used for permanent deployment
+        counts.deployment['permanent'] = (counts.deployment['permanent'] || 0) + 1;
+        
+        // Category counts (based on product_type)
+        const category = product.product_type;
+        if (category) {
+            counts.category[category] = (counts.category[category] || 0) + 1;
+        }
+        
+        // Manufacturer counts
+        const manufacturer = product.manufacturer;
+        if (manufacturer) {
+            counts.manufacturer[manufacturer] = (counts.manufacturer[manufacturer] || 0) + 1;
+        }
+    });
+    
+    console.log('📈 Calculated counts:', counts);
+    return counts;
+}
+
+/**
+ * Apply filters and update product display
+ */
+function applyFiltersAndUpdateDisplay() {
+    console.log('🔄 Applying filters and updating display...');
+    
+    const filters = getCurrentFilters();
+    console.log('📊 Current filters:', filters);
+    
+    const allProducts = (window as any).productDatabase || [];
+    console.log('📦 Total products in database:', allProducts.length);
+    
+    const filteredProducts = filterProductsByFilters(allProducts, filters);
+    console.log('✅ Filtered products:', filteredProducts.length);
+    
+    // Update the display
+    displayProducts(filteredProducts);
+}
+
+/**
+ * Filter products based on all filter types
+ */
+function filterProductsByFilters(products: any[], filters: any) {
+    return products.filter(product => {
+        const techData = product.technical_data;
+        if (!techData) return false;
+        
+        // Vehicle Mass filter (checkbox selection)
+        if (filters.vehicleMass.length > 0) {
+            const vehicleMass = techData.pr_mass_kg;
+            const vehicleCategory = techData.pr_veh;
+            if (!vehicleMass || !vehicleCategory) return false;
+            
+            const matchesVehicleMass = filters.vehicleMass.some((filterValue: string) => {
+                const [massStr, category] = filterValue.split(' ');
+                const mass = parseInt(massStr);
+                return vehicleMass === mass && vehicleCategory === category.replace(/[\[\]]/g, '');
+            });
+            
+            if (!matchesVehicleMass) return false;
+        }
+        
+        // Impact Speed filter (range)
+        const impactSpeed = techData.pr_speed_kph;
+        if (impactSpeed && (impactSpeed < filters.impactSpeed.min || impactSpeed > filters.impactSpeed.max)) {
+            return false;
+        }
+        
+        // Impact Angle filter (range)
+        const impactAngle = techData.pr_angle_deg;
+        if (impactAngle && (impactAngle < filters.impactAngle.min || impactAngle > filters.impactAngle.max)) {
+            return false;
+        }
+        
+        // Penetration Distance filter (range)
+        const penetrationDistance = techData.pr_pen_m;
+        if (penetrationDistance && (penetrationDistance < filters.penetrationDistance.min || penetrationDistance > filters.penetrationDistance.max)) {
+            return false;
+        }
+        
+        // Standard filter (checkbox selection)
+        if (filters.standard.length > 0) {
+            const standard = techData.standard;
+            if (!standard || !filters.standard.includes(standard)) {
+                return false;
+            }
+        }
+        
+        // Foundation filter (checkbox selection)
+        if (filters.foundation.length > 0) {
+            const foundation = techData.foundation_depth;
+            if (!foundation || !filters.foundation.includes(foundation)) {
+                return false;
+            }
+        }
+        
+        // Operation filter (checkbox selection)
+        if (filters.operation.length > 0) {
+            // This would need to be mapped from product data - for now, skip if no operation data
+            // const operation = techData.operation;
+            // if (!operation || !filters.operation.includes(operation)) {
+            //     return false;
+            // }
+        }
+        
+        // Deployment filter (checkbox selection)
+        if (filters.deployment.length > 0) {
+            // Check if "temporary" deployment is selected
+            const temporarySelected = filters.deployment.includes('temporary');
+            const permanentSelected = filters.deployment.includes('permanent');
+            
+            // Check if product is free-standing (suitable for temporary deployment)
+            const isFreeStanding = techData.foundation_depth === 'A - Free standing (no ground fixings)';
+            
+            let matchesDeployment = false;
+            
+            // If temporary is selected, free-standing products automatically match
+            if (temporarySelected && isFreeStanding) {
+                matchesDeployment = true;
+            }
+            
+            // If permanent is selected, all products except purely temporary ones match
+            // (since most products can be used permanently)
+            if (permanentSelected) {
+                matchesDeployment = true;
+            }
+            
+            // If both are selected, all products match
+            if (temporarySelected && permanentSelected) {
+                matchesDeployment = true;
+            }
+            
+            // If only temporary is selected and product is NOT free-standing, exclude it
+            if (!matchesDeployment && temporarySelected && !isFreeStanding) {
+                return false;
+            }
+            
+            // If no match found, exclude the product
+            if (!matchesDeployment) {
+                return false;
+            }
+        }
+        
+        // Category filter (checkbox selection)
+        if (filters.category.length > 0) {
+            // This would need to be mapped from product data - for now, skip if no category data
+            // const category = product.product_type;
+            // if (!category || !filters.category.includes(category)) {
+            //     return false;
+            // }
+        }
+        
+        // Manufacturer filter (dropdown selection)
+        if (filters.manufacturer && filters.manufacturer !== '') {
+            if (product.manufacturer !== filters.manufacturer) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+}
+
+/**
+ * Extract year from standard string (e.g., "PAS 68:2010" -> 2010)
+ */
+function extractYearFromStandard(standard: string): number | null {
+    const yearMatch = standard.match(/(\d{4})/);
+    return yearMatch ? parseInt(yearMatch[1]) : null;
+}
+
+/**
+ * Extract depth from foundation string
+ */
+function extractDepthFromFoundation(foundation: string): number | null {
+    if (foundation.includes('Free standing') || foundation.includes('Surface mounted')) {
+        return 0;
+    } else if (foundation.includes('<= 0.5m')) {
+        return 0.5;
+    } else if (foundation.includes('>0.5m')) {
+        return 1.0; // Assume >0.5m means around 1m
+    }
+    return null;
+}
+
+/**
+ * Reset all filters to default values
+ */
+function resetAllFilters() {
+    console.log('Resetting all filters...');
+    
+    // Reset range inputs to default values
+    const rangeInputs = [
+        { id: 'min-speed', value: '16' },
+        { id: 'max-speed', value: '112' },
+        { id: 'min-angle', value: '15' },
+        { id: 'max-angle', value: '90' },
+        { id: 'min-distance', value: '0' },
+        { id: 'max-distance', value: '60' }
+    ];
+    
+    rangeInputs.forEach(({ id, value }) => {
+        const element = document.getElementById(id) as HTMLInputElement;
+        if (element) {
+            element.value = value;
+        }
+    });
+    
+    // Reset checkboxes (uncheck all)
+    const checkboxContainers = [
+        'vehicle-mass-content',
+        'standards-content', 
+        'foundation-content',
+        'operation-content',
+        'deployment-content',
+        'categories-content'
+    ];
+    
+    checkboxContainers.forEach(containerId => {
+        const container = document.getElementById(containerId);
+        if (container) {
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                (checkbox as HTMLInputElement).checked = false;
+            });
+        }
+    });
+    
+    // Reset manufacturer dropdown
+    const manufacturerSelect = document.getElementById('manufacturer-select') as HTMLSelectElement;
+    if (manufacturerSelect) {
+        manufacturerSelect.value = '';
+    }
+    
+    console.log('All filters reset to default values');
+}
+
+// Make toggle functions globally available
+(window as any).toggleRangeInput = toggleRangeInput;
+(window as any).toggleDropdown = toggleDropdown;
 
 // Initialize authentication system when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

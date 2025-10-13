@@ -24,8 +24,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-DVUHvblQ.js"></script>
-  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-B_-WFVv3.css">
+  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-CTz7Vv26.js"></script>
+  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-WHRHrjq1.css">
 </head>
 <body>
     <!-- =============================================== -->
@@ -135,15 +135,54 @@
                     <div class="map-tabs">
                         <a href="#" id="tab-marking-area" data-target="nav-marking-area" class="active" data-translate-key="nav.markingArea">Sicherheitsbereich</a>
                         <a href="#" id="tab-param-input" data-target="nav-param-input" data-translate-key="nav.paramInput">Parameter</a>
-                        <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a>
+                        <div class="tab-with-submenu">
+                            <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis" class="has-submenu">
+                                Gefahrenanalyse
+                                <i class="fas fa-chevron-down submenu-indicator"></i>
+                            </a>
+                            <div id="threat-analysis-submenu" class="threat-submenu" style="display: none; width: 300px !important; min-width: 300px !important;">
+                                <a href="#" class="submenu-item active" data-submenu-action="access-analysis" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-road"></i>
+                                    Zufahrtanalyse
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="kritis" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-shield-alt"></i>
+                                    KRITIS-Modul
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="scenario-sim" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-project-diagram"></i>
+                                    ScenarioSim Pro (inkl. DynSim+)
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="compliance" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-file-contract"></i>
+                                    Compliance- Dokumenten-Kit
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="funding" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-hand-holding-usd"></i>
+                                    Fördermittel-Assistent
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="authorities" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-building"></i>
+                                    Behörden- & Fördermittel-Paket
+                                </a>
+                                <a href="#" class="submenu-item disabled" data-submenu-action="tender" style="width: 300px !important; min-width: 300px !important;">
+                                    <i class="fas fa-gavel"></i>
+                                    Ausschreibungs-Assistent
+                                </a>
+                            </div>
+                        </div>
                         <a href="#" id="tab-risk-report" data-target="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a>
                         <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a>
                         <a href="#" id="tab-project-description" data-target="nav-project-description" data-translate-key="nav.projectDescription">Ausschreibung</a>
                     </div>
+                    <!-- Map Settings Button -->
+                    <button id="map-settings-btn" class="map-settings-btn" title="Karteneinstellungen" data-translate-key="map.settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Paderborn, Domplatz" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" placeholder="Soest, Marktplatz" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
@@ -344,6 +383,9 @@
                 </div>
                 
                 <div class="manufacturer-content-wrapper">
+                    <!-- React FilterSidebar Mount Point -->
+                    <div id="filter-sidebar-root"></div>
+                    
                     <!-- Left Sidebar for Manufacturer View -->
                     <aside class="manufacturer-sidebar">
                         <section class="sidebar-section">
@@ -536,6 +578,33 @@
         </div>
     </div>
     <div id="tooltip" class="tooltip" role="tooltip"></div>
+    
+    <!-- Contact Modal for Disabled Modules -->
+    <div id="module-contact-modal" class="module-contact-modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content-box">
+            <button class="modal-close-btn" id="close-module-modal">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="modal-icon">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <h2 class="modal-title">Weitere Module verfügbar</h2>
+            <p class="modal-message">
+                Bitte kontaktieren Sie uns für die Nutzung weiterer Module.
+            </p>
+            <div class="modal-actions">
+                <a href="mailto:info@barricadix.com" class="modal-btn modal-btn-primary">
+                    <i class="fas fa-envelope"></i>
+                    Kontakt aufnehmen
+                </a>
+                <button class="modal-btn modal-btn-secondary" id="close-module-modal-btn">
+                    Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Application Logic -->
     
 </body>

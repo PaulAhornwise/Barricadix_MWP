@@ -22,53 +22,6 @@
     "user": {
       "loggedIn": "Angemeldet: BarricadiX Admin"
     },
-      "options": {
-        "vehicle": {
-          "all": "alle",
-          "motorcycle": "Motorrad",
-          "car_light": "KFZ <3.5t",
-          "truck_light": "LKW <7.5t",
-          "truck_medium": "LKW <12t",
-          "truck_heavy": "LKW <40t"
-        },
-        "access": {
-          "all": "alle",
-          "meadow": "Wiese",
-          "forest_path": "Waldweg",
-          "pedestrian_path": "Fußgängerweg",
-          "one_way": "Einbahnstraße",
-          "two_lane": "Zweispur",
-          "three_lane": "Dreispur",
-          "four_lane": "Vierspur"
-        },
-        "curbs": {
-          "yes": "ja",
-          "no": "nein"
-        },
-        "obstacles": {
-          "none": "keine",
-          "trees": "Bäume",
-          "posts": "Pfosten",
-          "bins": "Mülltonnen"
-        },
-        "period": {
-          "permanent": "dauerhaft",
-          "temporary": "temporär",
-          "eventual": "eventuell"
-        },
-        "products": {
-          "bollard": "Poller",
-          "barrier": "Barriere",
-          "post": "Pfosten",
-          "ditch": "Graben"
-        },
-        "property": {
-          "automatic_rigid": "aut./starr",
-          "retractable": "versenkbar",
-          "removable": "entfernbar"
-        }
-      }
-    },
     "placeholders": {
         "assetToProtect": "Bitte eintragen"
     },
@@ -178,18 +131,6 @@
                     "certification": "Zertifizierung",
                     "exportData": "Daten exportieren",
                     "printSpecs": "Spezifikationen drucken"
-                }
-            },
-            "productDatabase": {
-                "toggleToTable": "Tabellenansicht",
-                "toggleToGrid": "Kachelansicht",
-                "modal": {
-                    "title": "Produktdetails",
-                    "technicalSpecs": "Technische Spezifikationen",
-                    "performanceData": "Leistungsdaten",
-                    "certification": "Zertifizierung",
-                    "exportData": "Daten exportieren",
-                    "printSpecs": "Spezifikationen drucken"
                 },
                 "table": {
                     "manufacturer": "Hersteller",
@@ -211,7 +152,7 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Paderborn, Domplatz",
+      "searchPlaceholder": "Soest, Marktplatz",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
@@ -220,7 +161,8 @@
       "createReport": "Bericht erstellen",
       "downloadReport": "Bericht Downloaden",
       "securityAreaLabel": "Sicherheitsbereich",
-      "securityArea": "Sicherheitsbereich"
+      "securityArea": "Sicherheitsbereich",
+      "settings": "Karteneinstellungen"
     },
     "report": {
       "generating": "Bericht wird erstellt...",
@@ -469,7 +411,7 @@
         "assetToProtect": "Please enter"
     },
     "map": {
-      "searchPlaceholder": "Paderborn, Cathedral Square",
+      "searchPlaceholder": "Soest, Market Square",
       "searchButton": "Search",
       "setWaypoints": "Set Waypoints",
       "setWaypointsActive": "Waypoints Active",
@@ -478,7 +420,8 @@
       "createReport": "Create Report",
       "downloadReport": "Download Report",
       "securityAreaLabel": "Security Area",
-      "securityArea": "Security Area"
+      "securityArea": "Security Area",
+      "settings": "Map Settings"
     },
     "manufacturer": {
       "title": "Manufacturer View",
@@ -576,7 +519,6 @@
           "toggleToTable": "Switch to Table View",
           "toggleToGrid": "Switch to Grid View",
           "viewDetails": "View Details",
-          "viewDetails": "View Details",
           "closeDetails": "Close",
           "exportData": "Export Data",
           "printSpecs": "Print Specifications",
@@ -587,21 +529,7 @@
             "certification": "Certification",
             "exportData": "Export Data",
             "printSpecs": "Print Specifications"
-          }
-        },
-        "productDatabase": {
-          "toggleToTable": "Switch to Table View",
-          "toggleToGrid": "Switch to Grid View",
-          "modal": {
-            "title": "Product Details",
-            "technicalSpecs": "Technical Specifications",
-            "performanceData": "Performance Data",
-            "certification": "Certification",
-            "exportData": "Export Data",
-            "printSpecs": "Print Specifications"
           },
-          "toggleToGrid": "Grid View",
-          "toggleToTable": "Table View",
           "table": {
             "manufacturer": "Manufacturer",
             "type": "Type",

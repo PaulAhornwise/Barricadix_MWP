@@ -243,7 +243,7 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Paderborn, Domplatz",
+      "searchPlaceholder": "Soest, Marktplatz",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
@@ -252,7 +252,8 @@
       "createReport": "Bericht erstellen",
       "downloadReport": "Bericht Downloaden",
       "securityAreaLabel": "Sicherheitsbereich",
-      "securityArea": "Sicherheitsbereich"
+      "securityArea": "Sicherheitsbereich",
+      "settings": "Karteneinstellungen"
     },
     "report": {
       "generating": "Bericht wird erstellt...",
@@ -501,7 +502,7 @@
         "assetToProtect": "Please enter"
     },
     "map": {
-      "searchPlaceholder": "Paderborn, Cathedral Square",
+      "searchPlaceholder": "Soest, Market Square",
       "searchButton": "Search",
       "setWaypoints": "Set Waypoints",
       "setWaypointsActive": "Waypoints Active",
@@ -510,7 +511,8 @@
       "createReport": "Create Report",
       "downloadReport": "Download Report",
       "securityAreaLabel": "Security Area",
-      "securityArea": "Security Area"
+      "securityArea": "Security Area",
+      "settings": "Map Settings"
     },
     "manufacturer": {
       "title": "Manufacturer View",

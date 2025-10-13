@@ -1,0 +1,277 @@
+/* RangeInput CSS-Module */
+
+.rangeInput {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resetContainer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resetButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.resetButton:hover:not(.disabled) {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--primary-text, #ffffff);
+}
+
+.resetButton:focus {
+  outline: 2px solid var(--accent-color, #1e90ff);
+  outline-offset: 2px;
+}
+
+.resetButton.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.inputContainer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: end;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inputLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-text, #ffffff);
+  margin: 0;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  background-color: rgba(10, 45, 74, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.inputWrapper:focus-within {
+  border-color: var(--accent-color, #1e90ff);
+  box-shadow: 0 0 0 2px rgba(30, 144, 255, 0.2);
+}
+
+.numberInput {
+  flex: 1;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--primary-text, #ffffff);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  text-align: right;
+}
+
+.numberInput::-webkit-outer-spin-button,
+.numberInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.numberInput[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.unit {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.05);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  height: 100%;
+}
+
+.separatorText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+.sliderContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sliderWrapper {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.rangeSlider {
+  position: absolute;
+  width: 100%;
+  height: 6px;
+  background: transparent;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.rangeSlider::-webkit-slider-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.rangeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-color, #1e90ff);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.rangeSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.rangeSlider::-moz-range-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  border: none;
+}
+
+.rangeSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent-color, #1e90ff);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.rangeSlider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.minSlider {
+  z-index: 2;
+}
+
+.maxSlider {
+  z-index: 1;
+}
+
+/* Overlay for the range between min and max */
+.sliderWrapper::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: rgba(30, 144, 255, 0.3);
+  border-radius: 3px;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.sliderLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .inputContainer {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .separator {
+    display: none;
+  }
+  
+  .inputWrapper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .numberInput {
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .unit {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .rangeSlider::-webkit-slider-thumb,
+  .rangeSlider::-moz-range-thumb,
+  .resetButton {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .rangeSlider::-webkit-slider-thumb,
+  .rangeSlider::-moz-range-thumb {
+    border-width: 3px;
+  }
+  
+  .inputWrapper {
+    border-width: 2px;
+  }
+}

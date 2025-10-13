@@ -1179,6 +1179,39 @@ input[type="range"]::-moz-range-thumb {
 .map-area { flex-basis: 100%; width: 100%; position: relative; overflow: visible; border-radius: 16px; }
 .analysis-area { display: none; } /* rechte Spalte entfällt – alles über Karte */
 
+/* Map Settings Button */
+.map-settings-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    background-color: rgba(12, 47, 77, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: var(--accent-color);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 402;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.map-settings-btn:hover {
+    background-color: var(--accent-color);
+    color: white;
+    transform: rotate(90deg);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+}
+
+.map-settings-btn:active {
+    transform: rotate(90deg) scale(0.95);
+}
+
 .selection-error { padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-weight: 600; text-align: center; background-color: #a41e1e; color: white; border: 1px solid #c73e3e; }
 .selection-error span { display: block; }
 .selection-error span:not(:first-child) { margin-top: 8px; }
@@ -1255,9 +1288,9 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   padding: 0;
   max-width: calc(100% - 32px); /* Überlauf vermeiden */
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible !important; /* Allow submenu to overflow */
   white-space: nowrap;
+  flex-wrap: nowrap; /* Keep tabs in one line */
 }
 .map-tabs a {
   color: #eef5fb;
@@ -1273,6 +1306,286 @@ input[type="range"]::-moz-range-thumb {
 }
 .map-tabs a:hover { color: #ffffff; box-shadow: 0 3px 6px rgba(0,0,0,.35); }
 .map-tabs a.active { background: linear-gradient(180deg, #6a8aa6 0%, #4a6d8a 100%); border-color: #ffffff; }
+
+/* Submenu styles for Gefahrenanalyse */
+.tab-with-submenu {
+    position: relative;
+    display: inline-block;
+    overflow: visible !important; /* Allow submenu to overflow */
+    z-index: 403; /* Higher than map-tabs to ensure submenu appears on top */
+}
+.map-tabs a.has-submenu {
+    position: relative;
+    overflow: visible !important; /* Ensure submenu can be visible */
+}
+.submenu-indicator {
+    margin-left: 6px;
+    font-size: 0.75em;
+    transition: transform 0.3s ease;
+}
+.map-tabs a.has-submenu.submenu-open .submenu-indicator {
+    transform: rotate(180deg);
+}
+.threat-submenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px; /* Slightly more space from tab */
+    /* Removed background bubble styling */
+    background: transparent; /* No background */
+    backdrop-filter: none; /* No blur */
+    border: none; /* No border */
+    border-radius: 0; /* No border-radius */
+    box-shadow: none; /* No shadow */
+    width: 600px !important; /* Force fixed width to accommodate buttons */
+    min-width: 600px !important; /* Force minimum width to accommodate buttons */
+    z-index: 100000 !important;
+    flex-direction: column;
+    overflow: visible !important;
+    max-height: none !important;
+    pointer-events: auto;
+    align-items: flex-start; /* Allow items to have individual widths */
+    gap: 8px; /* Space between individual buttons */
+    /* Important: Don't set display here - let JavaScript control it */
+}
+
+/* When visible, apply flex and animation */
+.threat-submenu.show {
+    display: flex !important;
+    opacity: 1 !important; /* Force opacity to 1 */
+    animation: submenuSlideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; /* Bouncy animation */
+}
+
+/* Ensure submenu width adapts to longest content */
+.threat-submenu {
+    /* The container will size itself to fit the longest item */
+    align-items: flex-start; /* Allow items to have individual widths */
+    min-width: 600px !important; /* Force minimum width to accommodate buttons */
+    width: 600px !important; /* Force fixed width to accommodate buttons */
+}
+@keyframes submenuSlideDown {
+    0% {
+        opacity: 0;
+        transform: translateY(-15px) scale(0.95);
+    }
+    50% {
+        opacity: 0.8;
+        transform: translateY(-5px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+.submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    color: #eef5fb;
+    text-decoration: none;
+    font-size: 0.92rem;
+    font-weight: 500;
+    border-bottom: none; /* Remove border between items */
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    width: 600px !important; /* Fixed width - double the longest content width */
+    min-width: 600px !important; /* Ensure minimum width */
+    flex: none; /* Don't allow flex shrinking */
+    box-sizing: border-box;
+    height: 48px; /* Slightly taller for better touch targets */
+    flex-shrink: 0;
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(12, 47, 77, 0.95) 0%, 
+        rgba(18, 55, 85, 0.95) 100%); /* Individual button background */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Individual button border */
+    border-radius: 8px; /* Rounded corners for individual buttons */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* Individual button shadow */
+    margin-bottom: 4px; /* Space between buttons */
+}
+/* Remove specific border-radius rules for first/last items since each button is now individual */
+.submenu-item:hover:not(.disabled) {
+    background: rgba(106, 138, 166, 0.4);
+    color: #ffffff;
+    transform: translateX(2px); /* Subtle slide effect */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.submenu-item.active {
+    background: linear-gradient(135deg, 
+        rgba(106, 138, 166, 0.6) 0%, 
+        rgba(106, 138, 166, 0.4) 100%);
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.submenu-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, 
+        rgba(255, 255, 255, 0.8), 
+        rgba(255, 255, 255, 0.4));
+    border-radius: 0 2px 2px 0;
+}
+.submenu-item.disabled {
+    color: #6a7a85;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.submenu-item.disabled:hover {
+    background: rgba(255, 255, 255, 0.02);
+    transform: none;
+    box-shadow: none;
+}
+.submenu-item i {
+    width: 20px;
+    text-align: center;
+    font-size: 16px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.submenu-item:hover:not(.disabled) i {
+    transform: scale(1.1); /* Slight icon scale on hover */
+}
+
+/* Module Contact Modal */
+.module-contact-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.module-contact-modal .modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.module-contact-modal .modal-content-box {
+    position: relative;
+    background: linear-gradient(135deg, rgba(12, 47, 77, 0.98), rgba(30, 58, 82, 0.98));
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    animation: modalSlideIn 0.4s ease;
+    z-index: 1;
+}
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+.modal-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 24px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+.modal-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+.modal-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, #1e90ff, #4a6d8a);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(30, 144, 255, 0.4);
+}
+.modal-icon i {
+    font-size: 40px;
+    color: #ffffff;
+}
+.modal-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 16px;
+}
+.modal-message {
+    font-size: 16px;
+    color: #b0d4f1;
+    margin: 0 0 32px;
+    line-height: 1.6;
+}
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+.modal-btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: 2px solid transparent;
+}
+.modal-btn-primary {
+    background: linear-gradient(135deg, #1e90ff, #4a6d8a);
+    color: #ffffff;
+    border-color: #1e90ff;
+}
+.modal-btn-primary:hover {
+    background: linear-gradient(135deg, #4a6d8a, #1e90ff);
+    box-shadow: 0 4px 16px rgba(30, 144, 255, 0.4);
+    transform: translateY(-2px);
+}
+.modal-btn-secondary {
+    background: transparent;
+    color: #b0d4f1;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+.modal-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.5);
+}
 
 /* Drop‑off Panels/Boxes (schwebende Paneele) */
 .drop-panel { position: absolute; background-color: rgba(12,47,77,0.94); color: var(--primary-text); border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.35); padding: 10px; z-index: 403; }
@@ -1291,6 +1604,8 @@ input[type="range"]::-moz-range-thumb {
   .analysis-area { flex-basis: 100%; margin-left: 0; }
   .map-tabs { left: 12px; max-width: calc(100% - 24px); }
   .map-tabs a { font-size: 0.9rem; padding: 6px 10px; }
+  .threat-submenu { min-width: 600px !important; width: 600px !important; max-height: none; overflow: visible; }
+  .submenu-item { font-size: 0.85rem; padding: 9px 14px; height: 44px; }
   .view-selector { margin-right: 24px; }
   .view-btn { padding: 6px 12px; font-size: 13px; }
   #chatbot-react-root aside[aria-label="Zufahrtsschutz-Assistent Panel"], .zb-panel { width: 380px; max-width: calc(100vw - 28px); height: calc(65vh - 30px); }
@@ -1307,6 +1622,12 @@ input[type="range"]::-moz-range-thumb {
   .search-bar { max-width: 100%; }
   .map-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
   .map-tabs { right: 8px; }
+  .threat-submenu { min-width: 600px !important; width: 600px !important; max-height: none; overflow: visible; }
+  .submenu-item { font-size: 0.8rem; padding: 8px 12px; height: 44px; }
+  .submenu-item i { width: 16px; font-size: 0.9em; }
+  .modal-content-box { padding: 30px 20px; }
+  .modal-title { font-size: 24px; }
+  .modal-message { font-size: 14px; }
   .view-selector { margin-right: 16px; }
   .view-btn { padding: 4px 8px; font-size: 11px; }
   #chatbot-react-root aside[aria-label="Zufahrtsschutz-Assistent Panel"], .zb-panel { width: 300px; max-width: calc(100vw - 28px); height: calc(55vh - 30px); }
@@ -2796,7 +3117,7 @@ div.search-marker.leaflet-marker-icon {
     max-height: 38px !important;
     text-align: center !important;
     white-space: nowrap !important;
-    overflow: hidden !important;
+    overflow: visible !important; /* Changed from hidden to visible to show submenu */
     text-overflow: ellipsis !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -3221,6 +3542,118 @@ button[aria-label*="assistent"],
 #chatbot-button {
     background: linear-gradient(180deg, #6a8aa6 0%, #4a6d8a 100%) !important; /* Original gradient restored */
     border: 2px solid rgba(255,255,255,0.9) !important; /* Original border restored */
+}
+
+/* =============================================== */
+/* COLLAPSIBLE RANGE INPUTS */
+/* =============================================== */
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.filter-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.collapsible-range-group,
+.collapsible-dropdown-group {
+    margin-bottom: 16px;
+}
+
+.range-header,
+.dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.range-header:hover,
+.dropdown-header:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 0 -12px;
+}
+
+.range-header label,
+.dropdown-header label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    margin: 0;
+    cursor: pointer;
+    flex: 1;
+}
+
+.dropdown-icon {
+    font-size: 12px;
+    color: var(--secondary-text);
+    transition: transform 0.3s ease;
+    user-select: none;
+    margin-left: 8px;
+    min-width: 12px;
+    text-align: center;
+}
+
+.dropdown-icon.expanded {
+    transform: rotate(180deg);
+}
+
+.range-content,
+.dropdown-content {
+    padding: 12px 0;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hierarchical checkbox styles */
+.hierarchical-checkbox {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.category-item {
+    margin-bottom: 8px;
+}
+
+.category-header {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.category-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.category-children {
+    margin-left: 20px;
+    margin-top: 4px;
+}
+
+.category-children label {
+    font-weight: normal;
+    font-size: 0.9em;
 }
 
 

@@ -1,0 +1,120 @@
+/* FilterSection CSS-Module */
+
+.filterSection {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background-color: rgba(10, 45, 74, 0.6);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.filterSection:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(10, 45, 74, 0.7);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+  background-color: rgba(10, 45, 74, 0.8);
+}
+
+.header:hover {
+  background-color: rgba(10, 45, 74, 0.9);
+}
+
+.header:focus {
+  outline: 2px solid var(--accent-color, #1e90ff);
+  outline-offset: -2px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary-text, #ffffff);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: transform 0.3s ease, color 0.2s ease;
+}
+
+.chevron:hover {
+  color: var(--accent-color, #1e90ff);
+}
+
+.chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.chevron.collapsed {
+  transform: rotate(0deg);
+}
+
+.content {
+  padding: 16px;
+  background-color: rgba(10, 45, 74, 0.4);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.content.expanded {
+  max-height: 1000px;
+  opacity: 1;
+  padding: 16px;
+}
+
+.content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding: 0 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header {
+    padding: 10px 12px;
+  }
+  
+  .title {
+    font-size: 13px;
+  }
+  
+  .content.expanded {
+    padding: 12px;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .filterSection,
+  .header,
+  .chevron,
+  .content {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .filterSection {
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+  
+  .header:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}

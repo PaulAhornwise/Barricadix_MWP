@@ -1,0 +1,256 @@
+/* FilterSidebarDemo CSS-Module */
+
+.demoContainer {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a2d4a 0%, #1a4a6b 100%);
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.demoHeader {
+  padding: 40px 20px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.demoHeader h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  background: linear-gradient(45deg, #1e90ff, #00bfff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.demoHeader p {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 24px 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.demoControls {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.toggleButton {
+  padding: 12px 24px;
+  background: linear-gradient(45deg, #1e90ff, #00bfff);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(30, 144, 255, 0.3);
+}
+
+.toggleButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(30, 144, 255, 0.4);
+}
+
+.resetButton {
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.resetButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.resetButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.demoContent {
+  display: flex;
+  min-height: calc(100vh - 200px);
+}
+
+.sidebarContainer {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.contentArea {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.filterDisplay {
+  margin-bottom: 40px;
+}
+
+.filterDisplay h2 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: #1e90ff;
+}
+
+.filterInfo {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.filterInfo p {
+  font-size: 1.1rem;
+  margin: 0 0 16px 0;
+}
+
+.filterDetails {
+  margin-top: 20px;
+}
+
+.filterDetails h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #00bfff;
+}
+
+.filterJson {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e6e6e6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.usageExample {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.usageExample h2 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: #1e90ff;
+}
+
+.codeExample {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.codeExample pre {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #e6e6e6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .demoContent {
+    flex-direction: column;
+  }
+  
+  .sidebarContainer {
+    position: relative;
+    height: auto;
+  }
+  
+  .contentArea {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .demoHeader {
+    padding: 20px 16px;
+  }
+  
+  .demoHeader h1 {
+    font-size: 2rem;
+  }
+  
+  .demoHeader p {
+    font-size: 1rem;
+  }
+  
+  .demoControls {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .toggleButton,
+  .resetButton {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .contentArea {
+    padding: 16px;
+  }
+  
+  .filterInfo,
+  .usageExample {
+    padding: 16px;
+  }
+  
+  .codeExample {
+    padding: 12px;
+  }
+  
+  .codeExample pre {
+    font-size: 12px;
+  }
+  
+  .filterJson {
+    font-size: 12px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .demoHeader h1 {
+    font-size: 1.5rem;
+  }
+  
+  .filterDisplay h2,
+  .usageExample h2 {
+    font-size: 1.4rem;
+  }
+  
+  .filterInfo p {
+    font-size: 1rem;
+  }
+}

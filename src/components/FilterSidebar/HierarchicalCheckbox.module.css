@@ -1,0 +1,293 @@
+/* HierarchicalCheckbox CSS-Module */
+
+.hierarchicalCheckbox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.hierarchicalCheckbox::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hierarchicalCheckbox::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.hierarchicalCheckbox::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.hierarchicalCheckbox::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.categoryItem {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background-color: rgba(10, 45, 74, 0.3);
+  overflow: hidden;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: rgba(10, 45, 74, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.categoryLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  padding: 4px 0;
+}
+
+.categoryLabel:hover {
+  color: var(--accent-color, #1e90ff);
+}
+
+.categoryLabel.selected {
+  color: var(--accent-color, #1e90ff);
+}
+
+.categoryLabel.partiallySelected {
+  color: rgba(30, 144, 255, 0.8);
+}
+
+.checkboxInput {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+  background-color: transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.categoryLabel.selected .checkbox {
+  border-color: var(--accent-color, #1e90ff);
+  background-color: var(--accent-color, #1e90ff);
+  color: white;
+}
+
+.categoryLabel.partiallySelected .checkbox {
+  border-color: var(--accent-color, #1e90ff);
+  background-color: rgba(30, 144, 255, 0.2);
+  color: var(--accent-color, #1e90ff);
+}
+
+.categoryLabel:hover .checkbox {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.categoryLabel.selected:hover .checkbox,
+.categoryLabel.partiallySelected:hover .checkbox {
+  border-color: var(--accent-color, #1e90ff);
+}
+
+.categoryName {
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.categoryCount {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.expandButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.expandButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent-color, #1e90ff);
+}
+
+.expandButton:focus {
+  outline: 2px solid var(--accent-color, #1e90ff);
+  outline-offset: 2px;
+}
+
+.expandButton.expanded {
+  transform: rotate(180deg);
+}
+
+.childrenContainer {
+  background-color: rgba(10, 45, 74, 0.2);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.childrenContainer.expanded {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.childrenContainer.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+.childLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 32px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.childLabel:last-child {
+  border-bottom: none;
+}
+
+.childLabel:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--accent-color, #1e90ff);
+}
+
+.childLabel.selected {
+  background-color: rgba(30, 144, 255, 0.1);
+  color: var(--accent-color, #1e90ff);
+}
+
+.childLabel.selected .checkbox {
+  border-color: var(--accent-color, #1e90ff);
+  background-color: var(--accent-color, #1e90ff);
+  color: white;
+}
+
+.childLabel:hover .checkbox {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.childLabel.selected:hover .checkbox {
+  border-color: var(--accent-color, #1e90ff);
+  background-color: var(--accent-color, #1e90ff);
+}
+
+.childName {
+  font-size: 12px;
+  color: inherit;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.childCount {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* Indentation line for children */
+.childLabel::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .categoryHeader {
+    padding: 6px 10px;
+  }
+  
+  .childLabel {
+    padding: 6px 10px 6px 28px;
+  }
+  
+  .categoryName {
+    font-size: 12px;
+  }
+  
+  .childName {
+    font-size: 11px;
+  }
+  
+  .categoryCount {
+    font-size: 11px;
+    min-width: 35px;
+  }
+  
+  .childCount {
+    font-size: 10px;
+    min-width: 30px;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .childrenContainer,
+  .expandButton,
+  .categoryLabel,
+  .childLabel,
+  .checkbox {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .categoryItem {
+    border-width: 2px;
+  }
+  
+  .checkbox {
+    border-width: 2px;
+  }
+  
+  .categoryLabel.selected .checkbox,
+  .childLabel.selected .checkbox {
+    border-width: 3px;
+  }
+}
