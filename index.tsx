@@ -9,6 +9,8 @@
  * - Generates a PDF risk report with an AI-powered summary.
  */
 
+console.log('🔥🔥🔥 INDEX.TSX LOADED - VERSION: 2025-10-14-NRW-PROVIDER-DEBUG 🔥🔥🔥');
+
 import { GoogleGenAI, Type } from "@google/genai";
 // React-basierte Chatbot-Komponente ist als separate Datei vorhanden.
 // Import optional, Compiler kann ohne explizites React import arbeiten (no JSX here).
@@ -16,11 +18,19 @@ import { createElement } from "react";
 import type {} from "react-dom";
 import ZufahrtsschutzChatbot from "./ZufahrtsschutzChatbot";
 import { createRoot } from "react-dom/client";
+import "./src/styles/map3d-layout.css";
 import { fetchOsmBundleForPolygon, osmCache, OsmBundle } from './src/utils/osm.js';
 import { OsmSpeedLimiter, SpeedLimitConfig } from './src/utils/osmSpeedLimits.js';
 import { WeatherCondition } from './src/utils/osmParse.js';
 // Entry Detection System Integration
 import { integrateEntryDetectionWithExistingOSM, addEntryDetectionStyles } from './src/features/map/integration/entryDetectionIntegration.js';
+// Geodata Provider Abstraction - NRW Integration
+// Note: Functions will be imported dynamically to avoid build issues
+
+// 3D Mode Integration (deck.gl)
+import { ThreeDToggle } from './src/features/map/ui/ThreeDToggle';
+import { enter3DDeck, exit3DDeck, threeDDeckState } from './src/features/map/threeDModeDeck';
+import { ensureDeckMount } from './src/features/map/ui/DeckMount';
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -226,11 +236,15 @@ function logout() {
 
 // App state
 let map: any; // Module-scoped map object
-let tileLayer: any; // Module-scoped tile layer object
+// tileLayer removed - provider system handles basemap tiles
 let threatLayerGroup: any = null; // Group for all threat overlays to clear in one go
 let searchMarker: any = null; // To keep track of the current search marker
 let isDrawingMode = false;
 let waypoints: any[] = [];
+
+// 3D Mode state
+// 3D state is now managed in threeDModeDeck.ts
+// Cesium container root removed - using deck.gl now
 let currentActiveTab = 'nav-marking-area'; // Track current active tab
 let waypointMarkers: any[] = [];
 let pathLine: any = null;
@@ -637,7 +651,7 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Soest, Marktplatz",
+            "searchPlaceholder": "Dortmund, Innenstadt",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
@@ -1036,7 +1050,7 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Soest, Marktplatz",
+            "searchPlaceholder": "Dortmund, Innenstadt",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
@@ -1215,9 +1229,9 @@ function showPlanningView() {
     }
     
     // Wait a bit for DOM cleanup, then re-initialize
-    setTimeout(() => {
+    setTimeout(async () => {
         console.log('Re-initializing map...');
-        initOpenStreetMap();
+        await initOpenStreetMap();
         
         // Restore map state if available
         if ((window as any).savedMapState) {
@@ -2997,7 +3011,8 @@ async function setLanguage(lang: string) {
 /**
  * Initializes the OpenStreetMap map using Leaflet.
  */
-function initOpenStreetMap(): void {
+async function initOpenStreetMap(): Promise<void> {
+    console.log('🔥🔥🔥 INIT OPEN STREET MAP CALLED 🔥🔥🔥');
     const mapDiv = document.getElementById('map');
     if (!mapDiv) {
         console.error("Map container element not found.");
@@ -3012,7 +3027,20 @@ function initOpenStreetMap(): void {
     
     console.log('Map container prepared for initialization');
     
-    const mapCenter: [number, number] = [51.5711, 8.1060]; // Soest
+    // Test: Simple provider system initialization
+    console.log('🚀 Starting provider system initialization...');
+    try {
+        // Try to initialize provider system
+        const { initializeProviderSystem } = await import('./src/core/geodata/integration/indexIntegration.js');
+        await initializeProviderSystem();
+        console.log('✅ Provider system initialized successfully');
+    } catch (error) {
+        console.error('❌ Provider system initialization failed:', error);
+        console.log('⚠️ Continuing with standard map initialization...');
+        // Continue with normal initialization
+    }
+    
+    const mapCenter: [number, number] = [51.5136, 7.4653]; // Dortmund (NRW)
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -3022,9 +3050,79 @@ function initOpenStreetMap(): void {
         position: 'bottomright'
     }).addTo(map);
 
-    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Provider system initialization with EPSG:4326 (correct CRS!)
+    console.log('🗺️ Starting provider system initialization...');
+    try {
+        console.log('📦 Importing provider system modules...');
+        const { pickProvider, getCurrentMapBbox4326 } = await import('./src/core/geodata/index.js');
+        console.log('✅ Provider modules imported successfully');
+        
+        console.log('📍 Getting current map bounding box (EPSG:4326)...');
+        const bbox4326 = getCurrentMapBbox4326(map);
+        console.log('📍 Map bbox4326 (lon/lat):', bbox4326);
+        
+        console.log('🔍 Picking provider based on location...');
+        const provider = await pickProvider(bbox4326);
+        console.log(`🎯 Selected provider: ${provider.id}`);
+        
+        // Add basemap from selected provider
+        let basemapLayer: any = null;
+        if (provider.makeBasemapLayer) {
+            console.log(`🗺️ Creating basemap layer from ${provider.id} provider...`);
+            basemapLayer = provider.makeBasemapLayer();
+        } else {
+            console.warn(`⚠️ Provider ${provider.id} has no makeBasemapLayer, using OSM fallback`);
+            const { osmProvider } = await import('./src/core/geodata/index.js');
+            basemapLayer = osmProvider.makeBasemapLayer?.();
+        }
+        
+        if (basemapLayer) {
+            basemapLayer.addTo(map);
+            (map as any)._currentBasemapLayer = basemapLayer; // Store for easy removal
+            console.log(`✅ Basemap loaded from ${provider.id} provider`);
+        }
+        
+        // Add simple source attribution
+        console.log('📝 Adding source attribution...');
+        const attributionDiv = document.createElement('div');
+        attributionDiv.id = 'provider-attribution';
+        attributionDiv.style.cssText = `
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #333;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            z-index: 1000;
+            pointer-events: none;
+        `;
+        attributionDiv.textContent = provider.id === 'nrw' ? 'Quelle: GEOBASIS.NRW' : 'Quelle: OSM';
+        mapDiv.appendChild(attributionDiv);
+        console.log(`📝 Attribution added: ${attributionDiv.textContent}`);
+        
+        // Store provider globally for data fetching
+        (window as any).currentProvider = provider;
+        console.log('💾 Provider stored globally for data fetching');
+        
+        // Add event listeners for automatic provider switching
+        console.log('🔄 Adding event listeners for automatic provider switching...');
+        addProviderSwitchingListeners(map);
+        
+    } catch (error) {
+        console.error('❌ Provider system failed:', error);
+        console.warn('⚠️ Falling back to standard OSM');
+        // Fallback to standard OSM tiles
+        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+        console.log('✅ OSM fallback basemap added');
+    }
+    
+    // Store the map reference globally for provider system
+    (window as any).map = map;
     
     // Force map to calculate correct size after initialization
     setTimeout(() => {
@@ -3034,13 +3132,13 @@ function initOpenStreetMap(): void {
         }
     }, 100);
     
-    // Additional invalidation after tiles load
-    tileLayer.once('load', () => {
+    // Additional invalidation after map is ready (provider system handles tile loading)
+    setTimeout(() => {
         if (map) {
             map.invalidateSize();
-            console.log('Map size invalidated after tiles loaded');
+            console.log('Map size invalidated after provider initialization');
         }
-    });
+    }, 500);
     
         // Add event listeners for map movement to update pinned tooltips (throttled for performance)
     let moveTimeout: number | undefined;
@@ -3085,6 +3183,264 @@ function initOpenStreetMap(): void {
     });
     
     console.log('Map initialized successfully');
+    
+    // Initialize 3D mode with delay to ensure DOM is ready
+    setTimeout(() => {
+        initialize3DModeDeck();
+        add3DToggleEventListener();
+    }, 100);
+}
+
+/**
+ * Initialize 3D mode components and state
+ */
+function initialize3DModeDeck(): void {
+    console.log('🌍 Initializing 3D mode with deck.gl...');
+    
+    try {
+        // Ensure deck mount exists
+        const deckMountEl = ensureDeckMount();
+        console.info("[3D] deck mount ready", deckMountEl);
+        
+        // Make the toggle function globally available
+        (window as any).handle3DToggle = handle3DToggleDeck;
+        console.log('✅ 3D toggle function exposed globally');
+        
+        // Add 3D toggle button to map
+        add3DToggleToMap();
+        console.log('✅ 3D mode with deck.gl initialized successfully');
+    } catch (error) {
+        console.error('❌ Error initializing 3D mode:', error);
+    }
+}
+
+/**
+ * Add event listener for the 3D toggle button
+ */
+function add3DToggleEventListener(): void {
+    console.log('🎛️ Adding 3D toggle button event listener...');
+    
+    const toggleButton = document.getElementById('3d-toggle-btn');
+    if (!toggleButton) {
+        console.error('❌ 3D toggle button not found');
+        return;
+    }
+    
+    toggleButton.addEventListener('click', async () => {
+        console.log('🔄 3D toggle button clicked');
+        await handle3DToggleDeck();
+    });
+    
+    console.log('✅ 3D toggle button event listener added');
+}
+
+/**
+ * Add 3D toggle button to the map
+ */
+function add3DToggleToMap(): void {
+    console.log('🎛️ Adding 3D toggle button...');
+    
+    // Create the toggle button as a fixed UI element (not as Leaflet control)
+    // so it remains visible in both 2D and 3D modes
+    const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        console.error('❌ Map container not found for 3D toggle');
+        return;
+    }
+    
+    const container = document.createElement('div');
+    container.className = 'three-d-toggle-container';
+    container.style.cssText = `
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10000;
+        pointer-events: auto;
+    `;
+    
+    // Add to map container (which remains visible in both modes)
+    mapContainer.appendChild(container);
+    
+    // Create the toggle button directly without React to avoid hook context issues
+    const toggleButton = document.createElement('button');
+    toggleButton.className = 'leaflet-control leaflet-bar';
+    toggleButton.style.cssText = `
+        padding: 8px;
+        background-color: #fff;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: bold;
+    `;
+    toggleButton.title = '2D / 3D umschalten';
+    toggleButton.textContent = '3D';
+    
+    toggleButton.addEventListener('click', handle3DToggleDeck);
+    
+    container.appendChild(toggleButton);
+    
+    console.log('✅ 3D toggle button added as fixed UI element');
+}
+
+/**
+ * Handle 3D mode toggle
+ */
+async function handle3DToggleDeck(): Promise<void> {
+    console.log('🔄 Toggling 3D mode with deck.gl...');
+    
+    if (!map) {
+        console.error('❌ Map not initialized');
+        return;
+    }
+    
+    try {
+        console.info("[3D] toggle clicked. is3D=", threeDDeckState.is3D);
+        
+        // Ensure deck mount exists
+        const deckMountEl = ensureDeckMount();
+        console.info("[3D] deck mount ready", deckMountEl);
+        
+        if (threeDDeckState.is3D) {
+            // Exit 3D mode
+            console.log('🚪 Exiting 3D mode...');
+            exit3DDeck(map, deckMountEl);
+        } else {
+            // Enter 3D mode
+            console.log('🚀 Entering 3D mode...');
+            await enter3DDeck(map, deckMountEl);
+        }
+        
+        // Update toggle button state
+        update3DToggleButton();
+    } catch (e) {
+        console.error("[3D] toggle error", e);
+        alert("3D konnte nicht geladen werden. Details in der Konsole.");
+    }
+}
+
+/**
+ * Update the 3D toggle button state
+ */
+function update3DToggleButton(): void {
+    console.log('🔄 3D toggle button state updated:', threeDDeckState.is3D);
+    
+    // Update the HTML toggle button
+    const toggleButton = document.getElementById('3d-toggle-btn');
+    const toggleText = document.getElementById('3d-toggle-text');
+    
+    if (toggleButton && toggleText) {
+        if (threeDDeckState.is3D) {
+            toggleText.textContent = '2D';
+            toggleButton.title = 'Zu 2D wechseln';
+            toggleButton.classList.add('in-3d-mode');
+        } else {
+            toggleText.textContent = '3D';
+            toggleButton.title = 'Zu 3D wechseln';
+            toggleButton.classList.remove('in-3d-mode');
+        }
+    }
+    
+    // Update the programmatically created toggle button
+    const programmaticToggle = document.querySelector('.three-d-toggle-container button');
+    if (programmaticToggle) {
+        if (threeDDeckState.is3D) {
+            programmaticToggle.textContent = '2D';
+            programmaticToggle.title = 'Zu 2D wechseln';
+            programmaticToggle.style.backgroundColor = '#007cba';
+            programmaticToggle.style.color = '#fff';
+        } else {
+            programmaticToggle.textContent = '3D';
+            programmaticToggle.title = 'Zu 3D wechseln';
+            programmaticToggle.style.backgroundColor = '#fff';
+            programmaticToggle.style.color = '#333';
+        }
+    }
+}
+
+/**
+ * Add event listeners for automatic provider switching when map moves.
+ * 
+ * @param map Leaflet map instance
+ */
+function addProviderSwitchingListeners(map: any): void {
+    console.log('🔄 Adding provider switching event listeners...');
+    
+    // Debounce timer to avoid too frequent provider checks
+    let providerCheckTimeout: NodeJS.Timeout | null = null;
+    
+    const checkProviderChange = async () => {
+        if (providerCheckTimeout) {
+            clearTimeout(providerCheckTimeout);
+        }
+        
+        providerCheckTimeout = setTimeout(async () => {
+            console.log('🔄 Map moved - checking if provider should change...');
+            
+            try {
+                // Import provider functions
+                const { pickProvider, getCurrentMapBbox4326 } = await import('./src/core/geodata/index.js');
+                
+                // Get current map bounds
+                const bbox4326 = getCurrentMapBbox4326(map);
+                console.log('📍 Current map bbox4326:', bbox4326);
+                
+                // Pick new provider
+                const newProvider = await pickProvider(bbox4326);
+                console.log(`🔍 New provider would be: ${newProvider.id}`);
+                
+                // Check if provider changed
+                const currentProvider = (window as any).currentProvider;
+                if (!currentProvider || newProvider.id !== currentProvider.id) {
+                    console.log(`🔄 Provider change detected: ${currentProvider?.id || 'none'} → ${newProvider.id}`);
+                    
+                    // Remove current basemap layer
+                    const currentBasemapLayer = (map as any)._currentBasemapLayer;
+                    if (currentBasemapLayer) {
+                        map.removeLayer(currentBasemapLayer);
+                        console.log('🗑️ Removed current basemap layer');
+                    }
+                    
+                    // Add new basemap layer
+                    let newBasemapLayer: any = null;
+                    if (newProvider.makeBasemapLayer) {
+                        newBasemapLayer = newProvider.makeBasemapLayer();
+                        newBasemapLayer.addTo(map);
+                        (map as any)._currentBasemapLayer = newBasemapLayer;
+                        console.log(`✅ Added new basemap layer from ${newProvider.id}`);
+                    }
+                    
+                    // Update attribution
+                    const attributionDiv = document.getElementById('provider-attribution');
+                    if (attributionDiv) {
+                        attributionDiv.textContent = newProvider.id === 'nrw' ? 'Quelle: GEOBASIS.NRW' : 'Quelle: OSM';
+                        console.log(`📝 Updated attribution: ${attributionDiv.textContent}`);
+                    }
+                    
+                    // Store new provider globally
+                    (window as any).currentProvider = newProvider;
+                    console.log(`💾 Updated global provider to: ${newProvider.id}`);
+                    
+                    // Show notification if switching from NRW to OSM
+                    if (currentProvider?.id === 'nrw' && newProvider.id === 'osm') {
+                        console.log('ℹ️ Switched from NRW to OSM - showing notification');
+                        // You could add a toast notification here
+                    }
+                } else {
+                    console.log('✅ Provider unchanged, no action needed');
+                }
+            } catch (error) {
+                console.error('❌ Error checking provider change:', error);
+            }
+        }, 1500); // 1.5 second debounce to avoid too frequent checks
+    };
+    
+    // Listen for map movement events
+    map.on('moveend', checkProviderChange);
+    map.on('zoomend', checkProviderChange);
+    
+    console.log('✅ Provider switching event listeners added');
 }
 
 /**
@@ -6682,18 +7038,17 @@ async function generateRiskReport() {
                 // Force map refresh and wait for complete rendering
                 map.invalidateSize();
                 
-                // Wait for tiles to load completely
-                tileLayer.once('load', () => {
-                    console.log('Tile layer loaded successfully');
-                    clearTimeout(moveEndTimeoutId);
-                    resolveFn();
-                });
-
-                // Fallback: wait for map movement to end
+                // Wait for map movement to end (provider system handles tile loading)
                 map.once('moveend', () => {
                     console.log('Map movement ended');
-                    moveEndTimeoutId = window.setTimeout(resolveFn, 1000);
+                    moveEndTimeoutId = window.setTimeout(resolveFn, 1500);
                 });
+                
+                // Additional fallback timeout
+                setTimeout(() => {
+                    console.log('Tile loading timeout reached, proceeding...');
+                    resolveFn();
+                }, 3000);
                 
                 // Ensure polygon is visible and fit bounds
                 try {
@@ -6768,6 +7123,18 @@ async function generateRiskReport() {
         // Get asset to protect from chatbot planning state or fallback
         const planningState = (window as any).planningState || {};
         const assetToProtect = planningState.schutzgüter || planningState.schutzgueter || t('report.undefinedAsset');
+        
+        // Get current data provider for report attribution
+        let dataSource = 'OpenStreetMap'; // Default fallback
+        try {
+            const { getCurrentProviderId } = await import('./src/core/geodata/integration/mapIntegration.js');
+            const currentProvider = getCurrentProviderId();
+            dataSource = currentProvider === 'nrw' ? 'GEOBASIS.NRW' : 'OpenStreetMap';
+            console.log(`📄 Report using data source: ${dataSource}`);
+        } catch (error) {
+            console.warn('⚠️ Could not get provider info for report, using default:', error);
+            console.log(`📄 Report using data source: ${dataSource}`);
+        }
         
         // Generate threat list in table format
         let threatList = t('report.noThreatAnalysis');
@@ -7748,16 +8115,35 @@ async function loadOsmDataForCurrentPolygon(): Promise<void> {
         }
         osmLoadingController = new AbortController();
         
-        // Fetch new data with error handling
+        // Fetch new data with error handling using provider abstraction
         try {
-        const osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
+        console.log('🔄 Starting data fetch with provider system...');
+        
+        // Try to use provider system, fallback to original OSM if not available
+        let osmData: OsmBundle;
+        try {
+            const { fetchOsmDataWithProvider } = await import('./src/core/geodata/integration/indexIntegration.js');
+            osmData = await fetchOsmDataWithProvider(polygonCoords, osmLoadingController.signal);
+            console.log('✅ Data fetch completed successfully with provider system');
+            
+            // Log which provider was used
+            const { getCurrentProviderId } = await import('./src/core/geodata/integration/mapIntegration.js');
+            const providerId = getCurrentProviderId();
+            console.log(`🗺️ Data loaded from ${providerId === 'nrw' ? 'GEOBASIS.NRW' : 'OpenStreetMap'} provider`);
+        } catch (providerError) {
+            console.warn('⚠️ Provider system not available, falling back to original OSM:', providerError);
+            osmData = await fetchOsmBundleForPolygon(polygonCoords, osmLoadingController.signal);
+            console.log('✅ Data fetch completed with original OSM');
+        }
         
         // Cache the result
         osmCache.set(cacheKey, osmData);
+        console.log('💾 Data cached successfully');
         
         // Update global state
         currentOsmData = osmData;
         osmSpeedLimiter.setOsmData(osmData);
+        console.log('🔄 Global state updated');
         } catch (error) {
             console.error('OSM Data Loading Error:', error);
             updateOsmStatus('error', error instanceof Error ? error.message : 'Fehler beim Laden der OSM-Daten');
@@ -7984,6 +8370,7 @@ function addEntryDetectionResultsToThreatList(threatList: HTMLOListElement): voi
 // ===============================================
 // This initialization function will be called after authentication
 async function initializeApp() {
+    console.log('🔥🔥🔥 INITIALIZE APP CALLED 🔥🔥🔥');
     console.log('🚀 INITIALIZE APP CALLED!');
     
     // Initialize Entry Detection System
@@ -8007,7 +8394,7 @@ async function initializeApp() {
     console.log('🔥 About to call initViewSwitcher from initializeApp...');
     initViewSwitcher();
     console.log('🔥 About to call initOpenStreetMap...');
-    initOpenStreetMap();
+    await initOpenStreetMap();
     console.log('🔥 About to initialize OSM speed limits...');
     initOsmSpeedLimits();
     

@@ -1,0 +1,19 @@
+/* Ensure full-height app layout */
+html, body, #root, #app-container { height: 100%; }
+#map-wrapper { position: relative; height: 100%; width: 100%; }
+
+/* Leaflet map must keep its height even when hidden via visibility */
+#map { height: 100%; width: 100%; }
+
+/* DeckGL overlay as sibling (not a child of #map) */
+#deckgl-mount {
+  position: absolute;
+  inset: 0;
+  display: none;         /* shown in 3D */
+  z-index: 500;          /* above Leaflet tiles/controls */
+  pointer-events: auto;  /* interactable in 3D */
+}
+
+/* Optional: keep Leaflet controls above/below as desired */
+.leaflet-control-container { z-index: 520; }
+

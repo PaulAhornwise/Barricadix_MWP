@@ -101,3 +101,7 @@ export function prepareEntryDetectionInput(
 // Import der Konvertierungsfunktion
 import { convertFromExistingOsmData } from "../../../shared/graph/osmTopology";
 
+
+
+
+

@@ -152,7 +152,7 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Soest, Marktplatz",
+      "searchPlaceholder": "Dortmund, Innenstadt",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
@@ -411,7 +411,7 @@
         "assetToProtect": "Please enter"
     },
     "map": {
-      "searchPlaceholder": "Soest, Market Square",
+      "searchPlaceholder": "Dortmund, City Center",
       "searchButton": "Search",
       "setWaypoints": "Set Waypoints",
       "setWaypointsActive": "Waypoints Active",

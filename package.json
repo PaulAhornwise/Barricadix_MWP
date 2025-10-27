@@ -13,7 +13,13 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.2.2",
+    "@deck.gl/geo-layers": "^9.2.2",
+    "@deck.gl/layers": "^9.2.2",
+    "@deck.gl/react": "^9.2.2",
     "@google/genai": "^0.12.0",
+    "@loaders.gl/core": "^4.3.4",
+    "@loaders.gl/i3s": "^4.3.4",
     "@turf/bbox": "^7.0.0",
     "@turf/bbox-polygon": "^7.0.0",
     "@turf/boolean-point-in-polygon": "^7.0.0",
@@ -24,6 +30,7 @@
     "@turf/line-intersect": "^7.0.0",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
+    "cesium": "^1.134.1",
     "framer-motion": "^12.23.12",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

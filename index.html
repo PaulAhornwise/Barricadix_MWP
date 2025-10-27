@@ -10,6 +10,8 @@
     <!-- Leaflet.js CSS for OpenStreetMap -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
+    <!-- Cesium CSS for 3D mode -->
+    <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
     
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -20,11 +22,14 @@
     <!-- Leaflet.js Script -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
+    <!-- Cesium Script for 3D mode -->
+    <script src="/cesium/Cesium.js"></script>
+    
     <!-- PDF Generation Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-            <link rel="stylesheet" href="./index.css?v=2025-01-20-DATABASE-FIX-FINAL">
+            <link rel="stylesheet" href="./index.css?v=2025-10-14-NRW-PROVIDER-DEBUG">
 </head>
 <body>
     <!-- =============================================== -->
@@ -174,14 +179,21 @@
                         <a href="#" id="tab-product-selection" data-target="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a>
                         <a href="#" id="tab-project-description" data-target="nav-project-description" data-translate-key="nav.projectDescription">Ausschreibung</a>
                     </div>
-                    <!-- Map Settings Button -->
-                    <button id="map-settings-btn" class="map-settings-btn" title="Karteneinstellungen" data-translate-key="map.settings">
-                        <i class="fas fa-cog"></i>
-                    </button>
+                    <!-- Map Control Buttons Container -->
+                    <div id="map-control-buttons" class="map-control-buttons">
+                        <!-- Map Settings Button -->
+                        <button id="map-settings-btn" class="map-settings-btn" title="Karteneinstellungen" data-translate-key="map.settings">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <!-- 3D Toggle Button -->
+                        <button id="3d-toggle-btn" title="2D/3D Ansicht wechseln" onclick="window.handle3DToggle && window.handle3DToggle()">
+                            <span id="3d-toggle-text">3D</span>
+                        </button>
+                    </div>
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Soest, Marktplatz" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" placeholder="Dortmund, Innenstadt" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
@@ -202,8 +214,10 @@
                             </button>
                         </div>
                     </div>
-                    <!-- The map will be injected here by Leaflet.js -->
-                    <div id="map" class="relative"></div>
+                     <!-- The map will be injected here by Leaflet.js -->
+                     <div id="map" class="relative"></div>
+                     <!-- 3D DeckGL container (initially hidden) -->
+                     <div id="deck3d-root" style="position: absolute; inset: 0; display: none; z-index: 1;"></div>
                     <!-- React Chatbot overlay root -->
                     <div id="chatbot-react-root" class="map-overlay"></div>
                     
@@ -606,6 +620,6 @@
     
     <!-- Application Logic -->
     
-<script type="module" src="./index.tsx"></script>
+<script type="module" src="./index.tsx?v=2025-10-14-NRW-PROVIDER-DEBUG"></script>
 </body>
 </html>

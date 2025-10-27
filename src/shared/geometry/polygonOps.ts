@@ -84,3 +84,7 @@ export function findNearestPointOnPolygon(poly: Feature<Polygon>, coord: Positio
   return nearest;
 }
 
+
+
+
+

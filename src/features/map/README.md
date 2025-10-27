@@ -230,3 +230,7 @@ Bei Problemen oder Fragen:
 3. Überprüfen Sie die Logs
 4. Kontaktieren Sie das Entwicklungsteam
 
+
+
+
+
