@@ -29,11 +29,6 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      CESIUM_BASE_URL: JSON.stringify('/cesium'),
-      // DZ NRW 3D endpoints
-      'import.meta.env.VITE_DZNRW_3DTILES_URL': JSON.stringify(env.VITE_DZNRW_3DTILES_URL),
-      'import.meta.env.VITE_DZNRW_SCENE_URL': JSON.stringify(env.VITE_DZNRW_SCENE_URL),
-      'import.meta.env.VITE_CESIUM_ION_TOKEN': JSON.stringify(env.VITE_CESIUM_ION_TOKEN),
     },
     resolve: {
       alias: {

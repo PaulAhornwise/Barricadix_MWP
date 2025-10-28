@@ -6,12 +6,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BarricadiX - HVM Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg">
 
     <!-- Leaflet.js CSS for OpenStreetMap -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    
-    <!-- Cesium CSS for 3D mode -->
-    <link rel="stylesheet" href="/Barricadix_MWP/cesium/Widgets/widgets.css">
     
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -22,14 +20,11 @@
     <!-- Leaflet.js Script -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- Cesium Script for 3D mode -->
-    <script src="/Barricadix_MWP/cesium/Cesium.js"></script>
-    
     <!-- PDF Generation Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-DT3qT8KT.js"></script>
+  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-D4vvl_YZ.js"></script>
   <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-NIbdCOIG.css">
 </head>
 <body>
@@ -194,7 +189,7 @@
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Dortmund, Innenstadt" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" placeholder="Hövelhof" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
@@ -215,8 +210,8 @@
                             </button>
                         </div>
                     </div>
-                     <!-- The map will be injected here by Leaflet.js -->
-                     <div id="map" class="relative"></div>
+                    <!-- The map will be injected here by Leaflet.js -->
+                    <div id="map" class="relative"></div>
                      <!-- 3D DeckGL container (initially hidden) -->
                      <div id="deck3d-root" style="position: absolute; inset: 0; display: none; z-index: 1;"></div>
                     <!-- React Chatbot overlay root -->
