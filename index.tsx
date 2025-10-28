@@ -7459,47 +7459,170 @@ async function generateTender() {
 
         // Create PDF - get from window.jspdf like in generateRiskReport
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF();
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         
-        // Helper function to add watermark
+        // Helper function to add watermark (same format as risk report)
         const addWatermarkToCurrentPage = () => {
-            pdf.setTextColor(200, 200, 200);
-            pdf.setFontSize(60);
-            pdf.setFont('helvetica', 'italic');
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.text('AUSSCHREIBUNG', pageWidth / 2, pageHeight / 2, { angle: 45, align: 'center' });
+            pdf.saveGraphicsState();
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(120);
+            pdf.setTextColor(200, 200, 200);
+            if (jsPDF.GState) {
+                 const gState = new jsPDF.GState({ opacity: 0.2 });
+                 pdf.setGState(gState);
+            }
+            pdf.text('VERTRAULICH', (pageWidth / 2) + 50, (pageHeight / 2) + 50, { align: 'center', angle: 45 });
+            pdf.restoreGraphicsState();
+        };
+        
+        // Helper function to add header (same as risk report)
+        const addHeader = (pageNum: number, totalPages: number) => {
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(100, 100, 100);
+            pdf.text(`Ausschreibung Zufahrtsschutz`, 20, 12);
+            pdf.text(`Seite ${pageNum} von ${totalPages}`, pageWidth - 20, 12, { align: 'right' });
             pdf.setTextColor(0, 0, 0);
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'normal');
+        };
+        
+        // Helper function to add footer (same as risk report)
+        const addFooter = () => {
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(100, 100, 100);
+            const date = new Date().toLocaleDateString('de-DE');
+            pdf.text(date, 20, pageHeight - 10);
+            pdf.text(`Vertraulich - Barricadix`, pageWidth - 20, pageHeight - 10, { align: 'right' });
+            pdf.setTextColor(0, 0, 0);
         };
 
-        addWatermarkToCurrentPage();
-
-        // Set up constants
+        // Set up constants - DIN A4 margins (20mm left/right, 25mm top for header)
         const page_margin = 20;
+        const top_margin = 25; // Space for header
         const page_width = pdf.internal.pageSize.getWidth();
         const content_width = page_width - (page_margin * 2);
-        let currentY = 25;
+        let currentY = top_margin;
+
+        // Helper function to process bullet points with proper indentation
+        const processBulletPoints = (content: string, width: number): string => {
+            const lines = content.split('\n');
+            let processed = '';
+            let inList = false;
+            
+            lines.forEach((line, index) => {
+                line = line.trim();
+                if (!line) {
+                    processed += '\n';
+                    inList = false;
+                    return;
+                }
+                
+                // Check if line is a bullet point (starts with - or *)
+                const isBullet = line.match(/^[-*]\s+(.+)$/);
+                const isSubBullet = line.match(/^\s+[-*]\s+(.+)$/);
+                
+                if (isBullet || isSubBullet) {
+                    const indent = isSubBullet ? '    ' : '  '; // 4 spaces for sub-bullet, 2 for main bullet
+                    const text = (isBullet?.[1] || isSubBullet?.[1] || '').trim();
+                    processed += `${indent}• ${text}\n`;
+                    inList = true;
+                } else if (inList && line.startsWith('-') === false && line.startsWith('*') === false) {
+                    // Regular text after a bullet list
+                    inList = false;
+                    processed += `${line}\n`;
+                } else {
+                    processed += `${line}\n`;
+                    inList = false;
+                }
+            });
+            
+            return processed.trim();
+        };
 
         // Helper function to add a section (same as in generateRiskReport)
         const addSection = (title: string, content: string) => {
             if (currentY > 250) { // Check for page break before adding section
                 pdf.addPage();
+                const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
                 addWatermarkToCurrentPage();
-                currentY = 25;
+                addHeader(1, totalPages);
+                addFooter();
+                currentY = top_margin;
             }
-            pdf.setFont('helvetica', 'bold').setFontSize(14).text(title, page_margin, currentY);
-            currentY += 7;
-            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(content, content_width);
-            if (currentY + (textLines.length * 5) > 280) { // Check for page break before adding content
-                pdf.addPage();
-                addWatermarkToCurrentPage();
-                currentY = 25;
-            }
-            pdf.text(textLines, page_margin, currentY);
-            currentY += (textLines.length * 5) + 10;
+            // Clean title from markdown artifacts
+            const cleanTitle = title.replace(/^#+\s*/, '').replace(/^\d+\.\s*/, '').trim();
+            pdf.setFont('helvetica', 'bold').setFontSize(14).text(cleanTitle, page_margin, currentY);
+            currentY += 10; // Extra line break after heading
+            
+            // Process content line by line for proper bullet point handling
+            const lines = content.split('\n');
+            const bulletIndent = 8; // Indentation for bullet points in mm
+            const lineHeight = 5;
+            
+            lines.forEach((line, index) => {
+                if (currentY + lineHeight > 280) {
+                    pdf.addPage();
+                    const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
+                    addWatermarkToCurrentPage();
+                    addHeader(totalPages, totalPages);
+                    addFooter();
+                    currentY = top_margin;
+                }
+                
+                const trimmedLine = line.trim();
+                if (!trimmedLine) {
+                    currentY += lineHeight;
+                    return;
+                }
+                
+                // Check if it's a bullet point (looks for "•" or "-" at the start with indentation)
+                const bulletMatch = line.match(/^(\s*)•\s+(.+)$/);
+                const dashMatch = trimmedLine.match(/^-\s+(.+)$/);
+                
+                if (bulletMatch || dashMatch) {
+                    const indent = bulletMatch ? bulletMatch[1].length * 2 : 0; // Calculate indent in mm
+                    const text = bulletMatch ? bulletMatch[2] : (dashMatch ? dashMatch[1] : trimmedLine);
+                    const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(text, content_width - bulletIndent - indent);
+                    
+                    textLines.forEach((textLine: string) => {
+                        if (currentY + lineHeight > 280) {
+                            pdf.addPage();
+                            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
+                            addWatermarkToCurrentPage();
+                            addHeader(totalPages, totalPages);
+                            addFooter();
+                            currentY = 25;
+                        }
+                        pdf.text(textLine, page_margin + bulletIndent + indent, currentY);
+                        currentY += lineHeight;
+                    });
+                } else {
+                    // Regular text
+                    const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(trimmedLine, content_width);
+                    
+                    textLines.forEach((textLine: string) => {
+                        if (currentY + lineHeight > 280) {
+                            pdf.addPage();
+                            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
+                            addWatermarkToCurrentPage();
+                            addHeader(totalPages, totalPages);
+                            addFooter();
+                            currentY = 25;
+                        }
+                        pdf.text(textLine, page_margin, currentY);
+                        currentY += lineHeight;
+                    });
+                }
+            });
+            
+            currentY += 5; // Extra space after section
         };
+
+        // Add watermark, header and footer to first page
+        addWatermarkToCurrentPage();
+        addHeader(1, 1);
+        addFooter();
 
         // Tender Header (same style as risk report)
         const locationForFilename = locationName.split(',')[0].trim(); // Get first part (e.g., "Allee" or "Hövelhof")
@@ -7509,7 +7632,10 @@ async function generateTender() {
         const headerLineHeight = 8;
         if (currentY + (headerLines.length * headerLineHeight) > 280) {
             pdf.addPage();
+            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
             addWatermarkToCurrentPage();
+            addHeader(totalPages, totalPages);
+            addFooter();
             currentY = 25;
         }
         pdf.text(headerLines, page_margin, currentY);
@@ -7528,32 +7654,54 @@ async function generateTender() {
         currentY += 15;
 
         // Main tender text from AI (as sections)
-        const sections = aiTenderText.split(/^\d+\.\s+/m).filter(s => s.trim());
+        // First, try to split by Markdown headings (## or ###)
+        let sections = aiTenderText.split(/(?=^#{2,3}\s)/m).filter(s => s.trim());
+        
+        // If no markdown headings found, try number sections
+        if (sections.length <= 1) {
+            sections = aiTenderText.split(/^\d+\.\s+/m).filter(s => s.trim());
+        }
+        
         sections.forEach((section, index) => {
             if (section.trim()) {
                 const lines = section.trim().split('\n');
-                const title = lines[0] || `Abschnitt ${index + 1}`;
+                let title = lines[0] || `Abschnitt ${index + 1}`;
+                
+                // Remove all markdown heading markers
+                title = title.replace(/^#+\s*/, '').replace(/^\d+\.\s*/, '').trim();
+                
+                // Get content without the title
                 const content = lines.slice(1).join('\n').trim();
-                addSection(title, content || title);
+                
+                // Process bullet points with proper indentation
+                const processedContent = processBulletPoints(content, content_width);
+                
+                addSection(title, processedContent || title);
             }
         });
 
         // Add product specifications as a section
         if (currentY > 250) {
             pdf.addPage();
+            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
             addWatermarkToCurrentPage();
+            addHeader(totalPages, totalPages);
+            addFooter();
             currentY = 25;
         }
         
         pdf.setFont('helvetica', 'bold').setFontSize(14).text('Technische Details', page_margin, currentY);
-        currentY += 7;
+        currentY += 10; // Extra line break after heading
         
-        pdf.setFont('helvetica', 'normal').setFontSize(10);
+        pdf.setFont('helvetica', 'normal').setFontSize(11);
         
         productSpecs.forEach((spec, index) => {
             if (currentY > 280) {
                 pdf.addPage();
+                const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
                 addWatermarkToCurrentPage();
+                addHeader(totalPages, totalPages);
+                addFooter();
                 currentY = 25;
             }
             
@@ -7573,6 +7721,21 @@ async function generateTender() {
             
             currentY += 5;
         });
+
+        // Ensure watermark, header and footer are on all pages
+        try {
+            const getPages = (pdf as any).getNumberOfPages || pdf.internal?.getNumberOfPages;
+            const totalPages: number = typeof getPages === 'function' ? getPages.call(pdf) : 1;
+            for (let p = 1; p <= totalPages; p++) {
+                pdf.setPage(p);
+                addWatermarkToCurrentPage();
+                addHeader(p, totalPages);
+                addFooter();
+            }
+        } catch (e) {
+            // Fallback: at least watermark current page
+            addWatermarkToCurrentPage();
+        }
 
         // Set the filename for download
         const filename = `Ausschreibung Zufahrtsschutz ${locationForFilename}.pdf`;
@@ -7643,27 +7806,82 @@ async function generateAITenderText(productSpecs: any[], locationName: string): 
         const ai = new GoogleGenAI({ apiKey });
         
         const specsSummary = productSpecs.map(spec => {
-            return `${spec.streetName}: ${spec.maxSpeed} km/h, Standards: ${Array.isArray(spec.standards) ? spec.standards.join(', ') : spec.standards}`;
+            const standards = Array.isArray(spec.standards) ? spec.standards.join(', ') : spec.standards || 'N/A';
+            const performance = spec.performance || `Leistungsstufe für ${spec.maxSpeed} km/h`;
+            return `${spec.streetName}: ${spec.maxSpeed} km/h, Standards: ${standards}, Leistung: ${performance}`;
         }).join('\n');
 
-        const prompt = `Als Ausschreibungsexperte erstelle einen herstellerneutral formulierten Ausschreibungstext für Zufahrtsicherungsbarrieren gemäß § 7 VgV (Vergabeverordnung) und § 34 GWB (Gesetz gegen Wettbewerbsbeschränkungen).
+        const prompt = `SYSTEM / ROLLE
+Du bist deutschsprachiger Fachautor für Bauvergaben (VOB/A) mit Spezialisierung auf Perimetersicherheit/Zufahrtschutz (Fahrzeugrückhaltesysteme). Du erstellst eine herstellerneutrale, rechtssichere Leistungsbeschreibung mit Leistungsverzeichnis. Keine KI-Artefakte, keine Floskeln, keine Meta-Kommentare, keine Platzhalter wie „[Lorem]".
 
-Die Ausschreibung soll folgende technische Anforderungen enthalten:
+EINGABEDATEN (aus dem System)
+- LOCATION_NAME: ${locationName}
+- ANZAHL_ZUFAHRTEN: ${productSpecs.length}
+- SPECS (je Zugangspunkt; aus dem System generiert, Zeile pro Zugang, Format: „<Straßenname>: <MaxSpeed> km/h, Standards: <…>, Leistung: <…>"):
+<<<SPECS_START
 ${specsSummary}
+SPECS_END>>>
 
-Standort: ${locationName}
-Anzahl an Zufahrten: ${productSpecs.length}
+ANNAHME & BENENNUNG DER KOMMUNE
+Ermittle den Kommunennamen aus LOCATION_NAME (z. B. „Stadt <…>" / „Gemeinde <…>"). Wenn nicht eindeutig, wähle den städtischen Namen, der in Deutschland üblicherweise die Gemeinde bezeichnet. Falls weiterhin unklar, verwende LOCATION_NAME.
 
-Erstelle einen formellen, präzisen Ausschreibungstext mit folgenden Abschnitten:
-1. Verfahrensart und Ausschreibung
-2. Gegenstand der Ausschreibung
-3. Umfang der Leistungen
-4. Technische Anforderungen (ohne Hersteller- oder Produktnamen)
-5. Zertifizierung und Normen
-6. Leistungsbeschreibung
-7. Unternehmensqualifikation
+ZIEL / AUSGABEFORMAT
+Gib ausschließlich ein sauber strukturiertes Dokument in Markdown (für PDF-Rendering) zurück – ohne Präambel und ohne zusätzliche Erklärtexte. Titelzeile exakt:
 
-Der Text muss herstellerneutral sein und darf keine Produktnamen oder Herstellernamen enthalten.`;
+# Ausschreibung Zufahrtschutz – <Kommune>
+
+DOKUMENTSTRUKTUR (GENAU EINHALTEN)
+## 1. Auftrag und Projekt
+Kurzbeschreibung: Zufahrtschutz / Fahrzeugrückhaltesysteme für öffentlichen Raum in <Kommune> (Ort: ${locationName}).
+
+## 2. Leistungsumfang
+Beschaffung, Lieferung, Fundamentierung/Montage, Inbetriebnahme, Dokumentation, Einweisung, Wartung/Inspektion.
+
+## 3. Technische und funktionale Anforderungen
+### 3.1 Normative Grundlagen (produktneutral)
+- Leistungs- und Prüfnachweise nach IWA 14-1 / ISO 22343-1 **oder** DIN SPEC 91414-2 **oder** ASTM F2656 (gleichwertige Prüfverfahren zulässig).
+- Korrosionsschutz und Oberflächen gemäß einschlägiger DIN/EN (z. B. Feuerverzinken DIN EN ISO 1461), Ausführung im Straßenraum gemäß geltenden Regelwerken.
+
+### 3.2 Schutzziele je Zugangspunkt
+Für jeden in den SPECS aufgeführten Zugangspunkt:
+- Lage/Bezeichnung: Straßen-/Platzname aus SPECS.
+- Erforderliches Schutzziel (leistungsbezogen): Mindest-Aufprallleistung entsprechend örtlicher Annäherungsgeschwindigkeit (aus SPECS „<MaxSpeed> km/h") mit begrenzter Eindringtiefe (formuliere als Zielanforderung, **ohne** Produkte/Modelle).
+- Zulässige Nachweiswege: IWA 14-1 / ISO 22343-1 **oder** DIN SPEC 91414-2 **oder** ASTM F2656 – jeweils in einer Leistungsklasse, die das genannte Schutzziel erfüllt oder übertrifft.
+- Betriebliche Anforderungen (generisch): Winterdiensttauglichkeit, gut sichtbare Kennzeichnung, Rettungsfreigabe/Demontierbarkeit in praxisgerechter Zeit (ohne konkrete Minutenangabe, da nicht übergeben).
+
+> Nutze ausschließlich Informationen aus SPECS; erfinde keine Maße/Fristen. Wenn in SPECS „Leistung:" bzw. „Standards:" vorhanden ist, formuliere diese als **zulässige Nachweisgrundlage/Leistungsziel**, ohne Hersteller- oder Produktbezug.
+
+### 3.3 Ausführung/Installation (generische Mindestvorgaben)
+- Gründung/Fundamentierung entsprechend statischer Erfordernisse und Frosttiefe; Schutz vorhandener Leitungen; Wiederherstellung Beläge.
+- Entwässerung und Ebenheit; Toleranzen nach anerkannten Regeln der Technik.
+- Kennzeichnung/Sichtbarkeit im öffentlichen Raum; Barrierefreiheit berücksichtigen.
+
+### 3.4 Betrieb & Wartung
+- Ziel-Lebensdauer üblich für kommunale Außenanlagen; turnusmäßige Sicht-/Funktionsprüfung; Ersatzteilverfügbarkeit.
+- Einweisung des Betriebspersonals; Übergabe Bedien- und Wartungsunterlagen.
+
+## 4. Qualitätssicherung und Nachweise
+- Crash-/Leistungsnachweise (IWA 14-1/ISO 22343-1, DIN SPEC 91414-2 oder ASTM F2656) durch akkreditierte Prüfstelle; Gleichwertigkeit zulässig.
+- Montage- und Abnahmeprotokoll; As-Built-Unterlagen (Lage/Gründungen); Wartungsplan; Schulungsnachweis.
+
+## 5. Vertrags- und Ausführungsbedingungen (auszugsweise)
+- Ausführungsfristen, Arbeits-/Verkehrssicherung, Koordination mit Rettungsdiensten.
+- Haftung für Oberflächen-/Leitungsschäden nach gesetzlichen Vorgaben.
+- Abnahme und Mängelhaftung/Gewährleistung nach VOB/B (übliches Mindestniveau).
+
+## 6. Leistungsverzeichnis (produktneutral, positionsweise)
+Erzeuge pro in SPECS genannter Zufahrt eine Position mit:
+- **Kurztext:** Liefer- und Montageleistung Fahrzeugrückhaltesystem(e) für Zugang „<Straßenname>".
+- **Langtext (leistungsbezogen):** Ziel-Schutzniveau gemäß Abschnitt 3.2 auf Basis Annäherungsgeschwindigkeit aus SPECS; zulässige Nachweisnormen wie oben; Ausführung/Installation gem. Abschnitt 3.3; Doku/Nachweise gem. Abschnitt 4.
+- **Menge/Einheit:** ohne Wertangabe (Mengen werden separat ermittelt).
+- **Nebenleistungen:** Baustelleneinrichtung, Leitungsortung/-schutz, Vermessung, Wiederherstellung Beläge, Dokumentation, Einweisung.
+- **Nachweise zur Abnahme:** wie in Abschnitt 4.
+
+Zusätzlich Sammelpositionen (ohne Mengenwerte): Baustelleneinrichtung, Verkehrs-/Rettungskoordination, Dokumentation/As-Built.
+
+## 7. Eignungs- und Zuschlagskriterien (Hinweistext)
+Eignung: Referenzen vergleichbarer Projekte, Qualifikation Montagebetrieb, Service/Wartung.  
+Zuschlag: wirtschaftlichstes Angebot nach Vergabeunterlagen.`;
 
         console.log('📦 Sending request to Gemini API...');
         const response = await ai.models.generateContent({
