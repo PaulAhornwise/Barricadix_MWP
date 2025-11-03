@@ -2118,7 +2118,18 @@ function generateProductImagePath(product: any): string {
 
     // Priority 1: Use product_image_file if available (NEW DATABASE STRUCTURE)
     if (product.product_image_file && product.product_image_file !== null && product.product_image_file.trim() !== '') {
-        const imageFromDatabase = `${import.meta.env.BASE_URL}images/${product.product_image_file}`;
+        // Handle both absolute paths (/images/file.jpg) and relative paths (file.jpg)
+        let imageFromDatabase: string;
+        if (product.product_image_file.startsWith('/images/')) {
+            // Already has /images/ prefix, just prepend BASE_URL (handle trailing slash)
+            const baseUrl = import.meta.env.BASE_URL.endsWith('/') 
+                ? import.meta.env.BASE_URL 
+                : `${import.meta.env.BASE_URL}/`;
+            imageFromDatabase = `${baseUrl}${product.product_image_file.slice(1)}`; // slice(1) removes leading /
+        } else {
+            // Relative path, prepend BASE_URL and images/
+            imageFromDatabase = `${import.meta.env.BASE_URL}images/${product.product_image_file}`;
+        }
         console.log('🖼️ ✅ Using database image file:', product.product_image_file);
         console.log('🖼️ ✅ Full image path from database:', imageFromDatabase);
         
