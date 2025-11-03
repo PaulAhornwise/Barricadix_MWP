@@ -6,7 +6,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BarricadiX - HVM Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="/Barricadix_MWP/assets/Logo_BarricadiX_White-zC0wyyoN.svg">
 
     <!-- Leaflet.js CSS for OpenStreetMap -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
@@ -24,8 +23,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <!-- importmap ist lokal nicht nötig; Build übernimmt Bundling -->
-  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-D4vvl_YZ.js"></script>
-  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-NIbdCOIG.css">
+  <script type="module" crossorigin src="/Barricadix_MWP/assets/main-C2Ce4ckL.js"></script>
+  <link rel="stylesheet" crossorigin href="/Barricadix_MWP/assets/main-C178t90O.css">
 </head>
 <body>
     <!-- =============================================== -->
@@ -189,12 +188,15 @@
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Hövelhof" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" placeholder="Dortmund, Innenstadt" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
                             <button id="toggle-draw-mode" class="map-action-btn hidden" >
                                 <i class="fas fa-pencil-alt"></i> <span data-translate-key="map.setWaypoints"></span>
+                            </button>
+                            <button id="add-security-area-btn" class="map-action-btn hidden">
+                                <i class="fas fa-plus-circle"></i> <span>Weiteren Bereich hinzufügen</span>
                             </button>
                             <button id="reset-drawing" class="map-action-btn hidden">
                                 <i class="fas fa-trash-alt"></i> <span data-translate-key="map.reset"></span>
@@ -207,6 +209,12 @@
                             </button>
                             <button id="download-report-btn" class="map-action-btn hidden" disabled>
                                 <i class="fas fa-download"></i> <span data-translate-key="map.downloadReport"></span>
+                            </button>
+                            <button id="create-tender-btn" class="map-action-btn hidden">
+                                <i class="fas fa-gavel"></i> <span data-translate-key="map.createTender">Ausschreibung erstellen</span>
+                            </button>
+                            <button id="download-tender-btn" class="map-action-btn hidden" disabled>
+                                <i class="fas fa-download"></i> <span data-translate-key="map.downloadTender">Ausschreibung herunterladen</span>
                             </button>
                         </div>
                     </div>
@@ -371,6 +379,11 @@
                     <!-- The report preview will be shown here, layered on top of the map container -->
                     <div id="report-preview-area" class="view-hidden">
                          <iframe id="report-iframe" title="Risikobericht Vorschau"></iframe>
+                    </div>
+                    
+                    <!-- The tender (Ausschreibung) preview will be shown here, layered on top of the map container -->
+                    <div id="tender-preview-area" class="view-hidden">
+                         <iframe id="tender-iframe" title="Ausschreibung Vorschau"></iframe>
                     </div>
 
                     <!-- React Chatbot is mounted into the following overlay root -->
