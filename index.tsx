@@ -4812,29 +4812,19 @@ const analyzeAndMarkThreats = async () => {
             }
         };
         
-        const query = `
-            [out:json][timeout:30];
-            (
-              way["highway"~"^(primary|secondary|tertiary|residential|unclassified|service|living_street|track)$"](bbox:${bbox});
-              way["highway"~"^(motorway|trunk)$"](bbox:${bbox});
-              way["highway"="cycleway"]["motor_vehicle"!="no"](bbox:${bbox});
-              way["railway"="tram"](bbox:${bbox});
-              way["access"~"^(yes|permissive)$"]["highway"](bbox:${bbox});
-            );
-            (._;>;);
-            out geom;
-        `;
-        const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-        console.log('🌐 THREAT ANALYSIS Query URL:', url);
-        console.log('🔍 THREAT ANALYSIS Raw query:', query);
-
+        // Use optimized Overpass helper with fallback endpoints
         let data;
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(t('alerts.overpassError', { status: response.status }));
-            }
-            data = await response.json();
+            const { fetchOverpassWithFallback, createThreatAnalysisQuery } = await import('./src/utils/overpassHelper.js');
+            const query = createThreatAnalysisQuery(bbox, 25);
+            console.log('🔍 THREAT ANALYSIS Query:', query);
+            
+            data = await fetchOverpassWithFallback(query, {
+                timeout: 25,
+                maxRetries: 2,
+                retryDelay: 2000
+            });
+            
             const elementCount = data?.elements?.length || 0;
             console.log('🎯 THREAT ANALYSIS OSM Data received:', elementCount, 'elements');
             
@@ -4867,7 +4857,8 @@ const analyzeAndMarkThreats = async () => {
             console.log(`🚫 Pre-filtering: ${excludedCount} recreational/restricted ways will be excluded from threat analysis`);
         } catch (error) {
             console.error('🚨 THREAT ANALYSIS Overpass API error:', error);
-            alert(t('alerts.analysisError'));
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            alert(`Fehler bei der Gefahrenanalyse: ${errorMsg}. Bitte versuchen Sie es später erneut.`);
             loadingIndicator.classList.add('hidden');
             return;
         }

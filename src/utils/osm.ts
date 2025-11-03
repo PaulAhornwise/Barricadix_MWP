@@ -57,28 +57,15 @@ export async function fetchOsmBundleForPolygon(
   console.log('🗺️ OSM Query:', query.trim());
   
   try {
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: query,
-      headers: { "Content-Type": "text/plain" },
+    // Use optimized Overpass helper with fallback
+    const { fetchOverpassPOSTWithFallback } = await import('./overpassHelper');
+    
+    const data = await fetchOverpassPOSTWithFallback(query, {
+      timeout: 20,
+      maxRetries: 2,
+      retryDelay: 3000,
       signal
     });
-    
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => 'Unknown error');
-      console.error('Overpass API Error:', res.status, errorText);
-      
-      // Handle specific error cases
-      if (res.status === 504) {
-        throw new Error('Overpass API timeout - Server ist überlastet. Bitte versuchen Sie es später erneut.');
-      } else if (res.status === 429) {
-        throw new Error('Overpass API rate limit - Zu viele Anfragen. Bitte warten Sie einen Moment.');
-      } else {
-        throw new Error(`Overpass API Fehler ${res.status}: ${errorText}`);
-      }
-    }
-    
-    const data = await res.json();
     
     // Parse: ways + nodes (nur benötigte Felder)
     const nodes: Record<number, {lat:number;lon:number}> = {};

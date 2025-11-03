@@ -77,11 +77,31 @@ export const nrwProvider: GeoDataProvider = {
     
     try {
       const res = await fetch(url.toString());
+      
+      // Check for specific error conditions
       if (!res.ok) {
-        throw new Error(`NRW WFS failed: ${res.status} ${res.statusText}`);
+        const statusText = res.statusText || 'Unknown error';
+        let errorMessage = `NRW WFS failed with status ${res.status}`;
+        
+        if (res.status === 400) {
+          errorMessage = `NRW WFS Bad Request (400) - Invalid bounding box or parameters`;
+        } else if (res.status === 0 || res.status === 200 && res.type === 'opaque') {
+          errorMessage = `NRW WFS CORS error - Browser blocked request from ${url.origin}`;
+        } else {
+          errorMessage = `NRW WFS error: ${res.status} ${statusText}`;
+        }
+        
+        console.error(`[nrwProvider] ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
       const fc: FeatureCollection = await res.json();
+      
+      // Validate response structure
+      if (!fc || !fc.features || !Array.isArray(fc.features)) {
+        throw new Error('Invalid NRW WFS response format: missing features array');
+      }
+      
       console.log(`[nrwProvider] Received ${fc.features.length} features from NRW WFS`);
       
       const { nodes, ways } = wfsToOsm(fc);
@@ -93,7 +113,17 @@ export const nrwProvider: GeoDataProvider = {
       return { nodes, ways };
     } catch (error) {
       console.error("[nrwProvider] Failed to fetch from NRW WFS:", error);
-      throw new Error(`NRW WFS request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Provide helpful error messages
+      if (error instanceof Error) {
+        if (error.message.includes('CORS')) {
+          console.warn("[nrwProvider] CORS policy blocked WFS request - will use OSM fallback");
+          throw error; // Re-throw to trigger fallback
+        }
+        throw new Error(`NRW WFS request failed: ${error.message}`);
+      }
+      
+      throw new Error(`NRW WFS request failed: Unknown error`);
     }
   },
   
