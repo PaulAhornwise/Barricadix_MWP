@@ -1752,27 +1752,8 @@ input[type="range"]::-moz-range-thumb {
   top: 60px;
   height: calc(100% - 60px);
 }
-
-#tender-preview-area {
-  position: absolute;
-  top: 60px;
-  left: 0;
-  width: 100%;
-  height: calc(100% - 60px);
-  background-color: #555;
-  z-index: 10;
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-#tender-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  border-radius: 16px;
-}
 .report-loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(1, 42, 74, 0.8); color: white; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; z-index: 500; border-radius: 8px; transition: opacity 0.3s; }
-#report-iframe { width: 100%; height: 100%; border: none; }
+#report-iframe, #tender-iframe { width: 100%; height: 100%; border: none; }
 
 /* Tooltip */
 .tooltip { position: absolute; background-color: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 2000; }

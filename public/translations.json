@@ -243,14 +243,16 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Hövelhof",
+      "searchPlaceholder": "Dortmund, Innenstadt",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
       "reset": "Zurücksetzen",
-      "analyzeAccess": "Zufahrt analysieren",
+      "analyzeAccess": "Analyse der Zufahrten",
       "createReport": "Bericht erstellen",
       "downloadReport": "Bericht Downloaden",
+      "createTender": "Ausschreibung erstellen",
+      "downloadTender": "Ausschreibung herunterladen",
       "securityAreaLabel": "Sicherheitsbereich",
       "securityArea": "Sicherheitsbereich",
       "settings": "Karteneinstellungen"
@@ -502,14 +504,16 @@
         "assetToProtect": "Please enter"
     },
     "map": {
-      "searchPlaceholder": "Hövelhof",
+      "searchPlaceholder": "Dortmund, City Center",
       "searchButton": "Search",
       "setWaypoints": "Set Waypoints",
       "setWaypointsActive": "Waypoints Active",
       "reset": "Reset",
-      "analyzeAccess": "Analyze Access Route",
+      "analyzeAccess": "Analyze Access",
       "createReport": "Create Report",
       "downloadReport": "Download Report",
+      "createTender": "Create Tender",
+      "downloadTender": "Download Tender",
       "securityAreaLabel": "Security Area",
       "securityArea": "Security Area",
       "settings": "Map Settings"

@@ -6,7 +6,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BarricadiX - HVM Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="./Logo_BarricadiX_White.svg">
 
     <!-- Leaflet.js CSS for OpenStreetMap -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
@@ -188,12 +187,15 @@
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Hövelhof" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" placeholder="Dortmund, Innenstadt" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
                             <button id="toggle-draw-mode" class="map-action-btn hidden" >
                                 <i class="fas fa-pencil-alt"></i> <span data-translate-key="map.setWaypoints"></span>
+                            </button>
+                            <button id="add-security-area-btn" class="map-action-btn hidden">
+                                <i class="fas fa-plus-circle"></i> <span>Weiteren Bereich hinzufügen</span>
                             </button>
                             <button id="reset-drawing" class="map-action-btn hidden">
                                 <i class="fas fa-trash-alt"></i> <span data-translate-key="map.reset"></span>
@@ -208,10 +210,10 @@
                                 <i class="fas fa-download"></i> <span data-translate-key="map.downloadReport"></span>
                             </button>
                             <button id="create-tender-btn" class="map-action-btn hidden">
-                                <i class="fas fa-file-contract"></i> <span>Ausschreibung erstellen</span>
+                                <i class="fas fa-gavel"></i> <span data-translate-key="map.createTender">Ausschreibung erstellen</span>
                             </button>
                             <button id="download-tender-btn" class="map-action-btn hidden" disabled>
-                                <i class="fas fa-download"></i> <span>Ausschreibung herunterladen</span>
+                                <i class="fas fa-download"></i> <span data-translate-key="map.downloadTender">Ausschreibung herunterladen</span>
                             </button>
                         </div>
                     </div>

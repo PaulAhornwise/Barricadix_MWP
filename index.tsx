@@ -11,7 +11,7 @@
 
 console.log('🔥🔥🔥 INDEX.TSX LOADED - VERSION: 2025-10-14-NRW-PROVIDER-DEBUG 🔥🔥🔥');
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 // React-basierte Chatbot-Komponente ist als separate Datei vorhanden.
 // Import optional, Compiler kann ohne explizites React import arbeiten (no JSX here).
 import { createElement } from "react";
@@ -30,6 +30,8 @@ import { integrateEntryDetectionWithExistingOSM, addEntryDetectionStyles } from 
 // 3D Mode Integration (deck.gl)
 import { enter3DDeck, exit3DDeck, threeDDeckState } from './src/features/map/threeDModeDeck';
 import { ensureDeckMount } from './src/features/map/ui/ensureDeckMount';
+import { jsPDF } from 'jspdf';
+import { sanitizeDe } from './src/features/tender/createTenderPdf';
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -40,7 +42,6 @@ declare global {
 
 // Declare global variables from included libraries to satisfy TypeScript.
 declare const L: any;
-declare const jsPDF: any;
 declare const html2canvas: any;
 
 // ===============================================
@@ -247,8 +248,9 @@ let waypoints: any[] = [];
 let currentActiveTab = 'nav-marking-area'; // Track current active tab
 let waypointMarkers: any[] = [];
 let pathLine: any = null;
-let drawnPolygon: any = null;
-let polygonLabel: any = null; // To store the label for the polygon
+let drawnPolygon: any = null; // Deprecated - use drawnPolygons array
+let polygonLabel: any = null; // Deprecated - use polygonLabels array
+let drawnPolygons: Array<{polygon: any, label: any, id: string}> = []; // Array of security area polygons
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
 let threatsMap = new Map<string, { entryPoints: {lat: number, lon: number, distance: number}[], pathSegments: any[][], totalLength: number, threatLevel?: number, roadType?: string, maxSpeed?: number }>(); // To store analysis data for report
 
@@ -259,6 +261,7 @@ let osmLoadingController: AbortController | null = null;
 let osmDebounceTimeout: number | null = null;
 let generatedPdf: any = null; // To hold the generated PDF object
 let generatedPdfUrl: string | null = null; // Object URL for iframe preview
+let generatedPdfFilename: string = ''; // To store the generated PDF filename
 let generatedTenderPdf: any = null; // To hold the generated Tender PDF object
 let generatedTenderPdfUrl: string | null = null; // Object URL for tender iframe preview
 
@@ -653,14 +656,14 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Hövelhof",
+            "searchPlaceholder": "Dortmund, Innenstadt",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
             "reset": "Zurücksetzen",
             "securityAreaLabel": "Sicherheitsbereich",
             "securityArea": "Sicherheitsbereich",
-            "analyzeAccess": "Zufahrt analysieren"
+            "analyzeAccess": "Zugang analysieren"
         },
         "placeholders": {
             "assetToProtect": "Bitte eintragen"
@@ -675,7 +678,8 @@ const embeddedTranslations = {
             "locationNotFound": "Standort nicht gefunden. Bitte überprüfen Sie die Eingabe.",
             "noThreatsFound": "Keine Bedrohungen in diesem Bereich gefunden.",
             "reportGenerationError": "Fehler beim Erstellen des Berichts. Bitte versuchen Sie es erneut.",
-            "reportCreationError": "Fehler bei der Berichtserstellung. Bitte versuchen Sie es erneut."
+            "reportCreationError": "Fehler bei der Berichtserstellung. Bitte versuchen Sie es erneut.",
+            "geminiError": "Die KI-gestützte Analyse konnte aufgrund eines Fehlers nicht generiert werden."
         },
 
 
@@ -1052,18 +1056,31 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Hövelhof",
+            "searchPlaceholder": "Dortmund, Innenstadt",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
             "reset": "Reset",
             "securityAreaLabel": "Security Area",
             "securityArea": "Security Area",
-            "analyzeAccess": "Analyze Access Route"
+            "analyzeAccess": "Analyze Access"
         },
         "placeholders": {
             "assetToProtect": "Please enter"
         },
+        "alerts": {
+            "noPolygon": "Please draw a security area on the map first.",
+            "overpassError": "Error loading road data (Status: {status}).",
+            "analysisError": "Error in threat analysis. Please try again.",
+            "invalidPolygon": "Invalid polygon. Please redraw the security area.",
+            "emptyPolygon": "The drawn polygon has no valid coordinates.",
+            "polygonCoordinateError": "Error processing polygon coordinates.",
+            "locationNotFound": "Location not found. Please check your input.",
+            "noThreatsFound": "No threats found in this area.",
+            "reportGenerationError": "Error creating report. Please try again.",
+            "reportCreationError": "Error in report generation. Please try again.",
+            "geminiError": "The AI-powered analysis could not be generated due to an error."
+        }
 
     }
 };
@@ -2325,12 +2342,6 @@ async function filterProducts() {
     });
     
     const filteredProducts = products.filter((product: any) => {
-        // Exclude Roadblocker products
-        const productNameLower = product.product_name?.toLowerCase() || '';
-        if (productNameLower.includes('roadblocker') || productNameLower.includes('road blocker')) {
-            return false;
-        }
-        
         const matchesSearch = !searchTerm || 
             product.manufacturer?.toLowerCase().includes(searchTerm) ||
             product.product_name?.toLowerCase().includes(searchTerm) ||
@@ -2925,29 +2936,29 @@ async function setLanguage(lang: string) {
                     map.removeLayer(drawnPolygon);
                 }
                 
-                // Recreate polygon with stored coordinates
+                // Recreate polygon with stored coordinates (backward compatibility)
                 drawnPolygon = L.polygon(currentMapState.drawnPolygon, {
-                    color: '#ff7800',
-                    weight: 3,
-                    opacity: 0.8,
-                    fillColor: '#ff7800',
-                    fillOpacity: 0.2
+                    color: 'yellow',
+                    fillColor: '#FFFF00',
+                    fillOpacity: 0.3,
+                    weight: 2
                 }).addTo(map);
-                
-                // Restore polygon label if it existed
-                if (polygonLabel) {
-                    map.removeLayer(polygonLabel);
-                }
                 
                 const center = drawnPolygon.getBounds().getCenter();
                 polygonLabel = L.marker(center, {
                     icon: L.divIcon({
                         className: 'polygon-label',
-                        html: `<div style="background: white; padding: 5px; border: 2px solid #ff7800; border-radius: 5px; font-weight: bold; color: #ff7800;">${t('map.securityArea')}</div>`,
-                        iconSize: [120, 40],
-                        iconAnchor: [60, 20]
+                        html: `<div>${t('map.securityAreaLabel')} 1</div>`,
+                        iconSize: [150, 24]
                     })
                 }).addTo(map);
+                
+                // Add to polygons array
+                drawnPolygons.push({
+                    polygon: drawnPolygon,
+                    label: polygonLabel,
+                    id: `polygon-${Date.now()}`
+                });
             }
             
             // Restore threats map
@@ -3048,7 +3059,7 @@ async function initOpenStreetMap(): Promise<void> {
         // Continue with normal initialization
     }
     
-    const mapCenter: [number, number] = [51.8233, 8.6675]; // Hövelhof (NRW)
+    const mapCenter: [number, number] = [51.5136, 7.4653]; // Dortmund (NRW)
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -3664,15 +3675,17 @@ const deleteEntryPoint = (marker: any, candidate: any) => {
     
     // Find all layers that might be at this position
     map.eachLayer((layer: any) => {
-        // PROTECT: Never remove the security area polygon (drawnPolygon)
-        if (layer === drawnPolygon) {
+        // PROTECT: Never remove any security area polygon
+        const isPolygon = drawnPolygons.some(item => item.polygon === layer) || layer === drawnPolygon;
+        if (isPolygon) {
             console.log(`🛡️ PROTECTED: Skipping security area polygon - cannot be deleted from threat analysis tab`);
             console.warn(`⚠️ SECURITY: Attempted to delete security area polygon from threat analysis tab - this is not allowed!`);
             return;
         }
         
-        // PROTECT: Never remove the polygon label
-        if (layer === polygonLabel) {
+        // PROTECT: Never remove any polygon label
+        const isLabel = drawnPolygons.some(item => item.label === layer) || layer === polygonLabel;
+        if (isLabel) {
             console.log(`🛡️ PROTECTED: Skipping polygon label - cannot be deleted from threat analysis tab`);
             return;
         }
@@ -3752,14 +3765,16 @@ const deleteEntryPoint = (marker: any, candidate: any) => {
     threatMarkersMap.forEach((markers, key) => {
         const originalLength = markers.length;
         const filteredMarkers = markers.filter(m => {
-            // PROTECT: Never remove the security area polygon (drawnPolygon)
-            if (m === drawnPolygon) {
+            // PROTECT: Never remove any security area polygon
+            const isPolygon = drawnPolygons.some(item => item.polygon === m) || m === drawnPolygon;
+            if (isPolygon) {
                 console.log(`🛡️ PROTECTED: Keeping security area polygon in ${key}`);
                 return true;
             }
             
-            // PROTECT: Never remove the polygon label
-            if (m === polygonLabel) {
+            // PROTECT: Never remove any polygon label
+            const isLabel = drawnPolygons.some(item => item.label === m) || m === polygonLabel;
+            if (isLabel) {
                 console.log(`🛡️ PROTECTED: Keeping polygon label in ${key}`);
                 return true;
             }
@@ -3834,14 +3849,16 @@ const deleteEntryPoint = (marker: any, candidate: any) => {
     setTimeout(() => {
         const remainingLayers: any[] = [];
         map.eachLayer((layer: any) => {
-            // PROTECT: Never remove the security area polygon (drawnPolygon)
-            if (layer === drawnPolygon) {
+            // PROTECT: Never remove any security area polygon
+            const isPolygon = drawnPolygons.some(item => item.polygon === layer) || layer === drawnPolygon;
+            if (isPolygon) {
                 console.log(`🛡️ PROTECTED: Skipping security area polygon in final check`);
                 return;
             }
             
-            // PROTECT: Never remove the polygon label
-            if (layer === polygonLabel) {
+            // PROTECT: Never remove any polygon label
+            const isLabel = drawnPolygons.some(item => item.label === layer) || layer === polygonLabel;
+            if (isLabel) {
                 console.log(`🛡️ PROTECTED: Skipping polygon label in final check`);
                 return;
             }
@@ -4429,9 +4446,10 @@ function handleMapClickForThreatAddition(e: any) {
  * Calculate acceleration distance from a point to the security area
  */
 function calculateAccelerationDistanceToSecurityArea(point: {lat: number, lon: number}): number {
-    if (!drawnPolygon) return 100; // Default if no security area defined
+    const activePolygon = drawnPolygons.length > 0 ? drawnPolygons[drawnPolygons.length - 1].polygon : drawnPolygon;
+    if (!activePolygon) return 100; // Default if no security area defined
     
-    const polygonVertices = drawnPolygon.getLatLngs()[0].map((ll: any) => ({lat: ll.lat, lon: ll.lng}));
+    const polygonVertices = activePolygon.getLatLngs()[0].map((ll: any) => ({lat: ll.lat, lon: ll.lng}));
     
     // Find closest point on polygon boundary
     let minDistance = Infinity;
@@ -4707,27 +4725,49 @@ function updateThreatListTitle(showAnalysisFormat: boolean = false) {
  * It marks the entry points and highlights the approach path to the polygon.
  */
 const analyzeAndMarkThreats = async () => {
-    if (!drawnPolygon) {
+    // Check if we have any polygons
+    if (drawnPolygons.length === 0 && !drawnPolygon) {
         alert(t('alerts.noPolygon'));
         return;
     }
-
-    // Enhanced polygon validation
-    if (!drawnPolygon.getLatLngs || typeof drawnPolygon.getLatLngs !== 'function') {
-        console.error('Invalid polygon object - missing getLatLngs method');
-        alert(t('alerts.invalidPolygon'));
+    
+    // Validate all polygons are closed
+    const polygonsToAnalyze = drawnPolygons.length > 0 ? drawnPolygons : 
+        (drawnPolygon ? [{ polygon: drawnPolygon, label: polygonLabel, id: 'legacy' }] : []);
+    
+    if (polygonsToAnalyze.length === 0) {
+        alert(t('alerts.noPolygon'));
         return;
     }
-
-    const polygonCoords = drawnPolygon.getLatLngs();
-    if (!polygonCoords || polygonCoords.length === 0) {
-        console.error('Polygon has no coordinates');
-        alert(t('alerts.emptyPolygon'));
+    
+    // Check if any polygon is still being drawn (has active waypoints)
+    if (isDrawingMode && waypoints.length > 0) {
+        alert('Bitte schließen Sie zuerst alle Sicherheitsbereiche, bevor Sie die Gefahrenanalyse starten.');
         return;
     }
-
-    console.log(`Analyzing threats for polygon with ${polygonCoords.length} coordinate sets`);
-    console.log('Polygon coordinates:', polygonCoords);
+    
+    // Validate all polygons are properly closed
+    for (let i = 0; i < polygonsToAnalyze.length; i++) {
+        const { polygon } = polygonsToAnalyze[i];
+        if (!polygon.getLatLngs || typeof polygon.getLatLngs !== 'function') {
+            console.error(`Invalid polygon ${i + 1} - missing getLatLngs method`);
+            alert(`Sicherheitsbereich ${i + 1} ist ungültig. Bitte zeichnen Sie ihn neu.`);
+            return;
+        }
+        
+        const polygonCoords = polygon.getLatLngs();
+        if (!polygonCoords || polygonCoords.length === 0 || (polygonCoords[0] && polygonCoords[0].length < 3)) {
+            console.error(`Polygon ${i + 1} is not closed properly`);
+            alert(`Sicherheitsbereich ${i + 1} ist nicht geschlossen. Bitte schließen Sie ihn zuerst.`);
+            return;
+        }
+    }
+    
+    console.log(`Analyzing threats for ${polygonsToAnalyze.length} security area(s)`);
+    
+    // For now, analyze the first polygon (can be extended to analyze all)
+    const primaryPolygon = polygonsToAnalyze[0].polygon;
+    const polygonCoords = primaryPolygon.getLatLngs();
 
     const loadingIndicator = document.querySelector('.loading-indicator') as HTMLElement;
     if (!loadingIndicator) return;
@@ -4736,7 +4776,7 @@ const analyzeAndMarkThreats = async () => {
     loadingIndicator.classList.remove('hidden');
 
     try {
-        const bounds = drawnPolygon.getBounds();
+        const bounds = primaryPolygon.getBounds();
         if (!bounds || !bounds.isValid()) {
             throw new Error('Invalid polygon bounds');
         }
@@ -5431,7 +5471,7 @@ async function getAIReportSections(context: any): Promise<any> {
             console.warn('AI disabled for public/demo build. Using placeholder report sections.');
             return buildReportFromStateFallback(context);
         }
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenerativeAI(apiKey);
         // Calculate average threat level for recommendations
         const threats = Array.from(threatsMap.values());
         const avgThreatLevel = threats.length > 0 ? 
@@ -5482,36 +5522,35 @@ async function getAIReportSections(context: any): Promise<any> {
         Focus on the threat level analysis and provide specific justifications for each threat level based on road type, traffic speed, and vehicle access capabilities.
         Include the recommended product types and explain why they are suitable for this specific context and threat level.`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        purpose: { type: Type.STRING },
-                        threatAnalysis: { type: Type.STRING },
-                        vulnerabilities: { type: Type.STRING },
-                        hvmMeasures: { type: Type.STRING },
-                        siteConsiderations: { type: Type.STRING },
-                        operationalImpact: { type: Type.STRING }
-                    },
-                    required: ["purpose", "threatAnalysis", "vulnerabilities", "hvmMeasures", "siteConsiderations", "operationalImpact"]
-                }
-            }
-        });
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const response = await model.generateContent(prompt);
+        const result = response.response;
+        const text = result.text();
         
-        const jsonText = (response.text || '').trim();
-        const aiSections = JSON.parse(jsonText);
+        // Try to parse as JSON, otherwise use the text directly
+        let aiSections;
+        try {
+            aiSections = JSON.parse(text);
+        } catch (e) {
+            // If not JSON, create sections from text
+            aiSections = {
+                purpose: text.split('\n\n')[0] || text.substring(0, 500),
+                threatAnalysis: text.split('\n\n')[1] || text.substring(500, 1000),
+                vulnerabilities: text.split('\n\n')[2] || text.substring(1000, 1500),
+                hvmMeasures: text.split('\n\n')[3] || text.substring(1500, 2000),
+                siteConsiderations: text.split('\n\n')[4] || text.substring(2000, 2500),
+                operationalImpact: text.split('\n\n')[5] || text.substring(2500, 3000)
+            };
+        }
         
         // KI-Text nachträglich übersetzen, falls er in der falschen Sprache ist
         return translateAISections(aiSections);
 
     } catch (error) {
         console.error("Fehler bei der Gemini-API-Anfrage für den Bericht:", error);
-        alert(t('alerts.geminiError'));
-        return null;
+        console.warn("Using fallback report sections due to AI error");
+        // Fallback to static sections instead of null
+        return buildReportFromStateFallback(context);
     }
 }
 
@@ -5843,7 +5882,7 @@ async function addProductRecommendationTooltips() {
             if (recommendedProducts.length > 0) {
                 // Select optimal product based on speed requirement rather than always picking the first
                 const selectedProduct = selectOptimalProduct(recommendedProducts, maxSpeed, streetName, markerIndex);
-                addInteractiveTooltip(marker, streetName, maxSpeed, selectedProduct);
+                addInteractiveTooltip(marker, streetName, maxSpeed, selectedProduct, markerIndex);
             } else {
                 // No suitable product found - add fallback tooltip
                 addNoProductTooltip(marker, streetName, maxSpeed);
@@ -5888,7 +5927,7 @@ async function addProductRecommendationTooltips() {
             
             if (recommendedProducts.length > 0) {
                 const selectedProduct = selectOptimalProduct(recommendedProducts, maxSpeed, `Zufahrt ${index + 1}`, index);
-                addInteractiveTooltip(marker, `Zufahrt ${index + 1}`, maxSpeed, selectedProduct);
+                addInteractiveTooltip(marker, `Zufahrt ${index + 1}`, maxSpeed, selectedProduct, index);
                 console.log(`✅ Added product recommendation for Entry Detection candidate ${index + 1}`);
             } else {
                 addNoProductTooltip(marker, `Zufahrt ${index + 1}`, maxSpeed);
@@ -6044,12 +6083,6 @@ function findProductsForSpeed(requiredSpeed: number): any[] {
     
     // Find products that have been tested at speeds higher than required
     const suitableProducts = products.filter((product: any) => {
-        // Exclude Roadblocker products
-        const productNameLower = product.product_name?.toLowerCase() || '';
-        if (productNameLower.includes('roadblocker') || productNameLower.includes('road blocker')) {
-            return false;
-        }
-        
         let productSpeed = 0;
         
         // Priority 1: Use the new pr_speed_kph field (direct test speed)
@@ -6433,7 +6466,7 @@ function createEntryDetectionMarkers() {
 /**
  * Add interactive tooltip to a marker
  */
-function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number, product: any) {
+function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number, product: any, markerIndex?: number) {
     let tooltipElement: HTMLElement | null = null;
     let isPinned = false;
     let leafletPopup: any = null; // For pinned state using Leaflet popup
@@ -6523,7 +6556,7 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
     });
     
     // Click event for pinning/unpinning
-    marker.on('click', (e: any) => {
+    marker.on('click', async (e: any) => {
         e.originalEvent.stopPropagation();
         
         if (isPinned) {
@@ -6545,10 +6578,23 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
                     pinnedTooltips.splice(index, 1);
                 }
                 
-                // Remove from pinned products
+                // Remove from pinned products (legacy UI array)
                 const productIndex = pinnedProducts.findIndex(pp => pp.marker === marker);
                 if (productIndex !== -1) {
                     pinnedProducts.splice(productIndex, 1);
+                }
+                
+                // Remove from persistent store
+                try {
+                    const { useTenderSelection } = await import('./src/stores/useTenderSelection');
+                    // Find entry by marker/streetName match
+                    const storeItems = useTenderSelection.getState().list();
+                    const toRemove = storeItems.find(item => item.entryLabel === streetName);
+                    if (toRemove) {
+                        useTenderSelection.getState().remove(`${toRemove.entryId}:${toRemove.id}`);
+                    }
+                } catch (err) {
+                    console.warn('Failed to remove from tender selection store:', err);
                 }
                 
                 if ((tooltipElement as any).cleanup) {
@@ -6627,23 +6673,66 @@ function addInteractiveTooltip(marker: any, streetName: string, maxSpeed: number
             
             console.log(`Popup pinned using Leaflet API at:`, markerLatLng);
             
-            // Add to pinned products list
+            // Add to pinned products list (legacy UI array)
             pinnedProducts.push({
                 streetName: streetName,
                 maxSpeed: maxSpeed,
                 product: product,
                 marker: marker
             });
+            
+            // Add to persistent store
+            try {
+                const { useTenderSelection } = await import('./src/stores/useTenderSelection');
+                const entryId = markerIndex !== undefined ? `${streetName}-${markerIndex}` : `${streetName}-${Date.now()}`;
+                const productId = product.id || product.product_name || String(Date.now());
+                const key = `${entryId}:${productId}`;
+                
+                // Check if already exists to avoid duplicates
+                const existing = useTenderSelection.getState().items[key];
+                if (!existing) {
+                    useTenderSelection.getState().add({
+                        id: productId,
+                        name: product.product_name || 'Unbekannt',
+                        entryId: entryId,
+                        entryLabel: streetName,
+                        requiredSpeedKmh: maxSpeed,
+                        standards: Array.isArray(product.standard) 
+                            ? product.standard 
+                            : product.technical_data?.standard 
+                            ? [product.technical_data.standard]
+                            : [],
+                        image: product.product_image_file || undefined,
+                        raw: product
+                    });
+                }
+            } catch (err) {
+                console.warn('Failed to add to tender selection store:', err);
+            }
+            
             console.log(`📌 Product pinned: ${streetName} - ${product.product_name}`);
             
             // Add close event handler for popup
-            leafletPopup.on('remove', () => {
-                    isPinned = false;
+            leafletPopup.on('remove', async () => {
+                isPinned = false;
                 leafletPopup = null;
-                // Remove from pinned products
+                // Remove from pinned products (legacy UI array)
                 const productIndex = pinnedProducts.findIndex(pp => pp.marker === marker);
                 if (productIndex !== -1) {
                     pinnedProducts.splice(productIndex, 1);
+                }
+                
+                // Remove from persistent store
+                try {
+                    const { useTenderSelection } = await import('./src/stores/useTenderSelection');
+                    // Find entry by marker/streetName match
+                    const storeItems = useTenderSelection.getState().list();
+                    const toRemove = storeItems.find(item => item.entryLabel === streetName);
+                    if (toRemove) {
+                        useTenderSelection.getState().remove(`${toRemove.entryId}:${toRemove.id}`);
+                    }
+                } catch (err) {
+                    console.warn('Failed to remove from tender selection store:', err);
                 }
                 console.log('Popup closed');
             });
@@ -6932,11 +7021,11 @@ function clearProductTooltips() {
         }
     });
     
-    // Clear the pinned tooltips array
+    // Clear the pinned tooltips array (UI only - persistent store remains)
     pinnedTooltips = [];
-    pinnedProducts = [];
+    pinnedProducts = []; // Legacy UI array cleared, but store persists
     
-    console.log('All product tooltips and popups cleared');
+    console.log('All product tooltips and popups cleared (UI only - persistent selection maintained)');
 }
 
 /**
@@ -7261,7 +7350,9 @@ async function generateRiskReport() {
             }
             pdf.setFont('helvetica', 'bold').setFontSize(14).text(t(titleKey), page_margin, currentY);
             currentY += 7;
-            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(content, content_width);
+            // Sanitize content to fix Unicode character spacing issues
+            const sanitizedContent = sanitizeDe(content, false);
+            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(sanitizedContent, content_width);
             if (currentY + (textLines.length * 5) > 280) { // Check for page break before adding content
                 pdf.addPage();
                 addWatermarkToCurrentPage();
@@ -7276,7 +7367,9 @@ async function generateRiskReport() {
         // Report Header (wrapped to page width)
         const headerText = t('report.mainTitle', { locationName: locationName });
         pdf.setFont('helvetica', 'bold').setFontSize(18);
-        const headerLines = pdf.splitTextToSize(headerText, content_width);
+        // Sanitize header text to fix Unicode character spacing issues
+        const sanitizedHeader = sanitizeDe(headerText, false);
+        const headerLines = pdf.splitTextToSize(sanitizedHeader, content_width);
         const headerLineHeight = 8;
         if (currentY + (headerLines.length * headerLineHeight) > 280) {
             pdf.addPage();
@@ -7307,7 +7400,9 @@ async function generateRiskReport() {
                     const maxSpeed = Math.round(calculateVelocityWithOsm(maxAcc, data.totalLength));
                     reportLine += ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
                 }
-                const splitLines = pdf.splitTextToSize(reportLine, content_width - 5);
+                // Sanitize threat line to fix Unicode character spacing issues
+                const sanitizedReportLine = sanitizeDe(reportLine, false);
+                const splitLines = pdf.splitTextToSize(sanitizedReportLine, content_width - 5);
                 if (currentY + (splitLines.length * 7) > 280) {
                     pdf.addPage(); addWatermarkToCurrentPage(); currentY = 25;
                 }
@@ -7378,6 +7473,12 @@ async function generateRiskReport() {
             reportIframe.src = pdf.output('datauristring');
         }
         generatedPdf = pdf;
+        
+        // Generate filename similar to tender
+        const kommune = locationName.split(',')[0].trim();
+        const date = new Date().toLocaleDateString('de-DE').replace(/\./g, '-');
+        generatedPdfFilename = `Risikobericht_${kommune}_${date}.pdf`;
+        
         downloadReportBtn.disabled = false;
         
     } catch (error) {
@@ -7396,350 +7497,214 @@ async function generateRiskReport() {
  */
 function downloadRiskReport() {
     if (generatedPdf) {
-        generatedPdf.save(t('report.reportFilename'));
+        // Use stored filename or fallback to translation
+        const filename = generatedPdfFilename || t('report.reportFilename');
+        generatedPdf.save(filename);
     } else {
         alert(t('alerts.noReportToDownload'));
     }
 }
 
-function downloadTenderReport() {
+/**
+ * Triggers the download of the generated Tender PDF.
+ */
+async function downloadTender() {
     if (generatedTenderPdf) {
-        const locationName = drawnPolygon ? 'Location' : 'Location';
-        const locationForFilename = locationName.split(',')[0].trim();
-        const filename = `Ausschreibung Zufahrtsschutz ${locationForFilename}.pdf`;
-        generatedTenderPdf.save(filename);
+        const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : 'Standort';
+        // Use same robust Kommune extraction as in generateTender
+        let kommune = locationName.split(',')[0].trim();
+        kommune = kommune.replace(/^\d{5}\s+/, '');
+        if (!kommune || /^\d+$/.test(kommune)) {
+            const parts = locationName.split(',');
+            kommune = parts[1] ? parts[1].trim() : 'Standort';
+        }
+        if (!kommune || kommune.length < 2) {
+            kommune = 'Standort';
+        }
+        const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        generatedTenderPdf.save(`Ausschreibung_Zufahrtschutz_${kommune}_${date}.pdf`);
     } else {
         alert('Es wurde noch keine Ausschreibung erstellt, die heruntergeladen werden könnte.');
     }
 }
 
 /**
- * Generate tender (Ausschreibung) PDF using pinned products and Gemini AI
+ * Generate tender (Ausschreibung) PDF using pinned products - Municipal-grade LV format
  */
 async function generateTender() {
-    console.log('📄 Starting tender generation...');
-    console.log('📄 Pinned products count:', pinnedProducts.length);
-    
-    if (pinnedProducts.length === 0) {
-        alert('Bitte pinnen Sie zuerst Produkte in der Produktauswahl an.');
-        return;
-    }
 
     const tenderIframe = document.getElementById('tender-iframe') as HTMLIFrameElement;
     const loadingOverlay = document.querySelector('.report-loading-overlay') as HTMLElement;
     const mapDiv = document.getElementById('map') as HTMLElement;
     const tenderPreviewArea = document.getElementById('tender-preview-area') as HTMLElement;
-    
+    const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
+    if (downloadTenderBtn) downloadTenderBtn.disabled = true;
+
     if (loadingOverlay) loadingOverlay.classList.remove('view-hidden');
 
     try {
+        // Get products from persistent store
+        const { useTenderSelection } = await import('./src/stores/useTenderSelection');
+        const selectedProducts = useTenderSelection.getState().list();
+        
+        console.log(`📋 Tender generation: Store has ${selectedProducts.length} products`);
+        
+        if (selectedProducts.length === 0) {
+            alert('Bitte pinnen Sie zuerst Produkte in der Produktauswahl an.');
+            if (loadingOverlay) loadingOverlay.classList.add('view-hidden');
+            return;
+        }
+
         // Get location name
         const locationName = drawnPolygon ? await getReportLocationName(drawnPolygon.getBounds().getCenter()) : 'Standort';
-        console.log('📄 Location name:', locationName);
         
-        // Collect technical data from pinned products
-        const productSpecs = pinnedProducts.map(pp => {
-            const prod = pp.product;
-            return {
-                productName: prod.product_name || 'Unbekannt',
-                manufacturer: prod.manufacturer || 'Unbekannt',
-                maxSpeed: pp.maxSpeed,
-                streetName: pp.streetName,
-                technicalData: prod.technical_data || {},
-                performanceRating: prod.performance_rating || prod.technical_data?.performance_rating || 'Keine',
-                standards: prod.standard || prod.technical_data?.standard || []
-            };
-        });
-        console.log('📄 Product specs:', productSpecs);
-
-        // Generate AI tender text with Gemini
-        console.log('📄 Generating AI tender text...');
-        const aiTenderText = await generateAITenderText(productSpecs, locationName);
-        console.log('📄 AI tender text generated, length:', aiTenderText.length);
-
-        // Create PDF - get from window.jspdf like in generateRiskReport
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        // Extract Kommune from location name with robust parsing
+        // Nominatim format: e.g. "Münster, NRW, Deutschland" or "44147 Dortmund, Nordrhein-Westfalen, Deutschland"
+        let kommune = locationName.split(',')[0].trim();
+        // Remove leading postal codes if present (e.g. "44147 Dortmund" -> "Dortmund")
+        kommune = kommune.replace(/^\d{5}\s+/, '');
+        // If result is still numeric or empty, try second part
+        if (!kommune || /^\d+$/.test(kommune)) {
+            const parts = locationName.split(',');
+            kommune = parts[1] ? parts[1].trim() : 'Standort';
+        }
+        // Fallback to reasonable default if still invalid
+        if (!kommune || kommune.length < 2) {
+            kommune = 'Standort';
+        }
         
-        // Helper function to add watermark (same format as risk report)
-        const addWatermarkToCurrentPage = () => {
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.saveGraphicsState();
-            pdf.setFont('helvetica', 'bold');
-            pdf.setFontSize(120);
-            pdf.setTextColor(200, 200, 200);
-            if (jsPDF.GState) {
-                 const gState = new jsPDF.GState({ opacity: 0.2 });
-                 pdf.setGState(gState);
+        // Extract date for filename
+        const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+        // ==========================================
+        // DATA EXTRACTION FROM BARRICADIX
+        // ==========================================
+        
+        // 1. Project Meta (from runtime or defaults)
+        const projectMeta = {
+            KOMMUNE: kommune,
+            AMT: 'Amt für öffentliche Sicherheit', // Default, can be enhanced
+            STRASSEN_PLANGEBIET: locationName,
+            VERFAHRENSNR: `V-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+            VERGABEART: 'UVgO Liefer-/Dienstleistung',
+            LOS_NR: ['1'],
+            KOSTENSTELLE: 'KST-001',
+            ANSPRECHPARTNER: 'Mustermann, Max',
+            KONTAKT: 'max.mustermann@kommune.de, Tel: 0231/123-456',
+            DATUM_STAND: new Date().toLocaleDateString('de-DE')
+        };
+        
+        // 2. Event data (from planning state or defaults)
+        const planningState = (window as any).planningState || {};
+        const event = {
+            veranstaltung: planningState.schutzgüter || 'öffentliche Veranstaltung',
+            zeitraum: 'Nach Vereinbarung',
+            aufbau_ab: new Date().toLocaleDateString('de-DE'),
+            abbau_bis: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE'),
+            erwartete_besucher: planningState.erwarteteBesucher || 'variabel',
+            rettungswege: 'gemäß DIN 18040'
+        };
+        
+        // 3. Extract Zufahrten from selected products
+        const zufahrtenMap = new Map<string, any>();
+        selectedProducts.forEach(sp => {
+            if (!zufahrtenMap.has(sp.entryId)) {
+                const threatData = threatsMap.get(sp.entryLabel);
+                zufahrtenMap.set(sp.entryId, {
+                    id: sp.entryId,
+                    strasse_platz: sp.entryLabel,
+                    nutzungsprofil: threatData?.roadType === 'residential' ? 'Anlieferung/Anwohner' : 'Hauptzufahrt',
+                    freihaltebreite: 4.5, // Default, could be enhanced
+                    radien: 6.0,
+                    längsgefälle: 2.0,
+                    untergrund: 'Asphalt/Beton',
+                    medien_leitungslage: 'keine bekannt',
+                    fluchtwegbezug: 'ja',
+                    rettungsdienst: true,
+                    räumfahrzeugbedarf: true
+                });
             }
-            pdf.text('VERTRAULICH', (pageWidth / 2) + 50, (pageHeight / 2) + 50, { align: 'center', angle: 45 });
-            pdf.restoreGraphicsState();
-        };
+        });
+        const zufahrten = Array.from(zufahrtenMap.values());
         
-        // Helper function to add header (same as risk report)
-        const addHeader = (pageNum: number, totalPages: number) => {
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(100, 100, 100);
-            pdf.text(`Ausschreibung Zufahrtsschutz`, 20, 12);
-            pdf.text(`Seite ${pageNum} von ${totalPages}`, pageWidth - 20, 12, { align: 'right' });
-            pdf.setTextColor(0, 0, 0);
-        };
-        
-        // Helper function to add footer (same as risk report)
-        const addFooter = () => {
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(100, 100, 100);
-            const date = new Date().toLocaleDateString('de-DE');
-            pdf.text(date, 20, pageHeight - 10);
-            pdf.text(`Vertraulich - Barricadix`, pageWidth - 20, pageHeight - 10, { align: 'right' });
-            pdf.setTextColor(0, 0, 0);
-        };
-
-        // Set up constants - DIN A4 margins (20mm left/right, 25mm top for header)
-        const page_margin = 20;
-        const top_margin = 25; // Space for header
-        const page_width = pdf.internal.pageSize.getWidth();
-        const content_width = page_width - (page_margin * 2);
-        let currentY = top_margin;
-
-        // Helper function to process bullet points with proper indentation
-        const processBulletPoints = (content: string, width: number): string => {
-            const lines = content.split('\n');
-            let processed = '';
-            let inList = false;
+        // 4. Performance requirements per Zufahrt (from selected products)
+        const performanceRequirements = new Map<string, any>();
+        selectedProducts.forEach(sp => {
+            const prod = sp.raw || {};
+            const techData = prod.technical_data || {};
             
-            lines.forEach((line, index) => {
-                line = line.trim();
-                if (!line) {
-                    processed += '\n';
-                    inList = false;
-                    return;
-                }
-                
-                // Check if line is a bullet point (starts with - or *)
-                const isBullet = line.match(/^[-*]\s+(.+)$/);
-                const isSubBullet = line.match(/^\s+[-*]\s+(.+)$/);
-                
-                if (isBullet || isSubBullet) {
-                    const indent = isSubBullet ? '    ' : '  '; // 4 spaces for sub-bullet, 2 for main bullet
-                    const text = (isBullet?.[1] || isSubBullet?.[1] || '').trim();
-                    processed += `${indent}• ${text}\n`;
-                    inList = true;
-                } else if (inList && line.startsWith('-') === false && line.startsWith('*') === false) {
-                    // Regular text after a bullet list
-                    inList = false;
-                    processed += `${line}\n`;
-                } else {
-                    processed += `${line}\n`;
-                    inList = false;
-                }
+            // Calculate impact energy (simplified: E = 0.5 * m * v²)
+            const vehicleMass = prod.pr_veh === 'K12' ? 6800 : prod.pr_veh === 'N2' ? 3500 : 2000; // kg
+            const speedMs = (sp.requiredSpeedKmh / 3.6); // m/s
+            const impactEnergy = 0.5 * vehicleMass * speedMs * speedMs / 1000; // kJ
+            
+            performanceRequirements.set(sp.entryId, {
+                fahrzeugklasse: prod.pr_veh || techData.vehicle_type || 'K12',
+                anprallgeschwindigkeit: sp.requiredSpeedKmh,
+                anprallenergie: Math.round(impactEnergy),
+                penetration: techData.penetration || prod.penetration || 0.5,
+                restfahrzeuggeschwindigkeit: Math.round(sp.requiredSpeedKmh * 0.3), // 30% of impact speed
+                öffnungsart: prod.type?.includes('motor') || prod.type?.includes('automatic') ? 'motorisch' : 'manuell',
+                durchfahrtsbreite: techData.clear_width || 4.0,
+                notentriegelung: true,
+                schliesssystem: 'Profilzylinder',
+                wartung: 'jährlich'
             });
-            
-            return processed.trim();
-        };
-
-        // Helper function to add a section (same as in generateRiskReport)
-        const addSection = (title: string, content: string) => {
-            if (currentY > 250) { // Check for page break before adding section
-                pdf.addPage();
-                const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-                addWatermarkToCurrentPage();
-                addHeader(1, totalPages);
-                addFooter();
-                currentY = top_margin;
-            }
-            // Clean title from markdown artifacts
-            const cleanTitle = title.replace(/^#+\s*/, '').replace(/^\d+\.\s*/, '').trim();
-            pdf.setFont('helvetica', 'bold').setFontSize(14).text(cleanTitle, page_margin, currentY);
-            currentY += 10; // Extra line break after heading
-            
-            // Process content line by line for proper bullet point handling
-            const lines = content.split('\n');
-            const bulletIndent = 8; // Indentation for bullet points in mm
-            const lineHeight = 5;
-            
-            lines.forEach((line, index) => {
-                if (currentY + lineHeight > 280) {
-                    pdf.addPage();
-                    const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-                    addWatermarkToCurrentPage();
-                    addHeader(totalPages, totalPages);
-                    addFooter();
-                    currentY = top_margin;
-                }
-                
-                const trimmedLine = line.trim();
-                if (!trimmedLine) {
-                    currentY += lineHeight;
-                    return;
-                }
-                
-                // Check if it's a bullet point (looks for "•" or "-" at the start with indentation)
-                const bulletMatch = line.match(/^(\s*)•\s+(.+)$/);
-                const dashMatch = trimmedLine.match(/^-\s+(.+)$/);
-                
-                if (bulletMatch || dashMatch) {
-                    const indent = bulletMatch ? bulletMatch[1].length * 2 : 0; // Calculate indent in mm
-                    const text = bulletMatch ? bulletMatch[2] : (dashMatch ? dashMatch[1] : trimmedLine);
-                    const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(text, content_width - bulletIndent - indent);
-                    
-                    textLines.forEach((textLine: string) => {
-                        if (currentY + lineHeight > 280) {
-                            pdf.addPage();
-                            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-                            addWatermarkToCurrentPage();
-                            addHeader(totalPages, totalPages);
-                            addFooter();
-                            currentY = 25;
-                        }
-                        pdf.text(textLine, page_margin + bulletIndent + indent, currentY);
-                        currentY += lineHeight;
-                    });
-                } else {
-                    // Regular text
-                    const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(trimmedLine, content_width);
-                    
-                    textLines.forEach((textLine: string) => {
-                        if (currentY + lineHeight > 280) {
-                            pdf.addPage();
-                            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-                            addWatermarkToCurrentPage();
-                            addHeader(totalPages, totalPages);
-                            addFooter();
-                            currentY = 25;
-                        }
-                        pdf.text(textLine, page_margin, currentY);
-                        currentY += lineHeight;
-                    });
-                }
-            });
-            
-            currentY += 5; // Extra space after section
-        };
-
-        // Add watermark, header and footer to first page
-        addWatermarkToCurrentPage();
-        addHeader(1, 1);
-        addFooter();
-
-        // Tender Header (same style as risk report)
-        const locationForFilename = locationName.split(',')[0].trim(); // Get first part (e.g., "Allee" or "Hövelhof")
-        const headerText = `Ausschreibung Zufahrtsschutz ${locationForFilename}`;
-        pdf.setFont('helvetica', 'bold').setFontSize(18);
-        const headerLines = pdf.splitTextToSize(headerText, content_width);
-        const headerLineHeight = 8;
-        if (currentY + (headerLines.length * headerLineHeight) > 280) {
-            pdf.addPage();
-            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-            addWatermarkToCurrentPage();
-            addHeader(totalPages, totalPages);
-            addFooter();
-            currentY = 25;
-        }
-        pdf.text(headerLines, page_margin, currentY);
-        currentY += (headerLines.length * headerLineHeight) + 5;
-        pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
-        currentY += 15;
-
-        // Metadata
-        pdf.setFont('helvetica', 'normal').setFontSize(10);
-        const date = new Date().toLocaleDateString('de-DE');
-        pdf.text(`Standort: ${locationName}`, page_margin, currentY);
-        currentY += 6;
-        pdf.text(`Erstellt am: ${date}`, page_margin, currentY);
-        currentY += 6;
-        pdf.text(`Anzahl Zufahrten: ${productSpecs.length}`, page_margin, currentY);
-        currentY += 15;
-
-        // Main tender text from AI (as sections)
-        // First, try to split by Markdown headings (## or ###)
-        let sections = aiTenderText.split(/(?=^#{2,3}\s)/m).filter(s => s.trim());
-        
-        // If no markdown headings found, try number sections
-        if (sections.length <= 1) {
-            sections = aiTenderText.split(/^\d+\.\s+/m).filter(s => s.trim());
-        }
-        
-        sections.forEach((section, index) => {
-            if (section.trim()) {
-                const lines = section.trim().split('\n');
-                let title = lines[0] || `Abschnitt ${index + 1}`;
-                
-                // Remove all markdown heading markers
-                title = title.replace(/^#+\s*/, '').replace(/^\d+\.\s*/, '').trim();
-                
-                // Get content without the title
-                const content = lines.slice(1).join('\n').trim();
-                
-                // Process bullet points with proper indentation
-                const processedContent = processBulletPoints(content, content_width);
-                
-                addSection(title, processedContent || title);
-            }
         });
-
-        // Add product specifications as a section
-        if (currentY > 250) {
-            pdf.addPage();
-            const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-            addWatermarkToCurrentPage();
-            addHeader(totalPages, totalPages);
-            addFooter();
-            currentY = 25;
+        
+        // 5. Capture map screenshot if available
+        let mapImage: string | undefined;
+        if (mapDiv && drawnPolygon) {
+            try {
+                // Close all popups before screenshot
+                if (map) {
+                    map.closePopup();
+                }
+                
+                // Hide all Leaflet popups and tooltips temporarily
+                const leafletPanes = document.querySelectorAll('.leaflet-popup-pane, .leaflet-tooltip-pane');
+                const originalDisplays: (string | null)[] = [];
+                leafletPanes.forEach(pane => {
+                    originalDisplays.push((pane as HTMLElement).style.display);
+                    (pane as HTMLElement).style.display = 'none';
+                });
+                
+                // Temporarily show map
+                mapDiv.classList.remove('view-hidden');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const canvas = await html2canvas(mapDiv, {
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    scale: 1,
+                    width: mapDiv.offsetWidth,
+                    height: mapDiv.offsetHeight
+                });
+                mapImage = canvas.toDataURL('image/png');
+                
+                mapDiv.classList.add('view-hidden');
+                
+                // Restore popups and tooltips
+                leafletPanes.forEach((pane, idx) => {
+                    (pane as HTMLElement).style.display = originalDisplays[idx] || '';
+                });
+            } catch (e) {
+                console.warn('Could not capture map for tender:', e);
+            }
         }
         
-        pdf.setFont('helvetica', 'bold').setFontSize(14).text('Technische Details', page_margin, currentY);
-        currentY += 10; // Extra line break after heading
-        
-        pdf.setFont('helvetica', 'normal').setFontSize(11);
-        
-        productSpecs.forEach((spec, index) => {
-            if (currentY > 280) {
-                pdf.addPage();
-                const totalPages = (pdf as any).getNumberOfPages() || pdf.internal?.getNumberOfPages() || 1;
-                addWatermarkToCurrentPage();
-                addHeader(totalPages, totalPages);
-                addFooter();
-                currentY = 25;
-            }
-            
-            pdf.setFont('helvetica', 'bold').setFontSize(11);
-            pdf.text(`Zufahrt ${index + 1}: ${spec.streetName}`, page_margin, currentY);
-            currentY += 6;
-            
-            pdf.setFont('helvetica', 'normal').setFontSize(10);
-            pdf.text(`Mindestgeschwindigkeit: ${spec.maxSpeed} km/h`, page_margin + 5, currentY);
-            currentY += 6;
-            
-            const standardsText = Array.isArray(spec.standards) ? spec.standards.join(', ') : (spec.standards || 'N/A');
-            if (standardsText && standardsText !== 'N/A') {
-                pdf.text(`Normen: ${standardsText}`, page_margin + 5, currentY);
-                currentY += 6;
-            }
-            
-            currentY += 5;
-        });
-
-        // Ensure watermark, header and footer are on all pages
-        try {
-            const getPages = (pdf as any).getNumberOfPages || pdf.internal?.getNumberOfPages;
-            const totalPages: number = typeof getPages === 'function' ? getPages.call(pdf) : 1;
-            for (let p = 1; p <= totalPages; p++) {
-                pdf.setPage(p);
-                addWatermarkToCurrentPage();
-                addHeader(p, totalPages);
-                addFooter();
-            }
-        } catch (e) {
-            // Fallback: at least watermark current page
-            addWatermarkToCurrentPage();
-        }
-
-        // Set the filename for download
-        const filename = `Ausschreibung Zufahrtsschutz ${locationForFilename}.pdf`;
-        console.log('📄 Tender PDF filename:', filename);
+        // ==========================================
+        // GENERATE PDF USING NEW MODULE
+        // ==========================================
+        const { createTenderPdf } = await import('./src/features/tender/createTenderPdf');
+        const pdf = await createTenderPdf(
+            projectMeta,
+            event,
+            zufahrten,
+            performanceRequirements,
+            selectedProducts,
+            mapImage
+        );
 
         // Display in iframe
         mapDiv.classList.add('view-hidden');
@@ -7748,34 +7713,20 @@ async function generateTender() {
         }
         
         const pdfBlob = pdf.output('blob');
-        console.log('📄 PDF blob created, size:', pdfBlob.size, 'bytes');
-        
         if (generatedTenderPdfUrl) {
             URL.revokeObjectURL(generatedTenderPdfUrl);
         }
         generatedTenderPdfUrl = URL.createObjectURL(pdfBlob);
-        console.log('📄 Tender PDF URL created:', generatedTenderPdfUrl);
         
         if (tenderIframe) {
-            console.log('📄 Setting tender iframe src...');
             tenderIframe.src = generatedTenderPdfUrl;
-            console.log('📄 Tender iframe src set successfully');
-        } else {
-            console.error('❌ Tender iframe not found!');
-        }
-        
-        if (tenderPreviewArea) {
-            console.log('📄 Tender preview area visibility:', !tenderPreviewArea.classList.contains('view-hidden'));
-        } else {
-            console.error('❌ Tender preview area not found!');
         }
         
         generatedTenderPdf = pdf;
-        const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
-        if (downloadTenderBtn) {
-            downloadTenderBtn.disabled = false;
-        }
-        console.log('✅ Tender PDF generated successfully');
+        console.log('✅ Municipal-grade tender PDF generated successfully');
+        
+        // Enable download button
+        if (downloadTenderBtn) downloadTenderBtn.disabled = false;
 
     } catch (error) {
         console.error("Error generating tender:", error);
@@ -7792,111 +7743,47 @@ async function generateAITenderText(productSpecs: any[], locationName: string): 
     const isGithubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
     const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY) as string | undefined;
     
-    console.log('🔍 Generating AI Tender Text...');
-    console.log('🔍 API Key available:', !!apiKey);
-    console.log('🔍 Is GitHub Pages:', isGithubPages);
-    
     if (!apiKey || isGithubPages) {
-        console.warn('⚠️ AI disabled - using fallback tender text');
+        console.warn('AI disabled - using fallback tender text');
         return generateFallbackTenderText(productSpecs, locationName);
     }
 
     try {
-        console.log('📦 Using @google/genai API (same as report generation)...');
-        const ai = new GoogleGenAI({ apiKey });
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const ai = new GoogleGenerativeAI(apiKey);
         
         const specsSummary = productSpecs.map(spec => {
-            const standards = Array.isArray(spec.standards) ? spec.standards.join(', ') : spec.standards || 'N/A';
-            const performance = spec.performance || `Leistungsstufe für ${spec.maxSpeed} km/h`;
-            return `${spec.streetName}: ${spec.maxSpeed} km/h, Standards: ${standards}, Leistung: ${performance}`;
+            return `${spec.streetName}: ${spec.maxSpeed} km/h, Standards: ${Array.isArray(spec.standards) ? spec.standards.join(', ') : spec.standards}`;
         }).join('\n');
 
-        const prompt = `SYSTEM / ROLLE
-Du bist deutschsprachiger Fachautor für Bauvergaben (VOB/A) mit Spezialisierung auf Perimetersicherheit/Zufahrtschutz (Fahrzeugrückhaltesysteme). Du erstellst eine herstellerneutrale, rechtssichere Leistungsbeschreibung mit Leistungsverzeichnis. Keine KI-Artefakte, keine Floskeln, keine Meta-Kommentare, keine Platzhalter wie „[Lorem]".
+        const prompt = `Als Ausschreibungsexperte erstelle einen herstellerneutral formulierten Ausschreibungstext für Zufahrtsicherungsbarrieren gemäß § 7 VgV (Vergabeverordnung) und § 34 GWB (Gesetz gegen Wettbewerbsbeschränkungen).
 
-EINGABEDATEN (aus dem System)
-- LOCATION_NAME: ${locationName}
-- ANZAHL_ZUFAHRTEN: ${productSpecs.length}
-- SPECS (je Zugangspunkt; aus dem System generiert, Zeile pro Zugang, Format: „<Straßenname>: <MaxSpeed> km/h, Standards: <…>, Leistung: <…>"):
-<<<SPECS_START
+Die Ausschreibung soll folgende technische Anforderungen enthalten:
 ${specsSummary}
-SPECS_END>>>
 
-ANNAHME & BENENNUNG DER KOMMUNE
-Ermittle den Kommunennamen aus LOCATION_NAME (z. B. „Stadt <…>" / „Gemeinde <…>"). Wenn nicht eindeutig, wähle den städtischen Namen, der in Deutschland üblicherweise die Gemeinde bezeichnet. Falls weiterhin unklar, verwende LOCATION_NAME.
+Standort: ${locationName}
+Anzahl an Zufahrten: ${productSpecs.length}
 
-ZIEL / AUSGABEFORMAT
-Gib ausschließlich ein sauber strukturiertes Dokument in Markdown (für PDF-Rendering) zurück – ohne Präambel und ohne zusätzliche Erklärtexte. Titelzeile exakt:
+Erstelle einen formellen, präzisen Ausschreibungstext mit folgenden Abschnitten:
+1. Verfahrensart und Ausschreibung
+2. Gegenstand der Ausschreibung
+3. Umfang der Leistungen
+4. Technische Anforderungen (ohne Hersteller- oder Produktnamen)
+5. Zertifizierung und Normen
+6. Leistungsbeschreibung
+7. Unternehmensqualifikation
 
-# Ausschreibung Zufahrtschutz – <Kommune>
+Der Text muss herstellerneutral sein und darf keine Produktnamen oder Herstellernamen enthalten.`;
 
-DOKUMENTSTRUKTUR (GENAU EINHALTEN)
-## 1. Auftrag und Projekt
-Kurzbeschreibung: Zufahrtschutz / Fahrzeugrückhaltesysteme für öffentlichen Raum in <Kommune> (Ort: ${locationName}).
-
-## 2. Leistungsumfang
-Beschaffung, Lieferung, Fundamentierung/Montage, Inbetriebnahme, Dokumentation, Einweisung, Wartung/Inspektion.
-
-## 3. Technische und funktionale Anforderungen
-### 3.1 Normative Grundlagen (produktneutral)
-- Leistungs- und Prüfnachweise nach IWA 14-1 / ISO 22343-1 **oder** DIN SPEC 91414-2 **oder** ASTM F2656 (gleichwertige Prüfverfahren zulässig).
-- Korrosionsschutz und Oberflächen gemäß einschlägiger DIN/EN (z. B. Feuerverzinken DIN EN ISO 1461), Ausführung im Straßenraum gemäß geltenden Regelwerken.
-
-### 3.2 Schutzziele je Zugangspunkt
-Für jeden in den SPECS aufgeführten Zugangspunkt:
-- Lage/Bezeichnung: Straßen-/Platzname aus SPECS.
-- Erforderliches Schutzziel (leistungsbezogen): Mindest-Aufprallleistung entsprechend örtlicher Annäherungsgeschwindigkeit (aus SPECS „<MaxSpeed> km/h") mit begrenzter Eindringtiefe (formuliere als Zielanforderung, **ohne** Produkte/Modelle).
-- Zulässige Nachweiswege: IWA 14-1 / ISO 22343-1 **oder** DIN SPEC 91414-2 **oder** ASTM F2656 – jeweils in einer Leistungsklasse, die das genannte Schutzziel erfüllt oder übertrifft.
-- Betriebliche Anforderungen (generisch): Winterdiensttauglichkeit, gut sichtbare Kennzeichnung, Rettungsfreigabe/Demontierbarkeit in praxisgerechter Zeit (ohne konkrete Minutenangabe, da nicht übergeben).
-
-> Nutze ausschließlich Informationen aus SPECS; erfinde keine Maße/Fristen. Wenn in SPECS „Leistung:" bzw. „Standards:" vorhanden ist, formuliere diese als **zulässige Nachweisgrundlage/Leistungsziel**, ohne Hersteller- oder Produktbezug.
-
-### 3.3 Ausführung/Installation (generische Mindestvorgaben)
-- Gründung/Fundamentierung entsprechend statischer Erfordernisse und Frosttiefe; Schutz vorhandener Leitungen; Wiederherstellung Beläge.
-- Entwässerung und Ebenheit; Toleranzen nach anerkannten Regeln der Technik.
-- Kennzeichnung/Sichtbarkeit im öffentlichen Raum; Barrierefreiheit berücksichtigen.
-
-### 3.4 Betrieb & Wartung
-- Ziel-Lebensdauer üblich für kommunale Außenanlagen; turnusmäßige Sicht-/Funktionsprüfung; Ersatzteilverfügbarkeit.
-- Einweisung des Betriebspersonals; Übergabe Bedien- und Wartungsunterlagen.
-
-## 4. Qualitätssicherung und Nachweise
-- Crash-/Leistungsnachweise (IWA 14-1/ISO 22343-1, DIN SPEC 91414-2 oder ASTM F2656) durch akkreditierte Prüfstelle; Gleichwertigkeit zulässig.
-- Montage- und Abnahmeprotokoll; As-Built-Unterlagen (Lage/Gründungen); Wartungsplan; Schulungsnachweis.
-
-## 5. Vertrags- und Ausführungsbedingungen (auszugsweise)
-- Ausführungsfristen, Arbeits-/Verkehrssicherung, Koordination mit Rettungsdiensten.
-- Haftung für Oberflächen-/Leitungsschäden nach gesetzlichen Vorgaben.
-- Abnahme und Mängelhaftung/Gewährleistung nach VOB/B (übliches Mindestniveau).
-
-## 6. Leistungsverzeichnis (produktneutral, positionsweise)
-Erzeuge pro in SPECS genannter Zufahrt eine Position mit:
-- **Kurztext:** Liefer- und Montageleistung Fahrzeugrückhaltesystem(e) für Zugang „<Straßenname>".
-- **Langtext (leistungsbezogen):** Ziel-Schutzniveau gemäß Abschnitt 3.2 auf Basis Annäherungsgeschwindigkeit aus SPECS; zulässige Nachweisnormen wie oben; Ausführung/Installation gem. Abschnitt 3.3; Doku/Nachweise gem. Abschnitt 4.
-- **Menge/Einheit:** ohne Wertangabe (Mengen werden separat ermittelt).
-- **Nebenleistungen:** Baustelleneinrichtung, Leitungsortung/-schutz, Vermessung, Wiederherstellung Beläge, Dokumentation, Einweisung.
-- **Nachweise zur Abnahme:** wie in Abschnitt 4.
-
-Zusätzlich Sammelpositionen (ohne Mengenwerte): Baustelleneinrichtung, Verkehrs-/Rettungskoordination, Dokumentation/As-Built.
-
-## 7. Eignungs- und Zuschlagskriterien (Hinweistext)
-Eignung: Referenzen vergleichbarer Projekte, Qualifikation Montagebetrieb, Service/Wartung.  
-Zuschlag: wirtschaftlichstes Angebot nach Vergabeunterlagen.`;
-
-        console.log('📦 Sending request to Gemini API...');
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
-            contents: prompt
-        });
-        
-        const text = response.text || '';
-        console.log('✅ AI tender text received, length:', text.length);
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
         
         return text;
         
     } catch (error) {
-        console.error('❌ Error generating AI tender text:', error);
-        console.warn('⚠️ Falling back to static tender text');
+        console.error('Error generating AI tender text:', error);
         return generateFallbackTenderText(productSpecs, locationName);
     }
 }
@@ -9158,12 +9045,60 @@ async function initializeApp() {
         waypointMarkers = [];
         if (pathLine) map.removeLayer(pathLine);
         pathLine = null;
-        if (drawnPolygon) map.removeLayer(drawnPolygon);
-        drawnPolygon = null;
-        if (polygonLabel) map.removeLayer(polygonLabel);
-        polygonLabel = null;
         waypoints = [];
         if (isDrawingMode) setDrawingMode(false);
+        
+        // Clear all polygons
+        drawnPolygons.forEach(({ polygon, label }) => {
+            if (polygon) map.removeLayer(polygon);
+            if (label) map.removeLayer(label);
+        });
+        drawnPolygons = [];
+        drawnPolygon = null;
+        polygonLabel = null;
+        
+        updateSecurityAreaUI();
+    };
+    
+    const removePolygon = (index: number) => {
+        if (index < 0 || index >= drawnPolygons.length) return;
+        
+        const { polygon, label } = drawnPolygons[index];
+        if (polygon) map.removeLayer(polygon);
+        if (label) map.removeLayer(label);
+        
+        drawnPolygons.splice(index, 1);
+        
+        // Update labels
+        drawnPolygons.forEach((item, idx) => {
+            if (item.label) {
+                const center = item.polygon.getBounds().getCenter();
+                item.label.setLatLng(center);
+                item.label.setIcon(L.divIcon({
+                    className: 'polygon-label',
+                    html: `<div>${t('map.securityAreaLabel')} ${idx + 1}</div>`,
+                    iconSize: [150, 24]
+                }));
+            }
+        });
+        
+        // Maintain backward compatibility
+        drawnPolygon = drawnPolygons.length > 0 ? drawnPolygons[drawnPolygons.length - 1].polygon : null;
+        polygonLabel = drawnPolygons.length > 0 ? drawnPolygons[drawnPolygons.length - 1].label : null;
+        
+        updateSecurityAreaUI();
+    };
+    
+    const updateSecurityAreaUI = () => {
+        const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+        if (addAreaBtn) {
+            // Show button if we're in marking area tab and not currently drawing
+            if (currentActiveTab === 'nav-marking-area' && !isDrawingMode && drawnPolygons.length > 0) {
+                addAreaBtn.classList.remove('hidden');
+            } else {
+                addAreaBtn.classList.add('hidden');
+            }
+        }
     };
     
     const updatePathLine = () => {
@@ -9172,23 +9107,54 @@ async function initializeApp() {
     };
 
     const closePolygon = () => {
-        if (waypoints.length < 3) return;
-        if (drawnPolygon) map.removeLayer(drawnPolygon);
-        drawnPolygon = L.polygon(waypoints, { color: 'yellow', fillColor: '#FFFF00', fillOpacity: 0.3, weight: 2 }).addTo(map);
-        const polygonCenter = drawnPolygon.getBounds().getCenter();
-        polygonLabel = L.marker(polygonCenter, { icon: L.divIcon({ className: 'polygon-label', html: t('map.securityAreaLabel'), iconSize: [150, 24] }) }).addTo(map);
+        if (waypoints.length < 3) {
+            alert('Bitte mindestens 3 Punkte setzen, um einen Sicherheitsbereich zu schließen.');
+            return;
+        }
+        
+        // Create new polygon
+        const polygon = L.polygon(waypoints, { 
+            color: 'yellow', 
+            fillColor: '#FFFF00', 
+            fillOpacity: 0.3, 
+            weight: 2 
+        }).addTo(map);
+        
+        const polygonCenter = polygon.getBounds().getCenter();
+        const label = L.marker(polygonCenter, { 
+            icon: L.divIcon({ 
+                className: 'polygon-label', 
+                html: `<div>${t('map.securityAreaLabel')} ${drawnPolygons.length + 1}</div>`, 
+                iconSize: [150, 24] 
+            }) 
+        }).addTo(map);
+        
+        // Store in array
+        const polygonId = `polygon-${Date.now()}`;
+        drawnPolygons.push({ polygon, label, id: polygonId });
+        
+        // Maintain backward compatibility
+        drawnPolygon = polygon;
+        polygonLabel = label;
+        
+        // Clean up current drawing
         if (pathLine) map.removeLayer(pathLine);
         pathLine = null;
         waypointMarkers.forEach(marker => map.removeLayer(marker));
         waypointMarkers = [];
+        waypoints = [];
+        setDrawingMode(false);
         
-        // Trigger OSM data loading for the new polygon
+        console.log(`✅ Sicherheitsbereich ${drawnPolygons.length} geschlossen. Gesamt: ${drawnPolygons.length} Bereiche.`);
+        
+        // Trigger OSM data loading for all polygons
         if (isOsmEnabled()) {
             console.log('🗺️ Polygon created, triggering OSM data load...');
             debouncedLoadOsmData();
         }
-        waypoints = [];
-        setDrawingMode(false);
+        
+        // Update UI to show option to add another area
+        updateSecurityAreaUI();
     };
 
     const onMapClick = (e: any) => {
@@ -9241,35 +9207,57 @@ async function initializeApp() {
             resetDrawing();
             clearThreatAnalysis();
             generatedPdf = null;
+            generatedPdfFilename = '';
+            
+            // Hide add area button when switching to parameter tab
+            const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+            if (addAreaBtn) addAreaBtn.classList.add('hidden');
         }
         if (newTabId === 'nav-marking-area') {
             // Don't clear threat analysis when returning to marking area
             // Only clear when user explicitly clicks "Reset" button
             generatedPdf = null;
+            generatedPdfFilename = '';
+            
+            // Show add area button if there are already polygons
+            const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+            if (addAreaBtn) {
+                if (drawnPolygons.length > 0 && !isDrawingMode) {
+                    addAreaBtn.classList.remove('hidden');
+                } else {
+                    addAreaBtn.classList.add('hidden');
+                }
+            }
             
             // Restore threat analysis if it exists
             restoreThreatAnalysis();
         }
         if (newTabId === 'nav-threat-analysis') {
             generatedPdf = null;
+            generatedPdfFilename = '';
+            
+            // Hide add area button when switching to threat analysis tab
+            const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+            if (addAreaBtn) addAreaBtn.classList.add('hidden');
             
             // Restore threat analysis if it exists
             restoreThreatAnalysis();
         }
         if (newTabId === 'nav-product-selection') {
             await updateProductRecommendations();
-        } else if (newTabId === 'nav-project-description') {
-            // Don't clear tooltips in tender view - user needs to see pinned products
-            // clearProductTooltips();
         } else {
             // Clear product tooltips when leaving product selection or switching tabs
-            clearProductTooltips();
+            // BUT NOT when going to tender view - need to keep markers visible
+            if (newTabId !== 'nav-project-description') {
+                clearProductTooltips();
+            }
         }
         if (newTabId === 'nav-project-description') {
             // Handle project description tab
             // DON'T clear threat analysis - user still needs to see where threats are
             // clearThreatAnalysis();
             generatedPdf = null;
+            generatedPdfFilename = '';
         }
 
         toggleDrawModeBtn.classList.add('hidden');
@@ -9277,8 +9265,8 @@ async function initializeApp() {
         analyzeThreatsBtn.classList.add('hidden');
         createReportBtn.classList.add('hidden');
         downloadReportBtn.classList.add('hidden');
-        
-        // Hide tender buttons by default
+        const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+        if (addAreaBtn) addAreaBtn.classList.add('hidden');
         const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
         const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
         if (createTenderBtn) createTenderBtn.classList.add('hidden');
@@ -9289,10 +9277,12 @@ async function initializeApp() {
         
         const tenderPreviewArea = document.getElementById('tender-preview-area') as HTMLElement;
         
-        mapDiv.classList.toggle('view-hidden', isReportView || isTenderView);
+        // Only hide map for report view or tender view if PDF has been generated
+        const shouldHideMapForTender = isTenderView && generatedTenderPdf !== null;
+        mapDiv.classList.toggle('view-hidden', isReportView || shouldHideMapForTender);
         reportPreviewArea.classList.toggle('view-hidden', !isReportView);
         if (tenderPreviewArea) {
-            tenderPreviewArea.classList.toggle('view-hidden', !isTenderView);
+            tenderPreviewArea.classList.toggle('view-hidden', !isTenderView || generatedTenderPdf === null);
         }
 
         if (map) {
@@ -9316,14 +9306,14 @@ async function initializeApp() {
             downloadReportBtn.classList.remove('hidden');
             downloadReportBtn.disabled = !generatedPdf;
         } else if (newTabId === 'nav-project-description') {
-            // Show tender creation and download buttons (like risk report)
+            // Show tender creation buttons
+            const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
+            const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
             if (createTenderBtn) createTenderBtn.classList.remove('hidden');
             if (downloadTenderBtn) {
                 downloadTenderBtn.classList.remove('hidden');
                 downloadTenderBtn.disabled = !generatedTenderPdf;
             }
-            
-            // Don't auto-generate tender - user must click "Ausschreibung erstellen" button
         }
     };
 
@@ -9508,9 +9498,50 @@ async function initializeApp() {
     });
 
     toggleDrawModeBtn.addEventListener('click', () => {
-        if (drawnPolygon) resetDrawing();
-        setDrawingMode(!isDrawingMode);
+        if (isDrawingMode) {
+            setDrawingMode(false);
+            // Show add area button if there are polygons
+            const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+            if (addAreaBtn) {
+                if (drawnPolygons.length > 0) {
+                    addAreaBtn.classList.remove('hidden');
+                } else {
+                    addAreaBtn.classList.add('hidden');
+                }
+            }
+        } else {
+            setDrawingMode(true);
+            // Hide add area button when entering drawing mode
+            const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+            if (addAreaBtn) addAreaBtn.classList.add('hidden');
+        }
     });
+    
+    // Add security area button
+    const addSecurityAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
+    if (addSecurityAreaBtn) {
+        addSecurityAreaBtn.addEventListener('click', () => {
+            // Check if any polygon is still being drawn (has active waypoints)
+            if (isDrawingMode && waypoints.length > 0) {
+                alert('Bitte schließen Sie zuerst den aktuellen Sicherheitsbereich, bevor Sie einen neuen hinzufügen.');
+                return;
+            }
+            
+            // Check if all existing polygons are closed (have at least 3 points)
+            const allClosed = drawnPolygons.every(item => {
+                const coords = item.polygon.getLatLngs();
+                return coords && coords.length > 0 && coords[0].length >= 3;
+            });
+            
+            if (!allClosed && drawnPolygons.length > 0) {
+                alert('Bitte schließen Sie zuerst alle vorhandenen Sicherheitsbereiche, bevor Sie einen neuen hinzufügen.');
+                return;
+            }
+            
+            setDrawingMode(true);
+            addSecurityAreaBtn.classList.add('hidden');
+        });
+    }
 
     resetDrawingBtn.addEventListener('click', () => {
         resetDrawing();
@@ -9524,13 +9555,8 @@ async function initializeApp() {
     // Tender buttons event listeners
     const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
     const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
-    
-    if (createTenderBtn) {
-        createTenderBtn.addEventListener('click', generateTender);
-    }
-    if (downloadTenderBtn) {
-        downloadTenderBtn.addEventListener('click', downloadTenderReport);
-    }
+    if (createTenderBtn) createTenderBtn.addEventListener('click', generateTender);
+    if (downloadTenderBtn) downloadTenderBtn.addEventListener('click', downloadTender);
 
 // Set initial state
 document.getElementById('nav-marking-area')?.click();
