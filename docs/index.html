@@ -181,14 +181,14 @@
                             <i class="fas fa-cog"></i>
                         </button>
                         <!-- 3D Toggle Button -->
-                        <button id="3d-toggle-btn" title="2D/3D Ansicht wechseln" onclick="window.handle3DToggle && window.handle3DToggle()">
+                        <button id="3d-toggle-btn" class="map-settings-btn map-3d-btn" title="2D/3D Ansicht wechseln" onclick="window.handle3DToggle && window.handle3DToggle()">
                             <span id="3d-toggle-text">3D</span>
                         </button>
                     </div>
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" placeholder="Dortmund, Innenstadt" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" value="Paderborn, Innenstadt" placeholder="Paderborn, Innenstadt" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
@@ -248,7 +248,7 @@
                                 <label for="protection-period-select" style="font-weight: 600; font-size: 13px; color: white; min-width: 140px;" data-translate-key="sidebar.protectionPeriod">Schutzzeitraum:</label>
                                 <select id="protection-period-select" name="protection-period-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
                                     <option value="dauerhaft" data-translate-key="sidebar.options.period.permanent">dauerhaft</option>
-                                    <option value="temporär" data-translate-key="sidebar.options.period.temporary">temporär</option>
+                                    <option value="temporär" data-translate-key="sidebar.options.period.temporary" selected>temporär</option>
                                     <option value="eventuell" data-translate-key="sidebar.options.period.eventual">eventuell</option>
                                 </select>
                             </div>
@@ -259,7 +259,7 @@
                                 <select id="product-property-select" name="product-property-select" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
                                     <option value="aut./starr" data-translate-key="sidebar.options.property.automatic_rigid">aut./starr</option>
                                     <option value="versenkbar" data-translate-key="sidebar.options.property.retractable">versenkbar</option>
-                                    <option value="entfernbar" data-translate-key="sidebar.options.property.removable">entfernbar</option>
+                                    <option value="entfernbar" data-translate-key="sidebar.options.property.removable" selected>entfernbar</option>
                                 </select>
                             </div>
                             
@@ -270,7 +270,7 @@
                                     <option value="alle" data-translate-key="sidebar.options.vehicle.all">alle</option>
                                     <option value="500" data-translate-key="sidebar.options.vehicle.motorcycle">Motorrad</option>
                                     <option value="3500" data-translate-key="sidebar.options.vehicle.car_light">KFZ &lt;3.5t</option>
-                                    <option value="7500" data-translate-key="sidebar.options.vehicle.truck_light">LKW &lt;7.5t</option>
+                                    <option value="7500" data-translate-key="sidebar.options.vehicle.truck_light" selected>LKW &lt;7.5t</option>
                                     <option value="12000" data-translate-key="sidebar.options.vehicle.truck_medium">LKW &lt;12t</option>
                                     <option value="40000" data-translate-key="sidebar.options.vehicle.truck_heavy">LKW &lt;40t</option>
                                 </select>

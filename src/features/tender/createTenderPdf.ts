@@ -157,7 +157,22 @@ export async function createTenderPdf(
 ): Promise<any> {
     const { jsPDF } = (window as any).jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    
+
+    const addWatermarkToCurrentPage = () => {
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.saveGraphicsState();
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(120);
+        pdf.setTextColor(200, 200, 200);
+        if (jsPDF.GState) {
+            const gState = new jsPDF.GState({ opacity: 0.2 });
+            pdf.setGState(gState);
+        }
+        pdf.text('Vertraulich', (pageWidth / 2) + 50, (pageHeight / 2) + 50, { align: 'center', angle: 45 });
+        pdf.restoreGraphicsState();
+    };
+
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageMargin = 20;
@@ -313,7 +328,16 @@ export async function createTenderPdf(
     // ==========================================
     pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`Ausschreibung Zufahrtschutz – ${projectMeta.KOMMUNE}`, pageWidth / 2, 40, { align: 'center' });
+    const title = `Ausschreibung Zufahrtschutz – ${projectMeta.KOMMUNE}`;
+    const maxTitleWidth = pageWidth - 2 * pageMargin;
+    const titleLines = pdf.splitTextToSize(title, maxTitleWidth);
+    const titleBaseY = 40;
+    const titleLineHeight = 8;
+    let lastTitleY = titleBaseY;
+    titleLines.forEach((line: string, idx: number) => {
+        lastTitleY = titleBaseY + idx * titleLineHeight;
+        pdf.text(line, pageWidth / 2, lastTitleY, { align: 'center' });
+    });
     
     pdf.setFontSize(10); // Smaller font for subtitle
     pdf.setFont('helvetica', 'normal');
@@ -326,11 +350,14 @@ export async function createTenderPdf(
     // Wrap subtitle text to fit page width
     const maxSubtitleWidth = pageWidth - 2 * pageMargin;
     const subtitleLines = pdf.splitTextToSize(subtitle, maxSubtitleWidth);
+    const subtitleStartY = lastTitleY + 10;
+    let lastSubtitleY = subtitleStartY;
     subtitleLines.forEach((line: string, idx: number) => {
-        pdf.text(line, pageWidth / 2, 50 + (idx * 5), { align: 'center' });
+        lastSubtitleY = subtitleStartY + (idx * 5);
+        pdf.text(line, pageWidth / 2, lastSubtitleY, { align: 'center' });
     });
     
-    currentY = 70;
+    currentY = Math.max(70, lastSubtitleY + 20);
     
     // Two-column layout for contact info
     pdf.setFontSize(10);
@@ -924,6 +951,7 @@ export async function createTenderPdf(
     const finalPageCount = pdf.internal.getNumberOfPages();
     for (let p = 1; p <= finalPageCount; p++) {
         pdf.setPage(p);
+        addWatermarkToCurrentPage();
         addFooterAndPageNumber(p, finalPageCount);
     }
     

@@ -243,12 +243,12 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Dortmund, Innenstadt",
+      "searchPlaceholder": "Paderborn, Innenstadt",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
       "reset": "Zurücksetzen",
-      "analyzeAccess": "Analyse der Zufahrten",
+      "analyzeAccess": "Zufahrt analysieren",
       "createReport": "Bericht erstellen",
       "downloadReport": "Bericht Downloaden",
       "createTender": "Ausschreibung erstellen",

@@ -656,14 +656,14 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Dortmund, Innenstadt",
+            "searchPlaceholder": "Paderborn, Innenstadt",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
             "reset": "Zurücksetzen",
             "securityAreaLabel": "Sicherheitsbereich",
             "securityArea": "Sicherheitsbereich",
-            "analyzeAccess": "Zugang analysieren"
+            "analyzeAccess": "Zufahrt analysieren"
         },
         "placeholders": {
             "assetToProtect": "Bitte eintragen"
@@ -1056,7 +1056,7 @@ const embeddedTranslations = {
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Dortmund, Innenstadt",
+            "searchPlaceholder": "Paderborn, Innenstadt",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
@@ -3070,7 +3070,7 @@ async function initOpenStreetMap(): Promise<void> {
         // Continue with normal initialization
     }
     
-    const mapCenter: [number, number] = [51.5136, 7.4653]; // Dortmund (NRW)
+    const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn (Innenstadt)
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -5736,7 +5736,7 @@ function buildReportFromStateFallback(context: any) {
 
         if (currentLanguage === 'de') {
             return {
-                purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414‑2 / ISO 22343‑2).`,
+                purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414-2 / ISO 22343-2).`,
                 threatAnalysis: `Bedrohungsannahme: ${bedrohung}. Aus der Karten-/Chat-Analyse ergibt sich eine Zufahrtsgeschwindigkeit von ca. ${vKmh} km/h. Anfahrkorridore laut Chat: ${corridors}.`,
                 vulnerabilities: `Untergrund/Fundamente: ${untergrund}. Restrisiko (Chat/Slider): ${restrisiko}. Kritische Zufahrtswinkel bzw. Engstellen sind bei der Maßnahmendefinition zu berücksichtigen.`,
                 hvmMeasures: `Empfohlene Maßnahmen orientieren sich an der erwarteten Geschwindigkeit und den Schutzzielen. Für ${schutzgueter} mit Geschwindigkeit ~${vKmh} km/h sind FSB mit entsprechendem Leistungsniveau, geprüften Fundamenten und Berücksichtigung des Anprallwinkels anzusetzen.`,
@@ -5745,7 +5745,7 @@ function buildReportFromStateFallback(context: any) {
             };
         } else {
             return {
-                purpose: `Protection objective: Securing ${schutzgueter} at location ${context.locationName}. The assistant provided additional inputs (standard reference DIN SPEC 91414‑2 / ISO 22343‑2).`,
+                purpose: `Protection objective: Securing ${schutzgueter} at location ${context.locationName}. The assistant provided additional inputs (standard reference DIN SPEC 91414-2 / ISO 22343-2).`,
                 threatAnalysis: `Threat assumption: ${bedrohung}. From the map/chat analysis, an access speed of approximately ${vKmh} km/h results. Access corridors according to chat: ${corridors}.`,
                 vulnerabilities: `Ground/foundations: ${untergrund}. Residual risk (Chat/Slider): ${restrisiko}. Critical impact angles or bottlenecks must be considered in measure definition.`,
                 hvmMeasures: `Recommended measures are oriented to expected speed and protection objectives. For ${schutzgueter} with speed ~${vKmh} km/h, FSB with corresponding performance level, tested foundations and consideration of impact angle should be applied.`,
@@ -8699,7 +8699,7 @@ function calculateVelocityWithOsm(acceleration: number, distance: number, pathCo
 // ===============================================
 // ENTRY DETECTION INTEGRATION
 // ===============================================
-// Entry Detection is now integrated into the existing "Zugang analysieren" button
+// Entry Detection is now integrated into the existing "Zufahrt analysieren" button
 // No separate UI setup needed - functionality is triggered automatically
 
 /**
@@ -8833,7 +8833,7 @@ async function initializeApp() {
     integrateEntryDetectionWithExistingOSM();
     addEntryDetectionStyles();
     
-    // Entry Detection is now integrated into the existing "Zugang analysieren" button
+    // Entry Detection is now integrated into the existing "Zufahrt analysieren" button
     
     // DEBUG: List all elements with IDs immediately
     console.log('🔍 DEBUG: All elements with IDs at app start:', 
@@ -8920,6 +8920,9 @@ async function initializeApp() {
     });
     
     const searchInput = document.getElementById('map-search-input') as HTMLInputElement;
+    if (searchInput && !searchInput.value) {
+        searchInput.value = t('map.searchPlaceholder');
+    }
     const searchButton = document.getElementById('map-search-button') as HTMLButtonElement;
     const toggleSidebarBtn = document.getElementById('toggle-sidebar') as HTMLButtonElement | null;
     const sidebarEl = document.querySelector('.sidebar') as HTMLElement | null;
