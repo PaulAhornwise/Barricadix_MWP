@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import type { OsmNode, OsmWay } from "../../shared/graph/types";
+import type { OsmTrafficNode } from "../../utils/osm";
 
 /**
  * Core data structure for road network data that can be consumed by the entry detection engine.
@@ -8,6 +9,7 @@ import type { OsmNode, OsmWay } from "../../shared/graph/types";
 export interface OsmBundle {
   nodes: OsmNode[];
   ways: OsmWay[];
+  calming?: OsmTrafficNode[];
 }
 
 /**

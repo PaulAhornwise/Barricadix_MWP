@@ -172,7 +172,7 @@ export async function createTenderPdf(
         pdf.text('Vertraulich', (pageWidth / 2) + 50, (pageHeight / 2) + 50, { align: 'center', angle: 45 });
         pdf.restoreGraphicsState();
     };
-
+    
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageMargin = 20;

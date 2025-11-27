@@ -21,6 +21,10 @@ export interface EntryDetectionIntegration {
   clearCandidates: () => void;
   /** Löscht einen spezifischen Entry Candidate */
   deleteCandidate: (candidateId: string) => void;
+  /** Fügt einen manuellen Entry Candidate hinzu */
+  addManualCandidate: (candidate: EntryCandidate) => void;
+  /** Löscht alle manuellen Entry Candidates */
+  clearManualCandidates: () => void;
   /** Setzt Callback für UI-Updates */
   setOnUpdate: (callback: (candidates: EntryCandidate[]) => void) => void;
 }
@@ -31,6 +35,7 @@ class EntryDetectionManager implements EntryDetectionIntegration {
   public error: string | null = null;
   public lastResult: EntryDetectionResult | null = null;
   private onUpdateCallback?: (candidates: EntryCandidate[]) => void;
+  private manualCandidates: EntryCandidate[] = [];
 
   async detectEntries(polygon: any, osmData: any): Promise<void> {
     if (!polygon || !osmData) {
@@ -60,7 +65,10 @@ class EntryDetectionManager implements EntryDetectionIntegration {
       // Führe Entry Detection aus
       const result = await this.runEntryDetection(input);
       
-      this.candidates = result.candidates;
+      this.candidates = [
+        ...result.candidates,
+        ...this.manualCandidates
+      ];
       this.lastResult = result;
       this.error = null;
       
@@ -79,8 +87,12 @@ class EntryDetectionManager implements EntryDetectionIntegration {
     }
   }
 
-  clearCandidates(): void {
-    this.candidates = [];
+  clearCandidates(preserveManual = false): void {
+    if (!preserveManual) {
+      this.manualCandidates = [];
+    }
+
+    this.candidates = preserveManual ? [...this.manualCandidates] : [];
     this.lastResult = null;
     this.error = null;
     this.notifyUpdate();
@@ -88,14 +100,29 @@ class EntryDetectionManager implements EntryDetectionIntegration {
 
   deleteCandidate(candidateId: string): void {
     const initialLength = this.candidates.length;
+    const manualRemoved = this.removeManualCandidateInternal(candidateId);
     this.candidates = this.candidates.filter(candidate => candidate.id !== candidateId);
     
-    if (this.candidates.length < initialLength) {
+    if (this.candidates.length < initialLength || manualRemoved) {
       console.log(`🗑️ Deleted entry candidate: ${candidateId}`);
       this.notifyUpdate();
     } else {
       console.warn(`⚠️ Entry candidate not found: ${candidateId}`);
     }
+  }
+
+  addManualCandidate(candidate: EntryCandidate): void {
+    const manualCandidate = { ...candidate, manual: true };
+    this.manualCandidates.push(manualCandidate);
+    this.candidates = [...this.candidates, manualCandidate];
+    this.notifyUpdate();
+  }
+
+  clearManualCandidates(): void {
+    if (this.manualCandidates.length === 0) return;
+    this.manualCandidates = [];
+    this.candidates = this.candidates.filter(candidate => !candidate.manual);
+    this.notifyUpdate();
   }
 
   setOnUpdate(callback: (candidates: EntryCandidate[]) => void): void {
@@ -106,6 +133,12 @@ class EntryDetectionManager implements EntryDetectionIntegration {
     if (this.onUpdateCallback) {
       this.onUpdateCallback(this.candidates);
     }
+  }
+
+  private removeManualCandidateInternal(candidateId: string): boolean {
+    const initialLength = this.manualCandidates.length;
+    this.manualCandidates = this.manualCandidates.filter(candidate => candidate.id !== candidateId);
+    return this.manualCandidates.length < initialLength;
   }
 
   private convertLeafletPolygonToGeoJSON(leafletPolygon: any): any {

@@ -93,9 +93,10 @@
             </div>
             <nav class="main-nav">
                 <ul>
+                    <li><a href="#" id="nav-hazard-analysis" data-translate-key="nav.hazardAnalysis">Gefährdungsanalyse</a></li>
                     <li><a href="#" id="nav-marking-area" class="active" aria-current="page" data-translate-key="nav.markingArea">Sicherheitsbereich</a></li>
                     <li><a href="#" id="nav-param-input" data-translate-key="nav.paramInput">Parameter</a></li>
-                    <li><a href="#" id="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Gefahrenanalyse</a></li>
+                    <li><a href="#" id="nav-threat-analysis" data-translate-key="nav.threatAnalysis">Zufahrtanalyse</a></li>
                     <li><a href="#" id="nav-risk-report" data-translate-key="nav.riskReport">Risikobericht</a></li>
                     <li><a href="#" id="nav-product-selection" data-translate-key="nav.productSelection">Produktauswahl</a></li>
                     <li><a href="#" id="nav-project-description" data-translate-key="nav.projectDescription">Ausschreibung</a></li>
@@ -131,11 +132,12 @@
                 <div class="map-area">
                     <!-- Top tabs positioned over the map -->
                     <div class="map-tabs">
+                        <a href="#" id="tab-hazard-analysis" data-target="nav-hazard-analysis" data-translate-key="nav.hazardAnalysis">Gefährdungsanalyse</a>
                         <a href="#" id="tab-marking-area" data-target="nav-marking-area" class="active" data-translate-key="nav.markingArea">Sicherheitsbereich</a>
                         <a href="#" id="tab-param-input" data-target="nav-param-input" data-translate-key="nav.paramInput">Parameter</a>
                         <div class="tab-with-submenu">
                             <a href="#" id="tab-threat-analysis" data-target="nav-threat-analysis" data-translate-key="nav.threatAnalysis" class="has-submenu">
-                                Gefahrenanalyse
+                                Zufahrtanalyse
                                 <i class="fas fa-chevron-down submenu-indicator"></i>
                             </a>
                             <div id="threat-analysis-submenu" class="threat-submenu" style="display: none; width: 300px !important; min-width: 300px !important;">
@@ -187,7 +189,7 @@
                     <div class="map-toolbar">
                         <div class="search-bar">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="map-search-input" value="Paderborn, Innenstadt" placeholder="Paderborn, Innenstadt" data-translate-key="map.searchPlaceholder">
+                            <input type="text" id="map-search-input" value="Soest" placeholder="Soest" data-translate-key="map.searchPlaceholder">
                             <button id="map-search-button" data-translate-key="map.searchButton" style="height: 20px !important; min-height: 20px !important; max-height: 20px !important; padding: 2px 8px !important; font-size: 12px !important; line-height: 1 !important;">Suchen</button>
                         </div>
                         <div class="map-actions">
@@ -202,6 +204,15 @@
                             </button>
                             <button id="analyze-threats" class="map-action-btn hidden">
                                 <i class="fas fa-route"></i> <span data-translate-key="map.analyzeAccess"></span>
+                            </button>
+                            <button id="manual-entry-toggle" class="map-action-btn hidden manual-entry-btn-toolbar" data-translate-key="threats.manualEntry" aria-pressed="false">
+                                <i class="fas fa-draw-polygon"></i> <span>Manuelle Zufahrt</span>
+                            </button>
+                            <button id="manual-path-drawing-toggle" class="map-action-btn hidden manual-entry-btn-toolbar" aria-pressed="false">
+                                <i class="fas fa-route"></i> <span>Zufahrtsweg zeichnen</span>
+                            </button>
+                            <button id="calculate-speeds-btn" class="map-action-btn hidden calculate-speeds-btn-toolbar" aria-pressed="false">
+                                <i class="fas fa-calculator"></i> <span>Geschwindigkeiten berechnen</span>
                             </button>
                             <button id="create-report-btn" class="map-action-btn hidden">
                                 <i class="fas fa-file-alt"></i> <span data-translate-key="map.createReport"></span>
@@ -225,7 +236,7 @@
                     <div id="chatbot-react-root" class="map-overlay"></div>
                     
                     <!-- Vertical Collapsed Strip -->
-                    <div id="parameter-strip" style="position: fixed !important; top: 130px !important; left: 8px !important; width: 40px !important; height: 200px !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 0 16px 16px 0 !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; display: block !important; cursor: pointer !important; transition: all 0.3s ease !important;">
+                    <div id="parameter-strip" style="position: fixed !important; top: 340px !important; left: 8px !important; width: 40px !important; height: 200px !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 0 16px 16px 0 !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; display: block !important; cursor: pointer !important; transition: all 0.3s ease !important;">
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px;">
                             <i class="fas fa-sliders-h" style="font-size: 16px; transform: rotate(90deg);"></i>
                             <span style="font-size: 12px; font-weight: 600; letter-spacing: 1px; writing-mode: vertical-rl; text-orientation: mixed;">PARAMETER</span>
@@ -234,7 +245,7 @@
                     </div>
                     
                     <!-- Floating Parameter Selection Bubble -->
-                    <div id="parameter-bubble" style="position: fixed !important; top: 130px !important; left: 8px !important; width: 320px !important; max-width: calc(100vw - 32px) !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 16px !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; max-height: calc(100vh - 140px) !important; overflow-y: auto !important; display: block !important; visibility: visible !important; opacity: 0 !important; transform: translateX(-100%) !important; transition: all 0.3s ease !important;">
+                    <div id="parameter-bubble" style="top: 340px; left: 48px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: linear-gradient(135deg, rgba(30, 144, 255, 0.2), rgba(30, 144, 255, 0.1)); border-bottom: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px 16px 0 0; cursor: move;">
                             <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.5px;" data-translate-key="sidebar.trafficData">Parameterwahl</h3>
                             <button id="toggle-parameter-bubble" style="background: none; border: none; color: white; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
@@ -351,6 +362,318 @@
                                     <span data-translate-key="sidebar.low">niedrig</span>
                                     <input type="range" id="product-class-slider" min="0" max="100" value="60" style="flex-grow: 1; height: 8px; background: linear-gradient(90deg, #2ecc71 0%, #f1c40f 50%, #e74c3c 100%); border-radius: 999px; outline: none;">
                                     <span data-translate-key="sidebar.high">hoch</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vertical Collapsed Strip for Hazard Analysis -->
+                    <div id="hazard-analysis-strip" style="position: fixed !important; top: 130px !important; left: 8px !important; width: 40px !important; height: 200px !important; background: rgba(12, 47, 77, 0.95) !important; backdrop-filter: blur(10px) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 0 16px 16px 0 !important; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important; z-index: 9999 !important; color: white !important; display: block !important; cursor: pointer !important; transition: all 0.3s ease !important;">
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 16px; transform: rotate(90deg);"></i>
+                            <span style="font-size: 12px; font-weight: 600; letter-spacing: 1px; writing-mode: vertical-rl; text-orientation: mixed;">GEFÄHRDUNG</span>
+                            <i class="fas fa-chevron-right" style="font-size: 12px;"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Floating Hazard Analysis Bubble -->
+                    <div id="hazard-analysis-bubble" style="top: 130px; left: 48px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: linear-gradient(135deg, rgba(30, 144, 255, 0.2), rgba(30, 144, 255, 0.1)); border-bottom: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px 16px 0 0; cursor: move;">
+                            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.5px;" data-translate-key="nav.hazardAnalysis">Gefährdungsanalyse</h3>
+                            <button id="toggle-hazard-analysis-bubble" style="background: none; border: none; color: white; font-size: 14px; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                        </div>
+                        <div id="hazard-analysis-bubble-content" style="padding: 12px; max-height: calc(84vh - 50px); overflow-y: auto;">
+                            <!-- Meta-Bereich -->
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="hazard-city" style="font-weight: 600; font-size: 13px; color: white; min-width: 180px;">Kommune / Stadt:</label>
+                                <input type="text" id="hazard-city" name="hazard-city" placeholder="z. B. Soest" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="In welcher Kommune / Stadt befindet sich der betrachtete Bereich?">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                <label for="hazard-area" style="font-weight: 600; font-size: 13px; color: white; min-width: 180px;">Schutzbereich:</label>
+                                <input type="text" id="hazard-area" name="hazard-area" placeholder="z. B. Marktplatz" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie lautet die Bezeichnung des betrachteten Schutzbereichs bzw. des Raumes (z. B. Platz, Straße, Veranstaltungsfläche)?">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <label for="hazard-expected-damage" style="font-weight: 600; font-size: 13px; color: white; min-width: 180px;">Erwart. Schadensausmaß:</label>
+                                <select id="hazard-expected-damage" name="hazard-expected-damage" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 13px; outline: none; height: 32px !important;">
+                                    <option value="">-- Bitte wählen --</option>
+                                    <option value="sachschaden">gering (Sachschäden)</option>
+                                    <option value="leicht">leichte Personenschäden</option>
+                                    <option value="schwer">schwere Personenschäden</option>
+                                    <option value="massenopfer">viele Tote / Massenopfer</option>
+                                </select>
+                                <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Welches Schadensausmaß wird im ungünstigen Fall für diesen Bereich erwartet? (z. B. nur Sachschäden vs. viele Tote / Massenopfer)">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Bewertungshinweis -->
+                            <div style="margin: 8px 0; padding: 8px; background-color: rgba(30, 144, 255, 0.15); border-radius: 6px; border-left: 3px solid #1e90ff;">
+                                <span style="font-size: 11px; color: rgba(255,255,255,0.85);">Bewertungsskala: 1 = geringe Ausprägung, 2 = mittlere Ausprägung, 3 = starke Ausprägung</span>
+                            </div>
+                            
+                            <!-- Kategorie 1: Anlassbezogene Belange -->
+                            <div class="hazard-category" style="margin-top: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                <button type="button" class="hazard-category-header" onclick="this.parentElement.classList.toggle('expanded'); this.querySelector('.hazard-chevron').classList.toggle('rotated');" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; background: rgba(30, 144, 255, 0.15); border: none; cursor: pointer; color: var(--secondary-text, #87CEEB); font-weight: 600; font-size: 13px; text-align: left;">
+                                    <span>Anlassbezogene Belange</span>
+                                    <i class="fas fa-chevron-down hazard-chevron" style="transition: transform 0.3s ease; font-size: 12px;"></i>
+                                </button>
+                                <div class="hazard-category-content" style="display: none; padding: 8px 12px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-anlass-allgemeingebrauch" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Stadträuml. Allgemeingebrauch</label>
+                                        <select id="hazard-anlass-allgemeingebrauch" name="hazard-anlass-allgemeingebrauch" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie stark wird der Raum im Alltag von der Allgemeinheit genutzt?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-anlass-sondernutzung" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Stadträuml. Sondernutzung</label>
+                                        <select id="hazard-anlass-sondernutzung" name="hazard-anlass-sondernutzung" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Finden im Raum regelmäßig Sondernutzungen statt (z. B. Veranstaltungen, Märkte)?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-anlass-haeufigkeit" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Häufigkeit d. Sondernutzung</label>
+                                        <select id="hazard-anlass-haeufigkeit" name="hazard-anlass-haeufigkeit" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie häufig finden Sondernutzungen im betrachteten Raum statt?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-anlass-zusammensetzung" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Zusammensetzung d. Nutzer</label>
+                                        <select id="hazard-anlass-zusammensetzung" name="hazard-anlass-zusammensetzung" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Welche Nutzergruppen halten sich überwiegend im Raum auf (z. B. Anwohner, Touristen, besonders exponierte Gruppen)?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-anlass-anzahl" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Anzahl der Nutzer</label>
+                                        <select id="hazard-anlass-anzahl" name="hazard-anlass-anzahl" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie viele Personen nutzen den Raum typischerweise gleichzeitig?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Kategorie 2: Räumliche Belange -->
+                            <div class="hazard-category" style="margin-top: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                <button type="button" class="hazard-category-header" onclick="this.parentElement.classList.toggle('expanded'); this.querySelector('.hazard-chevron').classList.toggle('rotated');" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; background: rgba(30, 144, 255, 0.15); border: none; cursor: pointer; color: var(--secondary-text, #87CEEB); font-weight: 600; font-size: 13px; text-align: left;">
+                                    <span>Räumliche Belange</span>
+                                    <i class="fas fa-chevron-down hazard-chevron" style="transition: transform 0.3s ease; font-size: 12px;"></i>
+                                </button>
+                                <div class="hazard-category-content" style="display: none; padding: 8px 12px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-raum-struktur" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Bauliche Struktur</label>
+                                        <select id="hazard-raum-struktur" name="hazard-raum-struktur" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Erleichtert die bauliche Struktur des Raumes eine Annäherung von Fahrzeugen?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-raum-gebaeude" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Besondere Gebäude</label>
+                                        <select id="hazard-raum-gebaeude" name="hazard-raum-gebaeude" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Gibt es besonders schutzwürdige Gebäude im unmittelbaren Umfeld?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-raum-flucht-nutzer" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Fluchtoptionen für Nutzer</label>
+                                        <select id="hazard-raum-flucht-nutzer" name="hazard-raum-flucht-nutzer" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Sind ausreichende Fluchtwege für die anwesenden Personen vorhanden?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-raum-flaeche" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Flächengröße</label>
+                                        <select id="hazard-raum-flaeche" name="hazard-raum-flaeche" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie groß ist die Fläche des betrachteten Raumes?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-raum-dichte" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Besucherdichte</label>
+                                        <select id="hazard-raum-dichte" name="hazard-raum-dichte" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie hoch ist die typische Besucherdichte im Raum?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Kategorie 3: Weitere Sicherheitsbelange -->
+                            <div class="hazard-category" style="margin-top: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                <button type="button" class="hazard-category-header" onclick="this.parentElement.classList.toggle('expanded'); this.querySelector('.hazard-chevron').classList.toggle('rotated');" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; background: rgba(30, 144, 255, 0.15); border: none; cursor: pointer; color: var(--secondary-text, #87CEEB); font-weight: 600; font-size: 13px; text-align: left;">
+                                    <span>Weitere Sicherheitsbelange</span>
+                                    <i class="fas fa-chevron-down hazard-chevron" style="transition: transform 0.3s ease; font-size: 12px;"></i>
+                                </button>
+                                <div class="hazard-category-content" style="display: none; padding: 8px 12px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-security-bedeutung-raum" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Bedeutung d. öffentl. Raumes</label>
+                                        <select id="hazard-security-bedeutung-raum" name="hazard-security-bedeutung-raum" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Welche symbolische oder gesellschaftliche Bedeutung hat der Raum?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-security-massnahmen-baulich" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Erkennb. Sicherheitsmaßn.</label>
+                                        <select id="hazard-security-massnahmen-baulich" name="hazard-security-massnahmen-baulich" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Sind bereits bauliche oder technische Sicherheitsmaßnahmen erkennbar vorhanden?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-security-massnahmen-personell" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Erkennb. personelle Sicherh.</label>
+                                        <select id="hazard-security-massnahmen-personell" name="hazard-security-massnahmen-personell" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Gibt es regelmäßig sichtbare Präsenz von Sicherheitskräften (z. B. Polizei, Ordnungsamt, Security)?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Kategorie 4: Tatbeeinflussende Belange -->
+                            <div class="hazard-category" style="margin-top: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden;">
+                                <button type="button" class="hazard-category-header" onclick="this.parentElement.classList.toggle('expanded'); this.querySelector('.hazard-chevron').classList.toggle('rotated');" style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 12px; background: rgba(30, 144, 255, 0.15); border: none; cursor: pointer; color: var(--secondary-text, #87CEEB); font-weight: 600; font-size: 13px; text-align: left;">
+                                    <span>Tatbeeinflussende Belange</span>
+                                    <i class="fas fa-chevron-down hazard-chevron" style="transition: transform 0.3s ease; font-size: 12px;"></i>
+                                </button>
+                                <div class="hazard-category-content" style="display: none; padding: 8px 12px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-tat-anfahrtsoptionen" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Anfahrtsoptionen f. Täter</label>
+                                        <select id="hazard-tat-anfahrtsoptionen" name="hazard-tat-anfahrtsoptionen" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie gut können Täter den Bereich mit einem Fahrzeug anfahren?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-tat-fluchtmoeglichkeiten" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Fluchtmögl. für Täter</label>
+                                        <select id="hazard-tat-fluchtmoeglichkeiten" name="hazard-tat-fluchtmoeglichkeiten" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Welche Fluchtmöglichkeiten bestünden für Täter nach einer Tat?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-tat-auswirkung" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Auswirkung</label>
+                                        <select id="hazard-tat-auswirkung" name="hazard-tat-auswirkung" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Wie gravierend wären die Wirkungen eines Fahrzeugangriffs im Raum?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-tat-ziele" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Zusätzliche Tatziele</label>
+                                        <select id="hazard-tat-ziele" name="hazard-tat-ziele" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Gibt es in unmittelbarer Nähe weitere potenzielle Tatziele?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                        <label for="hazard-tat-varianten" style="font-weight: 500; font-size: 12px; color: white; min-width: 180px;">Zusätzliche Tatvarianten</label>
+                                        <select id="hazard-tat-varianten" name="hazard-tat-varianten" style="width: 140px !important; max-width: 140px !important; min-width: 140px !important; box-sizing: border-box !important; margin-left: auto; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px; background-color: rgba(10, 45, 74, 0.8); color: white; font-size: 12px; outline: none; height: 28px !important;">
+                                            <option value="">--</option>
+                                            <option value="1">1 (geringe Ausprägung)</option>
+                                            <option value="2">2 (mittlere Ausprägung)</option>
+                                            <option value="3">3 (starke Ausprägung)</option>
+                                        </select>
+                                        <button type="button" class="info-icon" aria-label="Info" style="margin-left: 6px; background: none; border: none; padding: 0; color: rgba(255,255,255,0.7); cursor: pointer;" data-tooltip="Sind besondere Tatvarianten denkbar (z. B. alternative Routen, zeitliche Besonderheiten)?">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

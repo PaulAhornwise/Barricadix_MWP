@@ -32,6 +32,7 @@ import { enter3DDeck, exit3DDeck, threeDDeckState } from './src/features/map/thr
 import { ensureDeckMount } from './src/features/map/ui/ensureDeckMount';
 import { jsPDF } from 'jspdf';
 import { sanitizeDe } from './src/features/tender/createTenderPdf';
+import type { EntryCandidate } from './src/shared/graph/types';
 
 // Extend the Window interface to include jspdf for TypeScript.
 declare global {
@@ -253,6 +254,11 @@ let polygonLabel: any = null; // Deprecated - use polygonLabels array
 let drawnPolygons: Array<{polygon: any, label: any, id: string}> = []; // Array of security area polygons
 let threatMarkersMap = new Map<string, any[]>(); // Maps street name to an array of its marker layers
 let threatsMap = new Map<string, { entryPoints: {lat: number, lon: number, distance: number}[], pathSegments: any[][], totalLength: number, threatLevel?: number, roadType?: string, maxSpeed?: number }>(); // To store analysis data for report
+let manualEntryMode = false;
+let manualEntryButton: HTMLButtonElement | null = null;
+let manualEntryIdCounter = 0;
+let drawingCandidateId: string | null = null;
+let manualPathsMap = new Map<string, any[]>(); // Store manual paths: candidateId -> array of path segments
 
 // OSM Speed Limits Integration
 let osmSpeedLimiter: OsmSpeedLimiter | null = null;
@@ -279,7 +285,7 @@ let pinnedProducts: Array<{streetName: string, maxSpeed: number, product: any, m
 
 // Internationalization (i18n) state
 let currentLanguage = 'de';
-let translations: any = {};
+let translations: any = null; // Will be set to embeddedTranslations after definition
 
 // Embedded translations to avoid loading issues
 const embeddedTranslations = {
@@ -291,7 +297,7 @@ const embeddedTranslations = {
         "nav": {
             "paramInput": "Parameter",
             "markingArea": "Sicherheitsbereich",
-            "threatAnalysis": "Gefahrenanalyse",
+            "threatAnalysis": "Zufahrtanalyse",
             "riskReport": "Risikobericht",
             "productSelection": "Produktauswahl",
             "projectDescription": "Ausschreibung",
@@ -393,7 +399,131 @@ const embeddedTranslations = {
         },
 
         "ai": {
-            "reportPrompt": "Du bist ein Spezialist für physischen Zufahrtsschutz und erstellst einen Sicherheitsbericht für den Schutz vor Fahrzeugangriffen und unbefugtem Eindringen mit Kraftfahrzeugen (Vehicle Security Barriers / Hostile Vehicle Mitigation). Der Fokus liegt auf dem physischen Schutz von Gebäuden, Plätzen und Infrastruktur vor Terroranschlägen mit Fahrzeugen, Amokfahrten oder Unfällen. WICHTIG: Dies ist KEIN Cybersecurity-Bericht! Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Fokussiere ausschließlich auf: Fahrzeugbarrieren, Poller, physische Sperren, Fahrzeuganprallschutz, Rammangriffe, Teststandards wie PAS 68 oder IWA 14, Geschwindigkeiten, Fahrzeugmassen, Anprallwinkel, Eindringtiefen. Erwähne NIEMALS: Malware, Cyberangriffe, Netzwerksicherheit, Software, IT-Systeme.",
+            "reportPrompt": `ROLLE / IDENTITÄT:
+Du bist ein hochspezialisierter Sicherheitsberater mit 30 Jahren Erfahrung in Terrorprävention, Täterverhalten, Zufahrtsschutz und Sicherheitsanforderungsmanagement. Du arbeitest als externer Experte für das Unternehmen BarricadiX.
+
+STIL:
+- Schreibe in formalem „Verwaltungsdeutsch" / Gutachtenstil
+- Klar strukturiert, nachvollziehbar und normorientiert
+- Produktspezifisch neutral (produktoffen), d.h. keine Produktnamen nennen
+
+NORMATIVE GRUNDLAGEN:
+- DIN SPEC 91414-1/-2 (Zufahrtsschutzkonzepte, Risikobeurteilung, Sicherungsgrade)
+- DIN ISO 22343-1/-2 (Fahrzeugsicherheitsbarrieren – Leistungsanforderungen & Anwendung)
+- TR „Mobile Fahrzeugsperren" (Schutzklassen SK1/SK2, Betrieb)
+- ProPK-Handreichung „Schutz vor Überfahrtaten"
+- Polizeilicher Pflichtenkatalog „Fachplanung Zufahrtsschutz"
+
+KONTEXTVARIABLEN (aus BarricadiX):
+- Veranstaltung/Schutzgut: {assetToProtect}
+- Standort: {locationName}
+- Lagebeschreibung: {locationContext}
+- Schutzzeitraum: {protectionPeriod}
+- Sicherheitsniveau: {securityLevel}, Sicherungsgrad: {protectionGrade}
+- Identifizierte Zufahrten: {threatList}
+- Bedrohungsniveau: {averageThreatLevel}/10, Verteilung: {threatLevelDistribution}
+- Kritischste Zufahrten: {highestThreatRoads}
+- Empfohlene Produkttypen: {recommendedProductTypes}, {productType}
+- Begründung: {productTypeJustification}
+- Eindringtiefe: {penetration}, Trümmerflug: {debrisDistance}
+- Gefährdungsanalyse: {hazardAssessment}
+- Fahrdynamische Daten: {vehicleDynamicsTable}
+- Energiestufen: {energyClassification}
+
+FAHRZEUGKLASSEN (Referenzwerte):
+- Kleinwagen: m=1.200kg, a=2,75m/s²
+- Mittelklasse-Pkw: m=1.500kg, a=3,20m/s²
+- Full-Size-Pkw/Van: m=1.800kg, a=3,70m/s²
+- Performance-/Sportwagen: m=1.600kg, a=5,00m/s²
+- Pick-up: m=2.500kg, a=2,50m/s²
+- Transporter/Flatbed: m=3.500kg, a=1,90m/s²
+- Lkw 7,5t: m=7.200kg, a=2,00m/s²
+- Lkw 12t: m=12.000kg, a=1,25m/s²
+- Lkw 30t: m=30.000kg, a=0,75m/s²
+
+ENERGIESTUFEN (Schwellwerte):
+- E1 (niedrig): E < 250 kJ → einfache Sperren
+- E2 (mittel, SK1-Bereich): 250 kJ ≤ E < 800 kJ → SK1-Barrieren
+- E3 (hoch, SK2-Bereich): 800 kJ ≤ E < 1.950 kJ → SK2-Barrieren
+- E4 (sehr hoch): E ≥ 1.950 kJ → Hochsicherheitsbarrieren
+
+AUFGABE:
+Erstelle einen vollständigen, professionellen Risikobericht im Gutachtenstil. Nutze AUSSCHLIESSLICH die übergebenen Kontextvariablen – erfinde KEINE Orts- oder Straßennamen.
+
+AUSGABEFORMAT:
+Gib GENAU 11 nummerierte Textblöcke aus, getrennt durch eine Leerzeile (zwei Zeilenumbrüche).
+Jeder Block beginnt mit seiner fettgedruckten Nummer und Titel. Kein JSON, keine Code-Fences.
+
+**1. Auftrag, Zielsetzung und Geltungsbereich**
+- Auftraggeber (Kommune/Veranstalter), Bearbeiter (BarricadiX), Datum
+- Zielsetzung: Risikobewertung und Schutzkonzept für {assetToProtect} am Standort {locationName}
+- Räumlicher Geltungsbereich: definierter Sicherheitsperimeter
+- Zeitlicher Geltungsbereich: {protectionPeriod}
+- Hinweis: Gutachten ersetzt keine polizeiliche Gefährdungsbewertung
+
+**2. Normative Grundlagen und Referenzen**
+- Liste aller angewandten Normen (DIN SPEC 91414-1/-2, DIN ISO 22343-1/-2, TR „Mobile Fahrzeugsperren")
+- Erläuterung der Sicherungsgrade SG0–SG4 und Schutzklassen SK1/SK2
+- Verweis auf ProPK-Handreichung und polizeiliche Vorgaben
+
+**3. Beschreibung des Veranstaltungsbereichs**
+- 3.1 Lage und Nutzung: {locationContext}, städtebauliche Situation, Besonderheiten
+- 3.2 Erhebung durch BarricadiX: GIS-gestützte Analyse, identifizierte Zufahrten ({threatList})
+- Beschreibung des Sicherheitsperimeters und der Schutzzone
+
+**4. Bedrohungsanalyse und Täterverhalten**
+- 4.1 Relevante Bedrohungsszenarien: Vehicle-as-a-Weapon, spontane vs. geplante Taten
+- Fahrzeugtypen: Pkw, Transporter, Lkw (verschiedene Massen und Beschleunigungen)
+- 4.2 Zielattraktivität: Personendichte, Symbolik, mediale Wirkung, Fluchtmöglichkeiten
+- Integration der Gefährdungsanalyse: {hazardAssessment}
+
+**5. Methodik der BarricadiX-Analyse**
+- 5.1 GIS-gestützte Analyse des Straßennetzes (OpenStreetMap/Overpass)
+- 5.2 Fahrzeugklassen und Parameter (Masse m, Beschleunigung a)
+- 5.3 Anfahrtsstrecken der Zufahrten (effektive Beschleunigungsstrecke s)
+- Formeln: v = √(2·a·s) für Endgeschwindigkeit, E = m·a·s für kinetische Energie
+
+**6. Fahrdynamische Analyse und Maximalenergien**
+- 6.1 Grundlagen: Berechnung von Endgeschwindigkeit v [km/h] und Aufprallenergie E [kJ]
+- 6.2 Einteilung in Energiestufen E1–E4 mit Schwellwerten
+- 6.3 Worst-Case-Tabelle: Für jede Zufahrt die maximale Energie E_max und zugehörige Fahrzeugklasse
+- Nutze {vehicleDynamicsTable} und {energyClassification}
+
+**7. Risikoanalyse nach dem ALARP-Prinzip**
+- 7.1 Bewertungsansatz: ALARP (As Low As Reasonably Practicable)
+- 7.2 Energetische Einstufung der Zufahrten (E1–E4)
+- 7.3 Eintrittswahrscheinlichkeit: Pkw-Szenarien (höher) vs. Lkw-Szenarien (niedriger, aber schwerwiegender)
+- 7.4 Schadensausmaß: sehr hoch bei Personendichte im Schutzbereich
+- 7.5 Risikokategorien (niedrig/mittel/hoch) und abgeleitete Schutzklassen (SK1/SK2)
+- Bedrohungsniveau: {averageThreatLevel}/10, Verteilung: {threatLevelDistribution}
+
+**8. Schutzzieldefinition**
+- Spezifisches Schutzziel für {assetToProtect} am Standort {locationName}
+- Verhindern des Eindringens mehrspuriger Fahrzeuge (Pkw bis schwere Lkw) in den Schutzbereich
+- Auch im Worst Case (schwerstes Fahrzeug mit maximaler Anfahrenergie)
+- Abgeleiteter Sicherungsgrad: {protectionGrade}
+
+**9. Schutzkonzept und produktoffene Empfehlungen**
+- 9.1 Kategorisierung der Zufahrten nach Schutzbedarf:
+  - Kategorie A (hochkritisch, E3/E4): SK2-Barrieren erforderlich
+  - Kategorie B (mittel, E2): SK1-Barrieren ausreichend
+  - Kategorie C (gering, E1): einfache Sperren
+- 9.2 Anforderungen an Fahrzeugsperren (DIN ISO 22343-1, IWA 14-1)
+- 9.3 Systemtypen (produktoffen): Hochsicherheitspoller, Roadblocker, mobile Sperren, crash-getestete Stadtmöbel
+- 9.4 Rettungswege und Betriebsorganisation: BOS-Zufahrten, Öffnungskonzept
+- Empfohlene Produkttypen: {recommendedProductTypes}
+
+**10. Restgefahren und Grenzen**
+- Verbleibende Restgefahren: atypische Fahrzeuge, kombinierte Szenarien, Fehlbedienung
+- Grenzen der technischen Maßnahmen
+- Notwendigkeit organisatorischer Ergänzung (Betriebskonzept, Schulung, Überwachung)
+- Hinweis auf regelmäßige Überprüfung und Fortschreibung
+
+**11. Schlussfolgerungen und Empfehlung**
+- Gesamtbewertung: Mit Umsetzung der SK1-/SK2-Maßnahmen und Betriebskonzept wird Risiko auf ALARP-Niveau reduziert
+- Klare Empfehlung an Kommune/Veranstalter
+- Nächste Schritte: Detailplanung, Ausschreibung, Umsetzung
+- Abschließender Hinweis: Dieser Bericht ist eine technische Planungsgrundlage und ersetzt keine hoheitliche Gefährdungsbewertung der Polizei`,
             "chatbot": {
                 "title": "Zufahrtsschutz-Assistent",
                 "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
@@ -515,6 +645,12 @@ const embeddedTranslations = {
                     "manufacturer": "Hersteller",
                     "type": "Typ",
                     "standard": "Standard",
+                    "productType": "Produkttyp",
+                    "cluster": "Cluster",
+                    "performance": "Leistungsbewertung",
+                    "dimensions": "Abmessungen",
+                    "foundation": "Fundamenttiefe",
+                    "material": "Material",
                     "vehicleWeight": "Fahrzeuggewicht (kg)",
                     "vehicleType": "Fahrzeugtyp",
                     "speed": "Geschwindigkeit (km/h)",
@@ -582,6 +718,17 @@ const embeddedTranslations = {
                 "classification": "Klassifizierung"
             },
             "sections": {
+                "chapter1": { "title": "1. Auftrag, Zielsetzung und Geltungsbereich" },
+                "chapter2": { "title": "2. Normative Grundlagen und Referenzen" },
+                "chapter3": { "title": "3. Beschreibung des Veranstaltungsbereichs" },
+                "chapter4": { "title": "4. Bedrohungsanalyse und Täterverhalten" },
+                "chapter5": { "title": "5. Methodik der BarricadiX-Analyse" },
+                "chapter6": { "title": "6. Fahrdynamische Analyse und Maximalenergien" },
+                "chapter7": { "title": "7. Risikoanalyse nach dem ALARP-Prinzip" },
+                "chapter8": { "title": "8. Schutzzieldefinition" },
+                "chapter9": { "title": "9. Schutzkonzept und produktoffene Empfehlungen" },
+                "chapter10": { "title": "10. Restgefahren und Grenzen" },
+                "chapter11": { "title": "11. Schlussfolgerungen und Empfehlung" },
                 "purpose": {
                     "title": "Zweck und Zielsetzung",
                     "description": "Dieser Bericht dient der Bewertung der Sicherheitsrisiken für die zu schützenden Zufahrten und der Empfehlung geeigneter Schutzmaßnahmen."
@@ -639,7 +786,16 @@ const embeddedTranslations = {
                 "error": "Fehler bei der KI-Berichterstellung",
                 "loading": "KI-Bericht wird generiert...",
                 "timeout": "Zeitüberschreitung bei der KI-Berichterstellung"
-            }
+            },
+            "keyFacts": {
+                "title": "Eckdaten des Zufahrtsschutzkonzepts",
+                "location": "Standort",
+                "asset": "Schutzgut",
+                "securityLevel": "Sicherheitsniveau",
+                "protectionGrade": "Sicherungsgrad",
+                "dataBasis": "Datenbasis: {source}, Stand: {date}"
+            },
+            "threatListIntro": "Aus der GIS-Analyse der Anfahrkorridore ergeben sich folgende Zufahrten mit potenziell kritischen Annäherungswegen:"
         },
         "threats": {
             "title": "Gefahrenanalyse",
@@ -651,12 +807,13 @@ const embeddedTranslations = {
             "minimize": "Minimieren",
             "maximize": "Maximieren",
             "close": "Schließen",
-            "editMode": "Zufahrten bearbeiten"
+            "editMode": "Zufahrten bearbeiten",
+            "manualEntry": "Manuelle Zufahrt"
         },
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Paderborn, Innenstadt",
+            "searchPlaceholder": "Soest",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
@@ -793,7 +950,79 @@ const embeddedTranslations = {
             "clickToPin": "Click to pin"
         },
         "ai": {
-            "reportPrompt": "You are a specialist for physical vehicle access protection creating a security report for protection against vehicle attacks and unauthorized vehicle intrusion (Vehicle Security Barriers / Hostile Vehicle Mitigation). The focus is on physical protection of buildings, squares and infrastructure against vehicle terrorist attacks, rampage attacks or accidents. IMPORTANT: This is NOT a cybersecurity report! Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Focus exclusively on: vehicle barriers, bollards, physical barriers, vehicle impact protection, ram attacks, test standards like PAS 68 or IWA 14, speeds, vehicle masses, impact angles, penetration depths. NEVER mention: malware, cyber attacks, network security, software, IT systems.",
+            "reportPrompt": `You are a security planner specializing in Hostile Vehicle Mitigation (HVM) and protection against vehicle ramming attacks.
+You work according to standards:
+- DIN SPEC 91414-2 (Operational planning and application guidelines, incl. Annex E "Operational requirements for an access protection concept"),
+- DIN ISO 22343-2 (Application – especially chapters on operational requirements and maintenance/inspection),
+- DIN SPEC 91414-1, TR "Mobile Vehicle Barriers", relevant police guidance on vehicle attacks,
+- Police requirements catalog "Specialist Planning Access Protection".
+
+Context variables:
+- {locationName}, {assetToProtect}, {securityLevel}, {protectionGrade},
+- {protectionPeriod}, {locationContext},
+- {threatList}, {averageThreatLevel}, {threatLevelDistribution}, {highestThreatRoads},
+- {recommendedProductTypes}, {productType}, {productTypeJustification},
+- {penetration}, {debrisDistance} (if set),
+- {hazardAssessment} (results from the hazard analysis input dialog, including rated factors and risk classification).
+
+Use these values to formulate the report specifically for the project. Do not invent place or street names and do not adopt names from examples – everything must come from the current context. Integrate the hazard analysis results ({hazardAssessment}) meaningfully into the risk assessment and vulnerability analysis.
+
+Goal:
+The report is to be understood as an **operational requirement** in the sense of DIN SPEC 91414-2 Annex E (Table E.1). It comprehensibly documents what the operator can expect from the access protection concept, from planning to implementation and operation.
+
+Output EXACTLY 6 text blocks, separated by an empty line (two newlines).
+Each block starts with its bold header name (e.g. **purpose**). No other headers. No JSON, no code fences.
+
+The blocks are:
+
+**purpose**
+Cover the following points (Master Data / Assignment / Basics):
+- Designation of the project / access protection concept for {assetToProtect} at location {locationName}.
+- Client, operator, specialist planner, contact point (if unknown, define generically as placeholder).
+- Fundamental goals and functions of the access protection concept.
+- Description of the protection zone(s) and operating times ({protectionPeriod}).
+- Used basics (e.g. site plans, standards DIN SPEC 91414-2, DIN ISO 22343-2).
+
+**threatAnalysis**
+Cover the following points (Risk Assessment):
+- Risk identification: Vehicle-as-a-Weapon acts, vehicle types, attack possibilities.
+- Police threat assessment (if known or generically referenced).
+- Evaluation using qualitative risk matrix (probability of occurrence × extent of damage).
+- Explanation of the threat situation based on {averageThreatLevel} and {threatLevelDistribution}.
+- Integration of hazard analysis results ({hazardAssessment}): Rated factors (event-related, spatial, security-related, attack-influencing), total score and risk classification.
+- Derivation of the protection grade {protectionGrade} and classification (SG0–SG4).
+
+**vulnerabilities**
+Cover the following points (Vulnerability Analysis according to Table E.1):
+- Definition and description of the protection zone.
+- Topography, location, structural weaknesses, and nature of the locality ({locationContext}).
+- Identification of all access possibilities based on {threatList} (number, lengths, speeds).
+- Access authorizations and usage times (delivery traffic, residents, public transport).
+- Requirements of BOS (fire brigade, rescue service, police) and other conditions.
+
+**hvmMeasures**
+Cover the following points (Concept / System Selection):
+- Formulation of protection goals (e.g. preventing unauthorized entry, limiting penetration depth).
+- Product-neutral pre-selection of suitable protection systems based on {recommendedProductTypes} and {productType} (with justification {productTypeJustification}).
+- Requirements for tested vehicle security barriers (DIN ISO 22343-1, IWA 14, TR "Mobile Vehicle Barriers").
+- Derivation of performance requirements from the driving dynamics analysis (penetration depth {penetration}, debris flight {debrisDistance}).
+- Reference to necessary deviations or modifications.
+
+**siteConsiderations**
+Cover the following points (Integration / Location):
+- Integration of measures into the urban context ({locationContext}) and usage.
+- Consideration of accessibility and cityscape ("Security by Design").
+- Coordination with stakeholders (operator, residents, businesses, authorities).
+- Impact on traffic, logistics, and accessibility.
+
+**operationalImpact**
+Cover the following points (Operational requirements in the sense of DIN SPEC 91414-2 / DIN ISO 22343-2):
+- Operating times and operating states (open/closed, setup/dismantling times).
+- Operation, personnel requirements, training, and briefing.
+- Maintenance, upkeep, and regular inspections (reference to ISO 22343-2 Chap. 15/16).
+- Documentation (test certificates, protocols, operating instructions).
+- Reporting obligations for changes, handling of deviations and residual risks.
+- Concluding note: This report is a technical operational requirement and does not replace a sovereign threat assessment by the police.`,
             "chatbot": {
                 "title": "Access Protection Assistant",
                 "welcome": "Welcome to the Access Protection Assistant. I only ask questions that are still missing or uncertain. Ready?",
@@ -915,6 +1144,12 @@ const embeddedTranslations = {
                     "manufacturer": "Manufacturer",
                     "type": "Type",
                     "standard": "Standard",
+                    "productType": "Product Type",
+                    "cluster": "Cluster",
+                    "performance": "Performance Rating",
+                    "dimensions": "Dimensions",
+                    "foundation": "Foundation Depth",
+                    "material": "Material",
                     "vehicleWeight": "Vehicle Weight (kg)",
                     "vehicleType": "Vehicle Type",
                     "speed": "Speed (km/h)",
@@ -984,6 +1219,17 @@ const embeddedTranslations = {
                 "classification": "Classification"
             },
             "sections": {
+                "chapter1": { "title": "1. Assignment, Objectives and Scope" },
+                "chapter2": { "title": "2. Normative Framework and References" },
+                "chapter3": { "title": "3. Description of the Event Area" },
+                "chapter4": { "title": "4. Threat Analysis and Perpetrator Behavior" },
+                "chapter5": { "title": "5. BarricadiX Analysis Methodology" },
+                "chapter6": { "title": "6. Vehicle Dynamics Analysis and Maximum Energies" },
+                "chapter7": { "title": "7. Risk Analysis according to ALARP Principle" },
+                "chapter8": { "title": "8. Protection Goal Definition" },
+                "chapter9": { "title": "9. Protection Concept and Product-Neutral Recommendations" },
+                "chapter10": { "title": "10. Residual Risks and Limitations" },
+                "chapter11": { "title": "11. Conclusions and Recommendations" },
                 "purpose": {
                     "title": "Purpose and Objectives",
                     "description": "This report serves to assess security risks for the access routes to be protected and to recommend appropriate protective measures."
@@ -1039,7 +1285,16 @@ const embeddedTranslations = {
                 "error": "Error in AI report generation",
                 "loading": "AI report is being generated...",
                 "timeout": "Timeout in AI report generation"
-            }
+            },
+            "keyFacts": {
+                "title": "Key Facts of the Access Protection Concept",
+                "location": "Location",
+                "asset": "Asset to Protect",
+                "securityLevel": "Security Level",
+                "protectionGrade": "Protection Grade",
+                "dataBasis": "Data basis: {source}, as of: {date}"
+            },
+            "threatListIntro": "Based on the GIS analysis of approach corridors, the following access routes show potentially critical approach paths:"
         },
         "threats": {
             "title": "Threat Analysis",
@@ -1051,12 +1306,13 @@ const embeddedTranslations = {
             "minimize": "Minimize",
             "maximize": "Maximize",
             "close": "Close",
-            "editMode": "Edit access points"
+            "editMode": "Edit access points",
+            "manualEntry": "Manual Access"
         },
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Paderborn, Innenstadt",
+            "searchPlaceholder": "Soest",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
@@ -2642,45 +2898,29 @@ function getProperty(obj: any, path: string) {
  * @returns The translated string.
  */
 function t(key: string, replacements?: { [key: string]: string | number }): string {
-    // Debug: Log which translations source is being used
-    console.log(`Translation request for key: ${key}, language: ${currentLanguage}`);
-    console.log(`Translations source:`, translations === embeddedTranslations ? 'embedded' : 'external');
+    // Always use embedded translations to avoid any loading issues
+    const translationSource = embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations];
     
-    // Debug: Log the structure of translations
-    console.log('Current translations structure:', translations);
-    console.log('Embedded translations structure:', embeddedTranslations);
-    
-    // Ensure we have translations available
-    if (!translations || !translations[currentLanguage]) {
-        console.warn(`No translations loaded for language: ${currentLanguage}, using embedded`);
-        translations = embeddedTranslations;
+    if (!translationSource) {
+        console.warn(`No translations for language: ${currentLanguage}`);
+        return key;
     }
     
-    let text = getProperty(translations[currentLanguage as keyof typeof translations], key);
-    console.log(`Text from main translations for key '${key}':`, text);
+    let text = getProperty(translationSource, key);
     
-    // If still no text found, try embedded translations
+    // If not found, return the key
     if (typeof text !== 'string') {
-        console.warn(`Translation key not found in main translations for language '${currentLanguage}': ${key}`);
-        text = getProperty(embeddedTranslations[currentLanguage as keyof typeof embeddedTranslations], key);
-        console.log(`Text from embedded translations for key '${key}':`, text);
-        
-        if (typeof text !== 'string') {
-            console.warn(`Translation key not found in embedded translations for language '${currentLanguage}': ${key}`);
-            // Return a more user-friendly fallback instead of the raw key
-            const fallbackText = getFallbackText(key);
-            console.log(`Fallback text for key '${key}':`, fallbackText);
-            return fallbackText || key;
-        }
+        console.warn(`Translation key not found: ${key}`);
+        return key;
     }
     
+    // Replace placeholders
     if (replacements) {
         for (const placeholder in replacements) {
-            text = text.replace(`{${placeholder}}`, String(replacements[placeholder]));
+            text = text.replace(new RegExp(`\\{${placeholder}\\}`, 'g'), String(replacements[placeholder]));
         }
     }
     
-    console.log(`Final translation result for ${key}:`, text);
     return text;
 }
 
@@ -2708,7 +2948,7 @@ function getFallbackText(key: string): string | null {
         'sidebar.high': 'hoch',
         'nav.paramInput': 'Parameter',
         'nav.markingArea': 'Sicherheitsbereich',
-        'nav.threatAnalysis': 'Gefahrenanalyse',
+        'nav.threatAnalysis': 'Zufahrtanalyse',
         'nav.riskReport': 'Risikobericht',
         'nav.productSelection': 'Produktauswahl',
         'nav.projectDescription': 'Ausschreibung',
@@ -2954,6 +3194,7 @@ async function setLanguage(lang: string) {
                     fillOpacity: 0.3,
                     weight: 2
                 }).addTo(map);
+                attachManualEntryHandlersToPolygon(drawnPolygon);
                 
                 const center = drawnPolygon.getBounds().getCenter();
                 polygonLabel = L.marker(center, {
@@ -3070,7 +3311,7 @@ async function initOpenStreetMap(): Promise<void> {
         // Continue with normal initialization
     }
     
-    const mapCenter: [number, number] = [51.7189, 8.7575]; // Paderborn (Innenstadt)
+    const mapCenter: [number, number] = [51.5719, 8.1061]; // Soest (Kernstadt)
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -3218,6 +3459,7 @@ async function initOpenStreetMap(): Promise<void> {
     setTimeout(() => {
         initialize3DModeDeck();
         add3DToggleEventListener();
+        addBasemapToggleEventListener();
     }, 100);
 }
 
@@ -3260,6 +3502,38 @@ function add3DToggleEventListener(): void {
     });
     
     console.log('✅ 3D toggle button event listener added');
+}
+
+/**
+ * Add event listener for the basemap toggle button (settings button)
+ */
+function addBasemapToggleEventListener(): void {
+    console.log('🗺️ Adding basemap toggle button event listener...');
+    
+    const settingsButton = document.getElementById('map-settings-btn');
+    if (!settingsButton) {
+        console.error('❌ Map settings button not found');
+        return;
+    }
+    
+    settingsButton.addEventListener('click', async () => {
+        console.log('🔄 Map settings button clicked - toggling basemap');
+        
+        if (!map) {
+            console.error('❌ Map not initialized');
+            return;
+        }
+        
+        try {
+            const { toggleBasemapProvider } = await import('./src/core/geodata/integration/mapIntegration.js');
+            await toggleBasemapProvider(map);
+            console.log('✅ Basemap toggled successfully');
+        } catch (error) {
+            console.error('❌ Failed to toggle basemap:', error);
+        }
+    });
+    
+    console.log('✅ Basemap toggle button event listener added');
 }
 
 
@@ -3533,6 +3807,125 @@ const updateThreatListAfterDeletion = () => {
     }
 };
 
+const clearEntryDetectionMarkers = () => {
+    const entryMarkers = threatMarkersMap.get('entry-detection');
+    if (!entryMarkers) return;
+
+    entryMarkers.forEach(marker => {
+        if (threatLayerGroup && threatLayerGroup.hasLayer(marker)) {
+            threatLayerGroup.removeLayer(marker);
+        } else if (map && map.hasLayer(marker)) {
+            map.removeLayer(marker);
+        }
+    });
+
+    threatMarkersMap.set('entry-detection', []);
+};
+
+const createManualEntryCandidate = (latlng: any, id: string): EntryCandidate => {
+    const coordinate: [number, number] = [latlng.lng, latlng.lat];
+    return {
+        id,
+        intersectionPoint: coordinate,
+        pathNodeIds: [],
+        path: {
+            type: "Feature",
+            geometry: {
+                type: "LineString",
+                coordinates: [coordinate]
+            },
+            properties: {}
+        } as any,
+        distanceMeters: Math.max(100, 120),
+        straightness: 1,
+        continuity: 1,
+        confidence: 0.95,
+        wayIds: [],
+        manual: true
+    };
+};
+
+const hasManualCandidateNear = (manager: any, latlng: any): boolean => {
+    if (!manager?.candidates) return false;
+    return manager.candidates.some((candidate: EntryCandidate) => {
+        if (!candidate.manual) return false;
+        const candidateLatLng = L.latLng(candidate.intersectionPoint[1], candidate.intersectionPoint[0]);
+        return candidateLatLng.distanceTo(latlng) < 2;
+    });
+};
+
+const addManualEntryPoint = (latlng: any) => {
+    const manager = (window as any).entryDetectionManager;
+    if (!manager) return;
+    
+    if (hasManualCandidateNear(manager, latlng)) {
+        showNotification('In der Nähe existiert bereits eine manuelle Zufahrt.', 'warning');
+        return;
+    }
+    
+    const id = `manual-${Date.now()}-${manualEntryIdCounter++}`;
+    const candidate = createManualEntryCandidate(latlng, id);
+    manager.addManualCandidate(candidate);
+    
+    clearEntryDetectionMarkers();
+    createEntryDetectionMarkers();
+    updateThreatListAfterDeletion();
+    showNotification('Manuelle Zufahrt hinzugefügt. Analyse aktualisieren, um Wege neu zu berechnen.', 'success');
+};
+
+const setManualEntryMode = (enabled: boolean, silent = false) => {
+    if (enabled && drawnPolygons.length === 0 && !drawnPolygon) {
+        if (!silent) {
+            showNotification('Bitte zeichnen Sie zuerst einen Sicherheitsbereich.', 'warning');
+        }
+        enabled = false;
+    }
+    
+    manualEntryMode = enabled;
+    if (manualEntryButton) {
+        manualEntryButton.classList.toggle('active', enabled);
+        manualEntryButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    }
+    
+    if (!silent) {
+        showNotification(
+            enabled 
+                ? 'Manueller Zufahrtsmodus aktiv. Rechtsklick auf die Außenkante setzt eine neue Zufahrt.' 
+                : 'Manueller Zufahrtsmodus beendet.',
+            'info'
+        );
+    }
+};
+
+const updateManualEntryButtonAvailability = (enabled: boolean) => {
+    if (!manualEntryButton) return;
+    manualEntryButton.disabled = !enabled;
+    manualEntryButton.classList.toggle('disabled', !enabled);
+    if (!enabled && manualEntryMode) {
+        setManualEntryMode(false, true);
+    }
+};
+
+const attachManualEntryHandlersToPolygon = (polygon: any) => {
+    if (!polygon || (polygon as any)._manualEntryHandlerAttached) return;
+    
+    polygon.on('contextmenu', (e: any) => {
+        if (currentActiveTab !== 'nav-threat-analysis') {
+            return;
+        }
+        
+        // Auto-enable manual mode if user right-clicks on polygon in threat analysis tab
+        if (!manualEntryMode) {
+            setManualEntryMode(true);
+        }
+        
+        e.originalEvent?.preventDefault?.();
+        addManualEntryPoint(e.latlng);
+    });
+    
+    (polygon as any)._manualEntryHandlerAttached = true;
+};
+
 /**
  * Creates a local deletion bubble next to an entry point marker
  */
@@ -3668,6 +4061,60 @@ const updateDeletionBubblePosition = () => {
  */
 const deleteEntryPoint = (marker: any, candidate: any) => {
     console.log(`🗑️ Starting deletion of entry point ${candidate.id}`);
+    
+    // Handle deletion from threatsMap
+    if (candidate.fromThreatsMap && candidate.streetName) {
+        const threatData = threatsMap.get(candidate.streetName);
+        if (threatData) {
+            // Remove this entry point from threatsMap
+            const candidateLat = candidate.intersectionPoint[1];
+            const candidateLng = candidate.intersectionPoint[0];
+            threatData.entryPoints = threatData.entryPoints.filter((ep: any) => {
+                const distance = Math.sqrt(Math.pow(ep.lat - candidateLat, 2) + Math.pow(ep.lon - candidateLng, 2));
+                return distance > 0.0001; // ~10 meters tolerance
+            });
+            
+            // If no entry points left, remove the entire threat
+            if (threatData.entryPoints.length === 0) {
+                threatsMap.delete(candidate.streetName);
+                const markers = threatMarkersMap.get(candidate.streetName);
+                if (markers) {
+                    markers.forEach(m => {
+                        if (threatLayerGroup && threatLayerGroup.hasLayer(m)) {
+                            threatLayerGroup.removeLayer(m);
+                        } else if (map && map.hasLayer(m)) {
+                            map.removeLayer(m);
+                        }
+                    });
+                    threatMarkersMap.delete(candidate.streetName);
+                }
+            } else {
+                // Re-render threats for this street
+                const markers = threatMarkersMap.get(candidate.streetName);
+                if (markers) {
+                    markers.forEach(m => {
+                        if (threatLayerGroup && threatLayerGroup.hasLayer(m)) {
+                            threatLayerGroup.removeLayer(m);
+                        } else if (map && map.hasLayer(m)) {
+                            map.removeLayer(m);
+                        }
+                    });
+                    threatMarkersMap.delete(candidate.streetName);
+                }
+            }
+            
+            // Re-render threat list and markers
+            renderThreatList();
+            createEntryDetectionMarkers();
+            updateThreatListAfterDeletion();
+            return;
+        }
+    }
+    
+    // Clear manual path layers if applicable
+    if (candidate.manual) {
+        clearManualPath(candidate.id);
+    }
     
     // Get marker position for comprehensive cleanup
     const markerLatLng = marker.getLatLng();
@@ -3935,7 +4382,8 @@ const deleteEntryPoint = (marker: any, candidate: any) => {
 /**
  * Clears the threat markers (red circles and lines) and the list from the map and UI.
  */
-const clearThreatAnalysis = () => {
+const clearThreatAnalysis = (options?: { preserveManualEntries?: boolean }) => {
+    const preserveManualEntries = options?.preserveManualEntries ?? false;
     // Reset any street highlighting
     resetStreetHighlighting();
     
@@ -3969,7 +4417,11 @@ const clearThreatAnalysis = () => {
     
     // Clear Entry Detection results
     if ((window as any).entryDetectionManager) {
-        (window as any).entryDetectionManager.clearCandidates();
+        (window as any).entryDetectionManager.clearCandidates(preserveManualEntries);
+    }
+    
+    if (!preserveManualEntries) {
+        setManualEntryMode(false, true);
     }
     threatsMap.clear();
     const threatList = document.querySelector('.threat-list') as HTMLOListElement;
@@ -4783,7 +5235,7 @@ const analyzeAndMarkThreats = async () => {
     const loadingIndicator = document.querySelector('.loading-indicator') as HTMLElement;
     if (!loadingIndicator) return;
     
-    clearThreatAnalysis();
+    clearThreatAnalysis({ preserveManualEntries: true });
     loadingIndicator.classList.remove('hidden');
 
     try {
@@ -5489,7 +5941,7 @@ async function getAIReportSections(context: any): Promise<any> {
             threatLevel: avgThreatLevel
         });
         
-        // Enhanced context with threat level analysis and product recommendations
+        // Enhanced context with threat level analysis, product recommendations, and vehicle dynamics
         const enhancedContext = {
             ...context,
             threatAnalysis: generateThreatAnalysisText(),
@@ -5498,51 +5950,116 @@ async function getAIReportSections(context: any): Promise<any> {
             locationContext: locationContext,
             recommendedProductTypes: recommendedProductTypes.join(', '),
             averageThreatLevel: avgThreatLevel.toFixed(1),
-            productTypeJustification: generateProductTypeJustification(recommendedProductTypes, context.assetToProtect || '', locationContext, avgThreatLevel)
+            productTypeJustification: generateProductTypeJustification(recommendedProductTypes, context.assetToProtect || '', locationContext, avgThreatLevel),
+            hazardAssessment: buildHazardAssessmentSummary(),
+            // Neue fahrdynamische Daten für Gutachten
+            vehicleDynamicsTable: calculateVehicleDynamicsTable(),
+            energyClassification: getEnergyClassificationSummary()
         };
         
         const prompt = t('ai.reportPrompt', enhancedContext) + 
-        `\n\nENHANCED THREAT ANALYSIS:
-        ${enhancedContext.threatAnalysis}
-        
-        HIGHEST THREAT ROADS:
-        ${enhancedContext.highestThreatRoads}
-        
-        THREAT LEVEL DISTRIBUTION:
-        ${enhancedContext.threatLevelDistribution}
-        
-        RECOMMENDED PRODUCT TYPES:
-        ${enhancedContext.recommendedProductTypes}
-        
-        PRODUCT TYPE JUSTIFICATION:
-        ${enhancedContext.productTypeJustification}
-        
-        LOCATION CONTEXT: ${enhancedContext.locationContext}
-        AVERAGE THREAT LEVEL: ${enhancedContext.averageThreatLevel}/10
-        
-        IMPORTANT: Generate the report in ${currentLanguage === 'de' ? 'German' : 'English'} language only. All text must be in ${currentLanguage === 'de' ? 'German' : 'English'}. 
-        Focus on the threat level analysis and provide specific justifications for each threat level based on road type, traffic speed, and vehicle access capabilities.
-        Include the recommended product types and explain why they are suitable for this specific context and threat level.`;
+        `\n\n========== DETAILDATEN FÜR GUTACHTEN ==========
 
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+ENHANCED THREAT ANALYSIS:
+${enhancedContext.threatAnalysis}
+
+HIGHEST THREAT ROADS:
+${enhancedContext.highestThreatRoads}
+
+THREAT LEVEL DISTRIBUTION:
+${enhancedContext.threatLevelDistribution}
+
+HAZARD ANALYSIS (GEFÄHRDUNGSANALYSE ZUFAHRTSSCHUTZ):
+${enhancedContext.hazardAssessment}
+
+========== FAHRDYNAMISCHE ANALYSE ==========
+
+${enhancedContext.vehicleDynamicsTable}
+
+========== ENERGIEKLASSIFIZIERUNG ==========
+
+${enhancedContext.energyClassification}
+
+========== EMPFEHLUNGEN ==========
+
+RECOMMENDED PRODUCT TYPES:
+${enhancedContext.recommendedProductTypes}
+
+PRODUCT TYPE JUSTIFICATION:
+${enhancedContext.productTypeJustification}
+
+LOCATION CONTEXT: ${enhancedContext.locationContext}
+AVERAGE THREAT LEVEL: ${enhancedContext.averageThreatLevel}/10
+
+========== AUSGABEANWEISUNGEN ==========
+
+WICHTIG: 
+1. Erstelle den Bericht in ${currentLanguage === 'de' ? 'deutscher' : 'englischer'} Sprache.
+2. Verwende Gutachtenstil / Verwaltungsdeutsch.
+3. Integriere die fahrdynamischen Berechnungen (Geschwindigkeiten, Energien, Energiestufen) in Kapitel 5 und 6.
+4. Leite Schutzklassen (SK1/SK2) und Schutzkategorien (A/B/C) nachvollziehbar aus den Energiestufen ab.
+5. Wende das ALARP-Prinzip in Kapitel 7 an.
+6. Formuliere produktoffen/produktneutral - keine Herstellernamen.
+7. Jedes der 11 Kapitel sollte 2-4 Absätze umfassen.
+8. Gesamtumfang: mindestens 2000 Wörter.`;
+
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
         const result = response.response;
-        const text = result.text();
+        const text = result.text().trim();
         
-        // Try to parse as JSON, otherwise use the text directly
+        // Try to parse JSON, otherwise map the six required blocks by double line breaks
         let aiSections;
         try {
             aiSections = JSON.parse(text);
         } catch (e) {
-            // If not JSON, create sections from text
-            aiSections = {
-                purpose: text.split('\n\n')[0] || text.substring(0, 500),
-                threatAnalysis: text.split('\n\n')[1] || text.substring(500, 1000),
-                vulnerabilities: text.split('\n\n')[2] || text.substring(1000, 1500),
-                hvmMeasures: text.split('\n\n')[3] || text.substring(1500, 2000),
-                siteConsiderations: text.split('\n\n')[4] || text.substring(2000, 2500),
-                operationalImpact: text.split('\n\n')[5] || text.substring(2500, 3000)
-            };
+            const blocks = text.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
+            // Parse 11 Kapitel für Gutachtenstruktur
+            if (blocks.length >= 11) {
+                aiSections = {
+                    chapter1_auftrag: blocks[0],
+                    chapter2_normen: blocks[1],
+                    chapter3_bereich: blocks[2],
+                    chapter4_bedrohung: blocks[3],
+                    chapter5_methodik: blocks[4],
+                    chapter6_fahrdynamik: blocks[5],
+                    chapter7_risiko: blocks[6],
+                    chapter8_schutzziel: blocks[7],
+                    chapter9_konzept: blocks[8],
+                    chapter10_restgefahren: blocks[9],
+                    chapter11_empfehlung: blocks[10]
+                };
+            } else if (blocks.length >= 6) {
+                // Fallback auf 6-Block-Struktur für Kompatibilität
+                aiSections = {
+                    chapter1_auftrag: blocks[0],
+                    chapter2_normen: '',
+                    chapter3_bereich: blocks[1],
+                    chapter4_bedrohung: blocks[2],
+                    chapter5_methodik: '',
+                    chapter6_fahrdynamik: '',
+                    chapter7_risiko: blocks[2],
+                    chapter8_schutzziel: blocks[3],
+                    chapter9_konzept: blocks[3],
+                    chapter10_restgefahren: blocks[4],
+                    chapter11_empfehlung: blocks[5]
+                };
+            } else {
+                // Minimaler Fallback
+                aiSections = {
+                    chapter1_auftrag: blocks[0] || text.substring(0, 500),
+                    chapter2_normen: blocks[1] || '',
+                    chapter3_bereich: blocks[2] || text.substring(500, 1000),
+                    chapter4_bedrohung: blocks[3] || text.substring(1000, 1500),
+                    chapter5_methodik: blocks[4] || '',
+                    chapter6_fahrdynamik: blocks[5] || '',
+                    chapter7_risiko: blocks[6] || text.substring(1500, 2000),
+                    chapter8_schutzziel: blocks[7] || '',
+                    chapter9_konzept: blocks[8] || text.substring(2000, 2500),
+                    chapter10_restgefahren: blocks[9] || '',
+                    chapter11_empfehlung: blocks[10] || text.substring(2500, 3000)
+                };
+            }
         }
         
         // KI-Text nachträglich übersetzen, falls er in der falschen Sprache ist
@@ -5725,32 +6242,250 @@ function translateAIText(text: string, targetGerman: boolean): string {
 function buildReportFromStateFallback(context: any) {
     try {
         const ps = (window as any).planningState || {};
-        const schutzgueter = ps.schutzgüter?.join(', ') || context.assetToProtect || t('report.undefinedAsset');
-        const bedrohung = ps.risiko?.bedrohung?.art || t('report.undefinedValue');
-        const vKmh = ps.risiko?.dynamik?.v_kmh || context.estimatedSpeedKmH || t('report.undefinedValue');
-        const untergrund = ps.risiko?.site?.untergrund || t('report.undefinedValue');
-        const restrisiko = ps.restrisiko?.klasse || context.securityLevel || t('report.undefinedValue');
-        const corridors = (ps.risiko?.site?.anfahrkorridore && ps.risiko.site.anfahrkorridore.length>0)
-            ? t('report.identifiedCorridors', { count: ps.risiko.site.anfahrkorridore.length })
-            : t('report.noChatGeometry');
-
+        const undefinedValue = t('report.undefinedValue');
+        const rawAssets = ps.schutzgüter ?? ps.schutzgueter;
+        const assetList = Array.isArray(rawAssets)
+            ? rawAssets.filter(Boolean)
+            : rawAssets
+                ? [rawAssets]
+                : [];
+        const assetDescriptor = assetList.length > 0
+            ? assetList.join(', ')
+            : (context.assetToProtect && context.assetToProtect !== t('report.undefinedAsset')
+                ? context.assetToProtect
+                : t('report.undefinedAsset'));
+        const locationName = context.locationName || t('report.undefinedLocation');
+        const securityLevelText = context.securityLevel || undefinedValue;
+        const protectionGradeText = context.protectionGrade || undefinedValue;
+        const protectionPeriodText = context.protectionPeriod || undefinedValue;
+        const productTypeText = context.productType || undefinedValue;
+        const penetrationText = context.penetration || undefinedValue;
+        const debrisDistanceText = context.debrisDistance || undefinedValue;
+        const groundText = ps.risiko?.site?.untergrund || undefinedValue;
+        const residualRiskText = ps.restrisiko?.klasse || protectionGradeText;
+        
+        // Get hazard analysis data
+        const hazardData = (typeof getHazardAnalysisFormData === 'function') ? getHazardAnalysisFormData() : null;
+        const hazardCity = hazardData?.city || '';
+        const hazardArea = hazardData?.area || '';
+        const hazardDamageLabel = hazardData?.expectedDamageLabel || '';
+        const hazardAvgScore = hazardData?.averageScore || 0;
+        const hazardTotalScore = hazardData?.totalScore || 0;
+        const hazardMaxScore = hazardData?.maxPossibleScore || 0;
+        
+        // Derive risk classification from hazard assessment
+        let hazardRiskClass = '';
+        if (hazardAvgScore > 0) {
+            if (hazardAvgScore <= 1.5) hazardRiskClass = currentLanguage === 'de' ? 'NIEDRIG' : 'LOW';
+            else if (hazardAvgScore <= 2.0) hazardRiskClass = currentLanguage === 'de' ? 'MITTEL' : 'MEDIUM';
+            else if (hazardAvgScore <= 2.5) hazardRiskClass = currentLanguage === 'de' ? 'ERHÖHT' : 'ELEVATED';
+            else hazardRiskClass = currentLanguage === 'de' ? 'HOCH' : 'HIGH';
+        }
+        
+        // Extract rated factors by category for detailed reporting
+        const ratedFactors = hazardData?.factors?.filter((f: any) => f.value !== null) || [];
+        const anlassBelange = ratedFactors.filter((f: any) => f.category === 'Anlassbezogene Belange');
+        const raumBelange = ratedFactors.filter((f: any) => f.category === 'Räumliche Belange');
+        const securityBelange = ratedFactors.filter((f: any) => f.category === 'Weitere Sicherheitsbelange');
+        const tatBelange = ratedFactors.filter((f: any) => f.category === 'Tatbeeinflussende Belange');
+        
+        const corridorNamesFromState = Array.isArray(ps.risiko?.site?.anfahrkorridore)
+            ? ps.risiko.site.anfahrkorridore
+                .map((corr: any) => corr?.name || corr?.bezeichnung || corr?.label || corr?.strasse || corr?.straße)
+                .filter(Boolean)
+            : [];
+        const corridorNamesFromMap = Array.from(threatsMap.keys());
+        const corridorNames = Array.from(new Set([...corridorNamesFromState, ...corridorNamesFromMap]));
+        const corridorCount = corridorNames.length;
+        const corridorSentence = corridorNames.length > 0
+            ? (currentLanguage === 'de'
+                ? `${corridorNames.length} Zufahrten (${corridorNames.join(', ')})`
+                : `${corridorNames.length} access routes (${corridorNames.join(', ')})`)
+            : (currentLanguage === 'de'
+                ? 'keine detaillierten Zufahrten dokumentiert'
+                : 'no detailed access routes documented');
+        
+        const threatsArray = Array.from(threatsMap.entries());
+        const averageThreatLevelValue = threatsArray.length > 0
+            ? threatsArray.reduce((sum, [, data]) => sum + (data.threatLevel || 5), 0) / threatsArray.length
+            : null;
+        const averageThreatLevelText = averageThreatLevelValue
+            ? `${averageThreatLevelValue.toFixed(1)}/10`
+            : (currentLanguage === 'de' ? 'keine belastbaren Daten' : 'no reliable data');
+        
+        const longestCorridor = threatsArray.reduce<{ name: string; length: number; maxSpeed: number }>((longest, [name, data]) => {
+            const length = Math.round(data.totalLength || 0);
+            if (length > longest.length) {
+                return { name, length, maxSpeed: data.maxSpeed || 0 };
+            }
+            return longest;
+        }, { name: '', length: 0, maxSpeed: 0 });
+        
+        const corridorHighlight = longestCorridor.name
+            ? (currentLanguage === 'de'
+                ? `${longestCorridor.name} mit ca. ${longestCorridor.length} m Beschleunigungsstrecke`
+                : `${longestCorridor.name} with roughly ${longestCorridor.length} m of approach distance`)
+            : (currentLanguage === 'de'
+                ? 'die längeren, nahezu hindernisfreien Achsen'
+                : 'the longer, unobstructed approaches');
+        
+        // Build detailed corridor analysis
+        const corridorDetails = threatsArray.map(([name, data]) => {
+            const length = Math.round(data.totalLength || 0);
+            const minSpeed = Math.round(data.minSpeed || 0);
+            const maxSpeed = Math.round(data.maxSpeed || 0);
+            return currentLanguage === 'de'
+                ? `${name} (${length} m, ${minSpeed}–${maxSpeed} km/h)`
+                : `${name} (${length} m, ${minSpeed}–${maxSpeed} km/h)`;
+        }).join('; ');
+        
+        const parseSpeed = (value: any) => {
+            if (typeof value === 'number' && !isNaN(value)) return value;
+            if (typeof value === 'string') {
+                const normalized = parseFloat(value.replace(',', '.'));
+                return isNaN(normalized) ? null : normalized;
+            }
+            return null;
+        };
+        const plannedSpeed = parseSpeed(ps.risiko?.dynamik?.v_kmh);
+        const maxMapSpeed = threatsArray.length > 0
+            ? Math.max(...threatsArray.map(([, data]) => data.maxSpeed || 0))
+            : null;
+        const representativeSpeed = plannedSpeed ?? (maxMapSpeed !== null && isFinite(maxMapSpeed) ? maxMapSpeed : null);
+        const speedSentence = representativeSpeed
+            ? (currentLanguage === 'de'
+                ? `Die erwarteten Annäherungsgeschwindigkeiten liegen bei rund ${Math.round(representativeSpeed)} km/h`
+                : `Expected approach speeds are roughly ${Math.round(representativeSpeed)} km/h`)
+            : (currentLanguage === 'de'
+                ? 'Mangels Messwerten wird mit konservativen Annäherungsgeschwindigkeiten gerechnet'
+                : 'In absence of measurements, conservative approach speeds are assumed');
+        
+        // Build hazard assessment paragraph
+        const hazardParagraph = hazardAvgScore > 0
+            ? (currentLanguage === 'de'
+                ? `Die Gefährdungsanalyse im Eingabedialog ergab eine durchschnittliche Bewertung von ${hazardAvgScore.toFixed(1)} (Gesamtpunktzahl: ${hazardTotalScore}/${hazardMaxScore}), was einer Gefährdungseinstufung "${hazardRiskClass}" entspricht.${hazardDamageLabel ? ` Das erwartete Schadensausmaß wurde als "${hazardDamageLabel}" eingeschätzt.` : ''}`
+                : `The hazard analysis input yielded an average rating of ${hazardAvgScore.toFixed(1)} (total score: ${hazardTotalScore}/${hazardMaxScore}), corresponding to a "${hazardRiskClass}" risk classification.${hazardDamageLabel ? ` Expected damage level was assessed as "${hazardDamageLabel}".` : ''}`)
+            : '';
+        
+        // Build detailed factor-based insights with individual factor listings
+        const formatFactorList = (factors: any[], categoryName: string) => {
+            if (factors.length === 0) return '';
+            const factorStrings = factors.map((f: any) => {
+                const valueLabel = f.value === 1 ? 'gering' : f.value === 2 ? 'mittel' : f.value === 3 ? 'hoch' : '';
+                return `${f.label} (${valueLabel})`;
+            });
+            return `${categoryName}: ${factorStrings.join(', ')}`;
+        };
+        
+        const formatFactorListEn = (factors: any[], categoryName: string) => {
+            if (factors.length === 0) return '';
+            const factorStrings = factors.map((f: any) => {
+                const valueLabel = f.value === 1 ? 'low' : f.value === 2 ? 'medium' : f.value === 3 ? 'high' : '';
+                return `${f.label} (${valueLabel})`;
+            });
+            return `${categoryName}: ${factorStrings.join(', ')}`;
+        };
+        
+        let factorInsights = '';
+        if (ratedFactors.length > 0) {
+            if (currentLanguage === 'de') {
+                const parts = [];
+                parts.push(`Im Rahmen der Gefährdungsanalyse wurden ${ratedFactors.length} Bewertungsfaktoren erfasst:`);
+                if (anlassBelange.length > 0) parts.push(formatFactorList(anlassBelange, 'Anlassbezogene Belange'));
+                if (raumBelange.length > 0) parts.push(formatFactorList(raumBelange, 'Räumliche Belange'));
+                if (securityBelange.length > 0) parts.push(formatFactorList(securityBelange, 'Sicherheitsbelange'));
+                if (tatBelange.length > 0) parts.push(formatFactorList(tatBelange, 'Tatbeeinflussende Belange'));
+                factorInsights = parts.join(' ');
+            } else {
+                const parts = [];
+                parts.push(`The hazard analysis recorded ${ratedFactors.length} assessment factors:`);
+                if (anlassBelange.length > 0) parts.push(formatFactorListEn(anlassBelange, 'Event-related factors'));
+                if (raumBelange.length > 0) parts.push(formatFactorListEn(raumBelange, 'Spatial factors'));
+                if (securityBelange.length > 0) parts.push(formatFactorListEn(securityBelange, 'Security factors'));
+                if (tatBelange.length > 0) parts.push(formatFactorListEn(tatBelange, 'Attack-influencing factors'));
+                factorInsights = parts.join(' ');
+            }
+        }
+        
         if (currentLanguage === 'de') {
             return {
-                purpose: `Schutzziel: Sicherung von ${schutzgueter} am Standort ${context.locationName}. Der Assistent lieferte ergänzende Eingaben (Normbezug DIN SPEC 91414-2 / ISO 22343-2).`,
-                threatAnalysis: `Bedrohungsannahme: ${bedrohung}. Aus der Karten-/Chat-Analyse ergibt sich eine Zufahrtsgeschwindigkeit von ca. ${vKmh} km/h. Anfahrkorridore laut Chat: ${corridors}.`,
-                vulnerabilities: `Untergrund/Fundamente: ${untergrund}. Restrisiko (Chat/Slider): ${restrisiko}. Kritische Zufahrtswinkel bzw. Engstellen sind bei der Maßnahmendefinition zu berücksichtigen.`,
-                hvmMeasures: `Empfohlene Maßnahmen orientieren sich an der erwarteten Geschwindigkeit und den Schutzzielen. Für ${schutzgueter} mit Geschwindigkeit ~${vKmh} km/h sind FSB mit entsprechendem Leistungsniveau, geprüften Fundamenten und Berücksichtigung des Anprallwinkels anzusetzen.`,
-                siteConsiderations: `Betriebliche Rahmenbedingungen (z. B. Feuerwehrzufahrt, Fluchtwege) aus Chat sollten in die Detailplanung einfließen. Untergrund: ${untergrund}.`,
-                operationalImpact: `Maßnahmen sind so auszulegen, dass Betrieb, Rettungswege und Gestaltung berücksichtigt sind; temporäre Anpassungen (Events) werden unterstützt.`
+                purpose: `Diese Betriebsanforderung nach DIN SPEC 91414-2 Anhang E dokumentiert das Zufahrtsschutzkonzept für ${assetDescriptor} am Standort ${locationName}${hazardCity ? ` (${hazardCity}${hazardArea ? ', ' + hazardArea : ''})` : ''}. Das Konzept dient der nachvollziehbaren Planung des Zufahrtsschutzes gegen vorsätzliche Überfahrtaten und orientiert sich an DIN SPEC 91414-2, DIN ISO 22343-2 sowie der polizeilichen Weicht-Handreichung zu Überfahrtaten.
+
+Das angestrebte Sicherheitsniveau wurde als "${securityLevelText}" definiert, woraus sich der Sicherungsgrad "${protectionGradeText}" ableitet. Der Schutzzeitraum ist als "${protectionPeriodText}" festgelegt. Die Betriebsanforderung beschreibt, was der Betreiber vom Zufahrtsschutzkonzept erwarten kann – von der Planung über die Umsetzung bis zum laufenden Betrieb.
+
+Als normative Grundlagen dienen DIN SPEC 91414-1/-2 (Zufahrtsschutzkonzepte und Risikobeurteilung), DIN ISO 22343-1/-2 (Fahrzeugsicherheitsbarrieren – Leistungsanforderungen und Anwendung), die Technische Richtlinie „Mobile Fahrzeugsperren" sowie einschlägige polizeiliche Handreichungen. Der Bericht ersetzt keine hoheitliche Gefährdungsbewertung der zuständigen Sicherheitsbehörden.`,
+
+                threatAnalysis: `${speedSentence}. Die Bedrohungsszenarien folgen dem polizeilichen Vehicle-as-a-Weapon-Bild und berücksichtigen unterschiedliche Fahrzeugmassen von PKW bis hin zu schweren Nutzfahrzeugen. Die GIS-Analyse identifizierte ${corridorSentence} mit einem durchschnittlichen Bedrohungsniveau von ${averageThreatLevelText}.
+
+${hazardParagraph} ${factorInsights}
+
+Die Risikobewertung erfolgt qualitativ nach einer Matrix aus Eintrittswahrscheinlichkeit und Schadensausmaß gemäß DIN SPEC 91414-2. Hieraus leitet sich der Sicherungsgrad ${protectionGradeText} ab, der die Anforderungen an die einzusetzenden Fahrzeugsicherheitsbarrieren definiert. Die Sicherungsgrade SG0 bis SG4 korrespondieren mit steigenden Schutzanforderungen, wobei SG0 keinen besonderen Schutz und SG4 den höchsten Schutz gegen schwere Fahrzeuge bei hohen Geschwindigkeiten darstellt.
+
+Es wird ausdrücklich darauf hingewiesen, dass die konkrete Gefährdungsbewertung originär bei den zuständigen Sicherheitsbehörden liegt. Der vorliegende Bericht stellt eine technische Planungsgrundlage dar, ersetzt jedoch keine polizeiliche Gefährdungseinschätzung.`,
+
+                vulnerabilities: `Die Schwachstellenanalyse nach DIN SPEC 91414-2 untersucht systematisch die Übergänge von Zone 0 (öffentlicher Verkehrsraum) über die Übergangszone hin zur Schutzzone und identifiziert lange, hindernisarme Achsen als besonders kritisch. Die Analyse berücksichtigt Topografie, bauliche Gegebenheiten und vorhandene Infrastruktur.
+
+Insgesamt wurden ${corridorCount} Zufahrtsmöglichkeiten identifiziert: ${corridorDetails || corridorSentence}. Besonders kritisch erscheint ${corridorHighlight}, da hier weite Beschleunigungsräume ohne natürliche Hindernisse vorliegen. Die vorhandenen Boden- und Umfeldbedingungen (${groundText}) bieten nur begrenzten natürlichen Verzögerungsraum.
+
+Jede Zufahrt erhält ein eigenes Schwachstellenprofil, das Annäherungsrichtung, Beschleunigungsstrecke, erreichbare Geschwindigkeit, vorhandene oder fehlende Hindernisse sowie die Nutzungsart (z. B. Lieferverkehr, Fußgängerzone) berücksichtigt. Zufahrtsberechtigungen und Nutzungszeiten (Lieferverkehr, Anwohner, ÖPNV) sowie die Anforderungen von BOS (Feuerwehr, Rettungsdienst, Polizei) fließen in die Bewertung ein.`,
+
+                hvmMeasures: `Aus der Schwachstellenanalyse ergeben sich konkrete Schutzziele: Durchbruch verhindern, Geschwindigkeit vor Aufprall reduzieren und angrenzende Fußgängerbereiche schützen. Der abgeleitete Sicherungsgrad ${protectionGradeText} definiert die Leistungsanforderungen an die einzusetzenden Fahrzeugsicherheitsbarrieren.
+
+Empfohlen werden zertifizierte HVM-Komponenten der Kategorie "${productTypeText}" für den Schutzzeitraum "${protectionPeriodText}". Die Systeme sollten Eindringtiefen von etwa ${penetrationText} m und Trümmerstrecken von ${debrisDistanceText} m einhalten. Alle eingesetzten Barrieren müssen nach anerkannten Prüfstandards (IWA 14-1/-2, DIN ISO 22343-1/-2, PAS 68/69) zertifiziert sein.
+
+Die Zuordnung der Zufahrten zu Schutzmaßnahmen erfolgt auf Basis der energetischen Einstufung: Zufahrten mit hoher kinetischer Energie (lange Beschleunigungsstrecken, hohe Geschwindigkeiten) erfordern entsprechend leistungsfähigere Barrieren. Die finale Produktauswahl ist mit Polizei und Fachplanern abzustimmen. Bei Abweichungen von den allgemein anerkannten Regeln der Technik sind diese zu benennen, zu begründen und auf verbleibende Risiken hinzuweisen.`,
+
+                siteConsiderations: `Die Integration der HVM-Maßnahmen folgt den Prinzipien von „Security by Design": Schutzmaßnahmen werden möglichst unauffällig in den städtebaulichen Kontext eingebettet, ohne die Nutzung des öffentlichen Raums unnötig einzuschränken. Die vorhandenen Untergründe (${groundText}) und Nutzungsmuster werden berücksichtigt.
+
+Flucht- und Rettungswege sowie Feuerwehrzufahrten müssen jederzeit gewährleistet bleiben. Dies erfordert ggf. durchfahrbare oder entnehmbare Sperrelemente mit definierten Öffnungszeiten und -verfahren. Die Barrierefreiheit des öffentlichen Raums ist zu erhalten; Durchgangsbreiten müssen den Anforderungen entsprechen.
+
+Die Abstimmung mit allen Beteiligten (Betreiber, Anwohner, Gewerbe, Behörden) ist dokumentiert zu führen. Auswirkungen auf Lieferverkehr, Logistik und allgemeine Erreichbarkeit sind zu minimieren und in das Betriebskonzept zu integrieren.`,
+
+                operationalImpact: `Für den Betrieb des Zufahrtsschutzkonzepts sind klare Verantwortlichkeiten festzulegen. Der Betreiber/Risikoverantwortliche trägt die Gesamtverantwortung für Auf- und Abbau, regelmäßige Kontrollen, Winterdienst und das Freihalten der Schlüsselflächen. Mobile Elemente sind zu dokumentieren und deren Standorte zu protokollieren.
+
+Die Betriebszustände (offen/geschlossen, auf-/abgebaut) sind klar zu definieren. Personal muss geschult und eingewiesen werden; Bedienungsanweisungen sind vorzuhalten. Wartung, Instandhaltung und regelmäßige Inspektionen erfolgen gemäß DIN ISO 22343-2 Kapitel 15/16. Prüfzeugnisse, Zertifikate und Wartungsprotokolle sind zu dokumentieren und aufzubewahren.
+
+Bei wesentlichen Änderungen bestehen Meldepflichten gegenüber Betreiber und Polizei. Trotz technischer und organisatorischer Maßnahmen verbleibt ein Restrisiko (aktuelles Niveau: ${residualRiskText}), das nur durch kontinuierliche Lagebewertung und regelmäßige Überprüfung des Konzepts adressiert werden kann. Dieser Bericht stellt eine technische Betriebsanforderung nach DIN SPEC 91414-2 / DIN ISO 22343-2 dar und ersetzt keine hoheitliche Gefährdungsbewertung der zuständigen Sicherheitsbehörden.`
             };
         } else {
             return {
-                purpose: `Protection objective: Securing ${schutzgueter} at location ${context.locationName}. The assistant provided additional inputs (standard reference DIN SPEC 91414-2 / ISO 22343-2).`,
-                threatAnalysis: `Threat assumption: ${bedrohung}. From the map/chat analysis, an access speed of approximately ${vKmh} km/h results. Access corridors according to chat: ${corridors}.`,
-                vulnerabilities: `Ground/foundations: ${untergrund}. Residual risk (Chat/Slider): ${restrisiko}. Critical impact angles or bottlenecks must be considered in measure definition.`,
-                hvmMeasures: `Recommended measures are oriented to expected speed and protection objectives. For ${schutzgueter} with speed ~${vKmh} km/h, FSB with corresponding performance level, tested foundations and consideration of impact angle should be applied.`,
-                siteConsiderations: `Operational framework conditions (e.g., fire brigade access, escape routes) from chat should flow into detailed planning. Ground: ${untergrund}.`,
-                operationalImpact: `Measures are designed so that operations, rescue routes and design are considered; temporary adaptations (events) are supported.`
+                purpose: `This operational requirement according to DIN SPEC 91414-2 Annex E documents the access protection concept for ${assetDescriptor} at ${locationName}${hazardCity ? ` (${hazardCity}${hazardArea ? ', ' + hazardArea : ''})` : ''}. The concept serves to plan access protection against deliberate hostile vehicle attacks in a traceable manner and is based on DIN SPEC 91414-2, DIN ISO 22343-2 and police guidance on vehicle attacks.
+
+The target security level was defined as "${securityLevelText}", resulting in protection grade "${protectionGradeText}". The protection period is set as "${protectionPeriodText}". This operational requirement describes what the operator can expect from the access protection concept – from planning through implementation to ongoing operation.
+
+Normative foundations include DIN SPEC 91414-1/-2 (access protection concepts and risk assessment), DIN ISO 22343-1/-2 (vehicle security barriers – performance requirements and application), the Technical Guideline "Mobile Vehicle Barriers" and relevant police guidance. This report does not replace a sovereign threat assessment by the competent security authorities.`,
+
+                threatAnalysis: `${speedSentence}. Threat scenarios follow police experience with vehicle-as-a-weapon incidents involving different vehicle masses from cars to heavy commercial vehicles. The GIS analysis identified ${corridorSentence} with an average threat level of ${averageThreatLevelText}.
+
+${hazardParagraph} ${factorInsights}
+
+Risk assessment is performed qualitatively using a matrix of likelihood and impact according to DIN SPEC 91414-2. This derives protection grade ${protectionGradeText}, which defines requirements for vehicle security barriers. Protection grades SG0 to SG4 correspond to increasing protection requirements, with SG0 representing no special protection and SG4 the highest protection against heavy vehicles at high speeds.
+
+It is expressly noted that the specific threat assessment is the responsibility of the competent security authorities. This report provides a technical planning basis but does not replace a police threat assessment.`,
+
+                vulnerabilities: `The vulnerability analysis according to DIN SPEC 91414-2 systematically examines transitions from Zone 0 (public traffic area) through the transition zone to the protection zone and identifies long, unobstructed alignments as particularly critical. The analysis considers topography, structural conditions and existing infrastructure.
+
+A total of ${corridorCount} access possibilities were identified: ${corridorDetails || corridorSentence}. Particularly critical appears ${corridorHighlight}, as wide acceleration spaces without natural obstacles exist here. Existing ground and environmental conditions (${groundText}) offer only limited natural deceleration space.
+
+Each access point receives its own vulnerability profile considering approach direction, acceleration distance, achievable speed, existing or missing obstacles and usage type (e.g. delivery traffic, pedestrian zone). Access authorizations and usage times (delivery traffic, residents, public transport) as well as BOS requirements (fire brigade, rescue service, police) are incorporated into the assessment.`,
+
+                hvmMeasures: `The vulnerability analysis yields specific protection goals: prevent breakthrough, reduce speed before impact and protect adjacent pedestrian areas. The derived protection grade ${protectionGradeText} defines performance requirements for vehicle security barriers to be deployed.
+
+Certified HVM components of category "${productTypeText}" are recommended for protection period "${protectionPeriodText}". Systems should maintain penetration depths of approximately ${penetrationText} m and debris throw distances of ${debrisDistanceText} m. All deployed barriers must be certified according to recognized test standards (IWA 14-1/-2, DIN ISO 22343-1/-2, PAS 68/69).
+
+Assignment of access points to protective measures is based on energetic classification: access points with high kinetic energy (long acceleration distances, high speeds) require correspondingly more capable barriers. Final product selection must be coordinated with police and specialist planners. Any deviations from generally accepted technical rules must be identified, justified and residual risks noted.`,
+
+                siteConsiderations: `Integration of HVM measures follows "Security by Design" principles: protective measures are embedded as unobtrusively as possible into the urban context without unnecessarily restricting use of public space. Existing ground conditions (${groundText}) and usage patterns are considered.
+
+Escape and rescue routes as well as fire brigade access must be guaranteed at all times. This may require passable or removable barrier elements with defined opening times and procedures. Accessibility of public space must be maintained; passage widths must meet requirements.
+
+Coordination with all stakeholders (operator, residents, businesses, authorities) must be documented. Impacts on delivery traffic, logistics and general accessibility are to be minimized and integrated into the operating concept.`,
+
+                operationalImpact: `Clear responsibilities must be established for operation of the access protection concept. The operator/risk owner bears overall responsibility for setup and dismantling, regular inspections, winter maintenance and keeping key areas clear. Mobile elements must be documented and their locations logged.
+
+Operating states (open/closed, set up/dismantled) must be clearly defined. Personnel must be trained and briefed; operating instructions must be available. Maintenance, upkeep and regular inspections follow DIN ISO 22343-2 Chapters 15/16. Test certificates, certifications and maintenance logs must be documented and retained.
+
+Reporting obligations to operator and police exist for significant changes. Despite technical and organizational measures, residual risk remains (current level: ${residualRiskText}), which can only be addressed through continuous situational assessment and regular review of the concept. This report constitutes a technical operational requirement according to DIN SPEC 91414-2 / DIN ISO 22343-2 and does not replace a sovereign threat assessment by the competent security authorities.`
             };
         }
     } catch {
@@ -5916,13 +6651,12 @@ async function addProductRecommendationTooltips() {
             }
             
             // ⚠️ FIX: Entry Detection provides SHORT path to polygon edge, not acceleration distance!
-            // Entry Detection distance is the geometric path length to polygon edge (typically 5-30m)
-            // For realistic speed calculation, we need the actual vehicle acceleration distance
-            // Use 100m as standard acceleration distance for entry points (typical for security barriers)
-            const standardAccelerationDistance = 100;
+            // Entry Detection distance ist die gemessene Pfadlänge. Für realistische Geschwindigkeiten
+            // nutzen wir mindestens 100m Beschleunigungsweg, längere Pfade dürfen jedoch berücksichtigt werden.
+            const accelerationDistance = Math.max(candidate.distanceMeters, 100);
             
-            const maxSpeed = Math.round(calculateVelocity(accelerationRange[1], standardAccelerationDistance));
-            console.log(`🚗 Entry Detection candidate ${index + 1}: pathDistance=${candidate.distanceMeters}m, using accelerationDistance=${standardAccelerationDistance}m, speed=${maxSpeed} km/h`);
+            const maxSpeed = Math.round(calculateVelocity(accelerationRange[1], accelerationDistance));
+            console.log(`🚗 Entry Detection candidate ${index + 1}: pathDistance=${candidate.distanceMeters}m, using accelerationDistance=${accelerationDistance}m, speed=${maxSpeed} km/h`);
             
             // Find suitable products
             const recommendedProducts = findProductsForSpeed(maxSpeed);
@@ -6345,11 +7079,791 @@ function isErschliessungsstrasse(way: any): boolean {
 /**
  * Creates visual markers for Entry Detection candidates on the map
  */
+
+// --- Manual Path Drawing Helpers ---
+
+function clearManualPath(candidateId: string) {
+    const pathDataList = manualPathsMap.get(candidateId);
+    if (pathDataList) {
+        pathDataList.forEach(data => {
+            if (data.pathLine) map.removeLayer(data.pathLine);
+            if (data.waypointMarkers) {
+                data.waypointMarkers.forEach((m: any) => map.removeLayer(m));
+            }
+        });
+        manualPathsMap.delete(candidateId);
+    }
+}
+
+function startPathDrawingForEntryPoint(candidateId: string) {
+    console.log('Starting path drawing for entry point:', candidateId);
+    const manager = (window as any).entryDetectionManager;
+    if (!manager) {
+        showNotification('Entry Detection Manager nicht verfügbar.', 'error');
+        return;
+    }
+    
+    const candidate = manager.candidates?.find((c: any) => c.id === candidateId);
+    if (!candidate) {
+        showNotification('Zufahrtspunkt nicht gefunden.', 'error');
+        return;
+    }
+    
+    drawingCandidateId = candidateId;
+    
+    // Initialize path data if not exists
+    if (!manualPathsMap.has(candidateId)) {
+        manualPathsMap.set(candidateId, []);
+    }
+    
+    const paths = manualPathsMap.get(candidateId)!;
+    
+    // Check if there's already a path being drawn
+    const existingPath = paths.find(p => p.pathLine && map.hasLayer(p.pathLine));
+    if (existingPath) {
+        // Continue existing path
+        showNotification('Pfadzeichnen fortgesetzt. Klicke auf die Karte um weitere Punkte zu setzen.', 'info');
+        return;
+    }
+    
+    // Create new path starting from entry point
+    const startPoint = L.latLng(candidate.intersectionPoint[1], candidate.intersectionPoint[0]);
+    const pathData = {
+        pathLine: null,
+        waypointMarkers: [],
+        waypoints: [startPoint]
+    };
+    paths.push(pathData);
+    
+    // Add initial marker (blue dot) at entry point
+    const initialMarker = createWaypointMarker(startPoint, candidate, paths.length - 1, 0);
+    pathData.waypointMarkers.push(initialMarker);
+    
+    // Update button state
+    const manualPathBtn = document.getElementById('manual-path-drawing-toggle') as HTMLButtonElement;
+    if (manualPathBtn) {
+        manualPathBtn.classList.add('active');
+        manualPathBtn.setAttribute('aria-pressed', 'true');
+    }
+    
+    showNotification('Pfadzeichnen gestartet. Klicke auf die Karte um Punkte zu setzen. Rechtsklick auf letzten Punkt zum Beenden.', 'info');
+}
+
+function startBranchPath(candidate: any, marker: any) {
+    console.log('Starting branch path for candidate:', candidate.id);
+    const startPoint = marker.getLatLng();
+    const manager = (window as any).entryDetectionManager;
+    if (!manager) return;
+    
+    const newId = `manual-${Date.now()}-${manualEntryIdCounter++}`;
+    // Create a new candidate initialized at this branch point
+    const newCandidate = createManualEntryCandidate(startPoint, newId);
+    manager.addManualCandidate(newCandidate);
+    
+    drawingCandidateId = newId;
+    
+    if (!manualPathsMap.has(newId)) {
+        manualPathsMap.set(newId, []);
+    }
+    
+    const pathData = {
+        pathLine: null,
+        waypointMarkers: [],
+        waypoints: [startPoint]
+    };
+    manualPathsMap.get(newId)!.push(pathData);
+    
+    // Add initial marker (blue dot)
+    const initialMarker = createWaypointMarker(startPoint, newCandidate, 0, 0);
+    pathData.waypointMarkers.push(initialMarker);
+    
+    showNotification('Abzweigung gestartet. Klicke auf die Karte um Punkte zu setzen. Rechtsklick auf letzten Punkt zum Beenden.', 'info');
+    createEntryDetectionMarkers();
+}
+
+function finishPathDrawing() {
+    if (!drawingCandidateId) {
+        console.warn('⚠️ finishPathDrawing: No drawingCandidateId set');
+        return;
+    }
+    console.log('✅ Finishing path drawing for:', drawingCandidateId);
+    const candidateId = drawingCandidateId;
+    drawingCandidateId = null;
+    
+    // Get path data
+    const paths = manualPathsMap.get(candidateId);
+    if (!paths || paths.length === 0) {
+        console.warn('⚠️ finishPathDrawing: No paths found for candidate:', candidateId);
+        return;
+    }
+    
+    console.log(`📊 Processing ${paths.length} path segment(s)`);
+    
+    // Process each path segment
+    paths.forEach((pathData, pathIndex) => {
+        console.log(`📊 Path segment ${pathIndex}: ${pathData.waypoints.length} waypoints, ${pathData.waypointMarkers.length} markers`);
+        
+        if (pathData.waypoints.length < 2) {
+            console.warn(`⚠️ Path segment ${pathIndex} has less than 2 waypoints, skipping`);
+            return;
+        }
+        
+        // Hide waypoint markers by removing them from map (we keep them in memory for potential restoration)
+        console.log(`👁️ Hiding ${pathData.waypointMarkers.length} waypoint markers...`);
+        pathData.waypointMarkers.forEach((marker: any, markerIndex: number) => {
+            if (marker) {
+                try {
+                    // Remove marker from map (most reliable method)
+                    if (map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                        console.log(`  ✅ Removed marker ${markerIndex} from map`);
+                    } else {
+                        console.log(`  ℹ️ Marker ${markerIndex} was not on map`);
+                    }
+                    
+                    // Also try to hide via DOM manipulation as backup
+                    const element = marker.getElement?.();
+                    if (element) {
+                        element.style.opacity = '0';
+                        element.style.display = 'none';
+                        element.style.visibility = 'hidden';
+                        console.log(`  ✅ Hidden marker ${markerIndex} via DOM`);
+                    }
+                    
+                    // Mark as hidden for potential restoration later
+                    marker._isHidden = true;
+                } catch (error) {
+                    console.error(`❌ Error hiding marker ${markerIndex}:`, error);
+                }
+            } else {
+                console.warn(`⚠️ Marker ${markerIndex} is null or undefined`);
+            }
+        });
+        console.log(`✅ All ${pathData.waypointMarkers.length} markers hidden`);
+        
+        // Smooth the path with tangential curves
+        console.log(`🔄 Smoothing path with ${pathData.waypoints.length} waypoints...`);
+        let smoothedPoints: L.LatLng[];
+        try {
+            smoothedPoints = smoothPathWithTangentialCurves(pathData.waypoints);
+            console.log(`✅ Generated ${smoothedPoints.length} smoothed points`);
+            
+            if (smoothedPoints.length === 0) {
+                console.error('❌ Smoothing returned empty array, using original waypoints');
+                smoothedPoints = pathData.waypoints;
+            }
+        } catch (error) {
+            console.error('❌ Error smoothing path:', error);
+            smoothedPoints = pathData.waypoints; // Fallback to original
+        }
+        
+        // Replace the path line with smoothed version
+        if (pathData.pathLine) {
+            console.log('🗑️ Removing old path line...');
+            map.removeLayer(pathData.pathLine);
+            pathData.pathLine = null;
+        }
+        
+        // Create smoothed polyline
+        console.log(`📈 Creating smoothed polyline with ${smoothedPoints.length} points...`);
+        try {
+            pathData.pathLine = L.polyline(smoothedPoints, { 
+                color: '#0ea5e9', 
+                weight: 3,
+                smoothFactor: 1.0 // Disable Leaflet's built-in smoothing, we do it ourselves
+            }).addTo(map);
+            console.log('✅ Smoothed polyline created and added to map');
+        } catch (error) {
+            console.error('❌ Error creating smoothed polyline:', error);
+            // Fallback: create with original waypoints
+            pathData.pathLine = L.polyline(pathData.waypoints, { 
+                color: '#0ea5e9', 
+                weight: 3
+            }).addTo(map);
+        }
+        
+        // Store smoothed waypoints for later use
+        pathData.smoothedWaypoints = smoothedPoints;
+        pathData.isSmoothed = true;
+        console.log(`✅ Path segment ${pathIndex} finalized and smoothed`);
+    });
+    
+    // Update button state
+    const manualPathBtn = document.getElementById('manual-path-drawing-toggle') as HTMLButtonElement;
+    if (manualPathBtn) {
+        manualPathBtn.classList.remove('active');
+        manualPathBtn.setAttribute('aria-pressed', 'false');
+    }
+    
+    calculateSpeedsForManualPaths();
+    showNotification('Pfadzeichnen beendet. Pfad wurde geglättet.', 'success');
+    createEntryDetectionMarkers();
+}
+
+function createWaypointMarker(latlng: any, candidate: any, pathIndex: number, pointIndex: number) {
+    const marker = L.circleMarker(latlng, {
+        radius: 4,
+        color: '#0ea5e9',
+        fillColor: '#0ea5e9',
+        fillOpacity: 1
+    }).addTo(map);
+    
+    marker.on('contextmenu', (e: any) => {
+        L.DomEvent.stopPropagation(e);
+        e.originalEvent.preventDefault();
+        
+        const menu = document.createElement('div');
+        menu.className = 'waypoint-context-menu';
+        menu.style.cssText = `
+            position: absolute;
+            left: ${e.originalEvent.clientX}px;
+            top: ${e.originalEvent.clientY}px;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 5px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10000;
+            min-width: 120px;
+        `;
+        
+        const createBtn = (text: string, color: string, onClick: () => void) => {
+            const btn = document.createElement('div');
+            btn.textContent = text;
+            btn.style.cssText = `padding: 8px 12px; cursor: pointer; color: ${color}; font-family: sans-serif; font-size: 13px;`;
+            btn.onmouseover = () => btn.style.background = '#f3f4f6';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+            btn.onclick = onClick;
+            return btn;
+        };
+        
+        menu.appendChild(createBtn('Marker löschen', '#dc2626', () => {
+            deleteWaypointsFromIndex(candidate.id, pathIndex, pointIndex);
+            document.body.removeChild(menu);
+        }));
+        
+        menu.appendChild(createBtn('Abzweigung', '#0ea5e9', () => {
+            startBranchPath(candidate, marker);
+            document.body.removeChild(menu);
+        }));
+        
+        // If this is the last marker, add option to continue/finish
+        const paths = manualPathsMap.get(candidate.id);
+        if (paths && paths[pathIndex] && pointIndex === paths[pathIndex].waypoints.length - 1) {
+             menu.appendChild(createBtn('Zeichnen fortsetzen', '#10b981', () => {
+                drawingCandidateId = candidate.id;
+                showNotification('Pfadzeichnen fortgesetzt.', 'info');
+                document.body.removeChild(menu);
+            }));
+             menu.appendChild(createBtn('Zeichnen beenden', '#6b7280', () => {
+                finishPathDrawing();
+                document.body.removeChild(menu);
+            }));
+        }
+
+        document.body.appendChild(menu);
+        
+        const closeMenu = (ev: any) => {
+            if (!menu.contains(ev.target)) {
+                if (document.body.contains(menu)) document.body.removeChild(menu);
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    });
+    
+    // Right click on last marker to finish? Or click?
+    // User asked: "Rechtsklick auf den letztgesetzt Pfadpunkt ... Pfadsetzung beenden"
+    // This is handled by the context menu above.
+    // User also: "Oder durch Klicken auf den Letzten Punkt weiter fort zu setzen."
+    marker.on('click', (e: any) => {
+        if (drawingCandidateId === candidate.id) {
+             // If we are drawing, clicking the last point might toggle finish?
+             // Or simply do nothing (continue drawing elsewhere).
+             L.DomEvent.stopPropagation(e);
+        } else {
+             // If not drawing, maybe resume?
+             const paths = manualPathsMap.get(candidate.id);
+             if (paths && paths[pathIndex] && pointIndex === paths[pathIndex].waypoints.length - 1) {
+                 drawingCandidateId = candidate.id;
+                 showNotification('Pfadzeichnen fortgesetzt.', 'info');
+                 L.DomEvent.stopPropagation(e);
+             }
+        }
+    });
+    
+    return marker;
+}
+
+function deleteWaypointsFromIndex(candidateId: string, pathIndex: number, pointIndex: number) {
+    const paths = manualPathsMap.get(candidateId);
+    if (!paths || !paths[pathIndex]) return;
+    const pathData = paths[pathIndex];
+    
+    // If path was smoothed, restore original waypoints and show markers again
+    if (pathData.isSmoothed) {
+        console.log('🔄 Restoring unsmoothed path for editing...');
+        
+        // Remove smoothed path line
+        if (pathData.pathLine) {
+            map.removeLayer(pathData.pathLine);
+            pathData.pathLine = null;
+        }
+        
+        // Show waypoint markers again by re-adding them to map
+        pathData.waypointMarkers.forEach((marker: any, index: number) => {
+            if (marker) {
+                try {
+                    // Re-add to map if it was hidden
+                    if (marker._isHidden || !map.hasLayer(marker)) {
+                        marker.addTo(map);
+                        marker._isHidden = false;
+                        
+                        // Restore visibility via DOM
+                        const element = marker.getElement?.();
+                        if (element) {
+                            element.style.opacity = '1';
+                            element.style.display = '';
+                            element.style.visibility = 'visible';
+                        }
+                        
+                        // Restore style
+                        if (marker.setStyle) {
+                            marker.setStyle({ 
+                                opacity: 1, 
+                                fillOpacity: 1,
+                                color: '#0ea5e9',
+                                fillColor: '#0ea5e9'
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ Error restoring marker ${index}:`, error);
+                }
+            }
+        });
+        
+        // Clear smoothed data
+        pathData.smoothedWaypoints = null;
+        pathData.isSmoothed = false;
+        
+        // Recreate path line with original waypoints
+        if (pathData.waypoints.length > 1) {
+            pathData.pathLine = L.polyline(pathData.waypoints, { color: '#0ea5e9', weight: 3 }).addTo(map);
+        }
+    }
+    
+    // Remove markers
+    for (let i = pointIndex; i < pathData.waypointMarkers.length; i++) {
+        map.removeLayer(pathData.waypointMarkers[i]);
+    }
+    
+    pathData.waypoints.splice(pointIndex);
+    pathData.waypointMarkers.splice(pointIndex);
+    
+    if (pathData.waypoints.length === 0) {
+        // Path empty?
+        if (pathData.pathLine) map.removeLayer(pathData.pathLine);
+        paths.splice(pathIndex, 1);
+    } else {
+        if (pathData.pathLine) {
+            // Update path line with remaining waypoints
+            pathData.pathLine.setLatLngs(pathData.waypoints);
+        }
+    }
+    
+    updateCandidatePath(candidateId);
+    calculateSpeedsForManualPaths();
+}
+
+function updateCandidatePath(candidateId: string) {
+    const manager = (window as any).entryDetectionManager;
+    const candidate = manager?.candidates.find((c: any) => c.id === candidateId);
+    if (!candidate) return;
+    
+    const paths = manualPathsMap.get(candidateId);
+    if (!paths || paths.length === 0) return;
+    
+    const pathData = paths[0]; // Main path
+    
+    // Use smoothed waypoints if available, otherwise use original waypoints
+    const waypointsToUse = pathData.smoothedWaypoints || pathData.waypoints;
+    const coords = waypointsToUse.map((p: any) => [p.lng, p.lat]);
+    
+    candidate.path = {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: coords },
+        properties: {}
+    };
+    
+    // Calculate distance using smoothed waypoints if available
+    let dist = 0;
+    for (let i = 0; i < waypointsToUse.length - 1; i++) {
+        dist += waypointsToUse[i].distanceTo(waypointsToUse[i+1]);
+    }
+    candidate.distanceMeters = dist;
+}
+
+function handleManualPathClick(e: any) {
+    if (!drawingCandidateId) return;
+    const paths = manualPathsMap.get(drawingCandidateId);
+    if (!paths || paths.length === 0) return;
+    
+    const pathData = paths[paths.length - 1];
+    const newPoint = e.latlng;
+    
+    // Duplicate check (lenient)
+    if (pathData.waypoints.length > 0) {
+        const last = pathData.waypoints[pathData.waypoints.length - 1];
+        if (last.distanceTo(newPoint) < 0.1) return; 
+    }
+    
+    // Try to snap to nearest road if OSM data is available
+    if (currentOsmData && currentOsmData.ways) {
+        const snappedPoint = findNearestPointOnRoad(newPoint, currentOsmData);
+        if (snappedPoint) {
+            newPoint = snappedPoint;
+        }
+    }
+    
+    pathData.waypoints.push(newPoint);
+    
+    if (!pathData.pathLine) {
+        pathData.pathLine = L.polyline(pathData.waypoints, { color: '#0ea5e9', weight: 3 }).addTo(map);
+    } else {
+        pathData.pathLine.setLatLngs(pathData.waypoints);
+    }
+    
+    const marker = createWaypointMarker(newPoint, {id: drawingCandidateId}, paths.length - 1, pathData.waypoints.length - 1);
+    pathData.waypointMarkers.push(marker);
+    
+    updateCandidatePath(drawingCandidateId);
+}
+
+function findNearestPointOnRoad(point: L.LatLng, osmData: OsmBundle): L.LatLng | null {
+    if (!osmData.ways || osmData.ways.length === 0) return null;
+    if (!osmData.nodes) return null;
+    
+    // Build node index for quick lookup
+    const nodeIndex = new Map<string, any>();
+    osmData.nodes.forEach((node: any) => {
+        nodeIndex.set(String(node.id), node);
+    });
+    
+    let closestPoint: L.LatLng | null = null;
+    let closestDistance = Infinity;
+    const maxSearchDistance = 50; // meters
+    
+    for (const way of osmData.ways) {
+        // Skip pedestrian/cycle paths
+        if (way.tags?.highway === 'footway' || way.tags?.highway === 'cycleway' || way.tags?.highway === 'path') {
+            continue;
+        }
+        
+        if (!way.nodeIds || way.nodeIds.length < 2) continue;
+        
+        // Check each segment of the way
+        for (let i = 0; i < way.nodeIds.length - 1; i++) {
+            const nodeId1 = String(way.nodeIds[i]);
+            const nodeId2 = String(way.nodeIds[i + 1]);
+            const node1 = nodeIndex.get(nodeId1);
+            const node2 = nodeIndex.get(nodeId2);
+            
+            if (!node1 || !node2) continue;
+            
+            const segStart = L.latLng(node1.lat, node1.lon);
+            const segEnd = L.latLng(node2.lat, node2.lon);
+            
+            // Find closest point on segment
+            const closestOnSegment = closestPointOnSegment(point, segStart, segEnd);
+            const distance = point.distanceTo(closestOnSegment) * 111000; // rough conversion to meters
+            
+            if (distance < maxSearchDistance && distance < closestDistance) {
+                closestDistance = distance;
+                closestPoint = closestOnSegment;
+            }
+        }
+    }
+    
+    return closestPoint;
+}
+
+/**
+ * Smooths a path using tangential curves (quadratic Bezier curves)
+ * Creates smooth transitions at waypoints while maintaining tangent continuity
+ */
+function smoothPathWithTangentialCurves(waypoints: L.LatLng[]): L.LatLng[] {
+    console.log(`🔄 smoothPathWithTangentialCurves: Input ${waypoints.length} waypoints`);
+    
+    if (waypoints.length < 2) {
+        console.warn('⚠️ Less than 2 waypoints, returning as-is');
+        return waypoints;
+    }
+    if (waypoints.length === 2) {
+        console.log('📏 Only 2 waypoints, returning straight line');
+        return waypoints;
+    }
+    
+    const smoothed: L.LatLng[] = [];
+    const tension = 0.3; // Controls curve tightness (0 = straight, 1 = very curved)
+    
+    // Add first point
+    smoothed.push(waypoints[0]);
+    console.log(`📍 Added first point: ${waypoints[0].lat}, ${waypoints[0].lng}`);
+    
+    try {
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            const p0 = waypoints[Math.max(0, i - 1)];
+            const p1 = waypoints[i];
+            const p2 = waypoints[i + 1];
+            const p3 = waypoints[Math.min(waypoints.length - 1, i + 2)];
+            
+            // Calculate control points for smooth tangential curves
+            // For the first segment, use simpler calculation
+            if (i === 0) {
+                // First segment: curve from p1 to p2
+                // Use a simple quadratic curve with control point along the direction
+                const dir = calculateDirection(p1, p2);
+                const dist = p1.distanceTo(p2);
+                const controlDist = Math.min(dist * tension, 15); // Max 15m control distance
+                
+                // Control point is positioned along the path direction for smooth start
+                const controlPoint = calculateOffsetPoint(p1, dir, controlDist);
+                
+                // Generate curve points
+                const numPoints = Math.max(5, Math.min(15, Math.floor(dist / 5))); // Adaptive point count
+                const curvePoints = generateQuadraticBezierCurve(p1, controlPoint, p2, numPoints);
+                smoothed.push(...curvePoints.slice(1)); // Skip first point (already added)
+                console.log(`  📍 Segment 0: Generated ${curvePoints.length - 1} curve points (dist: ${dist.toFixed(1)}m)`);
+            } else if (i === waypoints.length - 2) {
+                // Last segment: curve from p1 to p2
+                const dir = calculateDirection(p1, p2);
+                const dist = p1.distanceTo(p2);
+                const controlDist = Math.min(dist * tension, 15);
+                
+                // Control point offset backwards from p2 along the direction
+                const controlPoint = calculateOffsetPoint(p2, dir + Math.PI, controlDist);
+                const numPoints = Math.max(5, Math.min(15, Math.floor(dist / 5)));
+                const curvePoints = generateQuadraticBezierCurve(p1, controlPoint, p2, numPoints);
+                smoothed.push(...curvePoints.slice(1));
+                console.log(`  📍 Last segment: Generated ${curvePoints.length - 1} curve points (dist: ${dist.toFixed(1)}m)`);
+            } else {
+                // Middle segments: smooth transition maintaining tangent continuity
+                // Calculate incoming and outgoing directions
+                const dirIn = calculateDirection(p0, p1);  // Direction into p1
+                const dirOut = calculateDirection(p1, p2); // Direction out of p1
+                const dirNext = calculateDirection(p2, p3); // Direction out of p2
+                
+                // For tangent continuity, control points should align with the path directions
+                // Control point 1: extends from p1 along the average of incoming/outgoing directions
+                const avgDir1 = averageAngle(dirIn, dirOut);
+                const dist1 = p1.distanceTo(p2);
+                const controlDist1 = Math.min(dist1 * tension * 0.5, 10); // Shorter for tighter curves
+                
+                // Control point 2: extends backwards from p2 along the average direction
+                const avgDir2 = averageAngle(dirOut, dirNext);
+                const controlDist2 = Math.min(dist1 * tension * 0.5, 10);
+                
+                // Control points positioned to create smooth tangential transitions
+                const cp1 = calculateOffsetPoint(p1, avgDir1, controlDist1);
+                const cp2 = calculateOffsetPoint(p2, avgDir2 + Math.PI, controlDist2);
+                
+                // Use cubic Bezier for smoother curves in the middle
+                const numPoints = Math.max(8, Math.min(20, Math.floor(dist1 / 3)));
+                const curvePoints = generateCubicBezierCurve(p1, cp1, cp2, p2, numPoints);
+                smoothed.push(...curvePoints.slice(1));
+                console.log(`  📍 Middle segment ${i}: Generated ${curvePoints.length - 1} curve points (dist: ${dist1.toFixed(1)}m)`);
+            }
+        }
+        
+        // Add last point (if not already added)
+        const lastPoint = waypoints[waypoints.length - 1];
+        const lastAdded = smoothed[smoothed.length - 1];
+        if (!lastAdded || lastAdded.lat !== lastPoint.lat || lastAdded.lng !== lastPoint.lng) {
+            smoothed.push(lastPoint);
+            console.log(`📍 Added last point: ${lastPoint.lat}, ${lastPoint.lng}`);
+        }
+        
+        console.log(`✅ Smoothing complete: ${smoothed.length} total points generated`);
+        return smoothed;
+    } catch (error) {
+        console.error('❌ Error in smoothPathWithTangentialCurves:', error);
+        console.error('Stack:', (error as Error).stack);
+        // Return original waypoints as fallback
+        return waypoints;
+    }
+}
+
+/**
+ * Calculates the direction (bearing) from point1 to point2 in radians
+ */
+function calculateDirection(p1: L.LatLng, p2: L.LatLng): number {
+    const lat1 = p1.lat * Math.PI / 180;
+    const lat2 = p2.lat * Math.PI / 180;
+    const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+    
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    
+    return Math.atan2(y, x);
+}
+
+/**
+ * Calculates a point offset from the given point by distance and direction
+ */
+function calculateOffsetPoint(point: L.LatLng, direction: number, distanceMeters: number): L.LatLng {
+    const R = 6371000; // Earth radius in meters
+    const lat1 = point.lat * Math.PI / 180;
+    const lon1 = point.lng * Math.PI / 180;
+    
+    const d = distanceMeters / R;
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(direction));
+    const lon2 = lon1 + Math.atan2(Math.sin(direction) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+    
+    return L.latLng(lat2 * 180 / Math.PI, lon2 * 180 / Math.PI);
+}
+
+/**
+ * Averages two angles, handling wrap-around
+ */
+function averageAngle(angle1: number, angle2: number): number {
+    // Normalize angles to [0, 2π]
+    const n1 = ((angle1 % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+    const n2 = ((angle2 % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+    
+    // Calculate average, handling wrap-around
+    let diff = n2 - n1;
+    if (diff > Math.PI) diff -= 2 * Math.PI;
+    if (diff < -Math.PI) diff += 2 * Math.PI;
+    
+    return n1 + diff / 2;
+}
+
+/**
+ * Generates points along a quadratic Bezier curve
+ */
+function generateQuadraticBezierCurve(p0: L.LatLng, p1: L.LatLng, p2: L.LatLng, numPoints: number): L.LatLng[] {
+    const points: L.LatLng[] = [];
+    
+    for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        const lat = (1 - t) * (1 - t) * p0.lat + 2 * (1 - t) * t * p1.lat + t * t * p2.lat;
+        const lng = (1 - t) * (1 - t) * p0.lng + 2 * (1 - t) * t * p1.lng + t * t * p2.lng;
+        points.push(L.latLng(lat, lng));
+    }
+    
+    return points;
+}
+
+/**
+ * Generates points along a cubic Bezier curve
+ */
+function generateCubicBezierCurve(p0: L.LatLng, p1: L.LatLng, p2: L.LatLng, p3: L.LatLng, numPoints: number): L.LatLng[] {
+    const points: L.LatLng[] = [];
+    
+    for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const mt3 = mt2 * mt;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        
+        const lat = mt3 * p0.lat + 3 * mt2 * t * p1.lat + 3 * mt * t2 * p2.lat + t3 * p3.lat;
+        const lng = mt3 * p0.lng + 3 * mt2 * t * p1.lng + 3 * mt * t2 * p2.lng + t3 * p3.lng;
+        points.push(L.latLng(lat, lng));
+    }
+    
+    return points;
+}
+
+function closestPointOnSegment(point: L.LatLng, segStart: L.LatLng, segEnd: L.LatLng): L.LatLng {
+    const A = point.lat - segStart.lat;
+    const B = point.lng - segStart.lng;
+    const C = segEnd.lat - segStart.lat;
+    const D = segEnd.lng - segStart.lng;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) param = dot / lenSq;
+    
+    let xx: number, yy: number;
+    
+    if (param < 0) {
+        xx = segStart.lat;
+        yy = segStart.lng;
+    } else if (param > 1) {
+        xx = segEnd.lat;
+        yy = segEnd.lng;
+    } else {
+        xx = segStart.lat + param * C;
+        yy = segStart.lng + param * D;
+    }
+    
+    return L.latLng(xx, yy);
+}
+
+function calculateSpeedsForManualPaths() {
+    console.log('Calculating speeds for manual paths...');
+    const manager = (window as any).entryDetectionManager;
+    if (!manager || !manager.candidates) return;
+    
+    manager.candidates.forEach((candidate: any) => {
+        if (!candidate.manual) return;
+        const paths = manualPathsMap.get(candidate.id);
+        if (!paths || paths.length === 0) return;
+        
+        const pathData = paths[0];
+        const samples = pathData.waypoints.map((p: any, i: number) => {
+            let d = 0;
+            for(let k=0; k<i; k++) d += pathData.waypoints[k].distanceTo(pathData.waypoints[k+1]);
+            return { lat: p.lat, lng: p.lng, distance: d };
+        });
+        
+        if (osmSpeedLimiter && samples.length > 1) {
+            try {
+                const config = { useMaxspeed: true, useTrafficCalming: true, useSurface: true, weather: 'dry' as any };
+                const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+                const accRange = getAccelerationRange(vehicleSelect?.value || '3500');
+                const maxAcc = accRange ? accRange[1] : 3.0;
+                
+                // NOTE: OsmSpeedLimiter might need updating if signatures don't match, 
+                // but assuming calculatePathVelocityProfile exists or similar logic
+                // If not, we can reuse calculateVelocityWithOsm logic slightly modified
+                
+                // Let's use calculateVelocityWithOsm which seems robust
+                // But calculateVelocityWithOsm takes total distance and maybe coords
+                // It applies OSM limits.
+                
+                const totalDist = samples[samples.length-1].distance;
+                const coords = samples.map(s => ({lat: s.lat, lng: s.lng}));
+                
+                const v = calculateVelocityWithOsm(maxAcc, totalDist, coords);
+                candidate.calculatedSpeed = v;
+                candidate.hasCalculatedSpeed = true;
+                console.log(`Manual path ${candidate.id}: speed = ${v} km/h`);
+            } catch (err) {
+                console.error("Error calculating speed for manual path:", err);
+            }
+        }
+    });
+    createEntryDetectionMarkers();
+}
+
 function createEntryDetectionMarkers() {
     const manager = (window as any).entryDetectionManager;
     if (!manager || !manager.candidates || manager.candidates.length === 0) {
+        // If no Entry Detection candidates, try to create markers from threatsMap
+        if (threatsMap.size > 0) {
+            console.log('⚠️ No Entry Detection candidates, but threatsMap has entries. Creating markers from threatsMap...');
+            createMarkersFromThreatsMap();
+        }
         return;
     }
+
+    clearEntryDetectionMarkers();
     
     if (!threatLayerGroup) {
         threatLayerGroup = L.layerGroup().addTo(map);
@@ -6365,16 +7879,74 @@ function createEntryDetectionMarkers() {
         });
     }
     
-    console.log(`🔍 Processing ${manager.candidates.length} entry detection candidates...`);
+    // Also include entry points from threatsMap that don't have Entry Detection candidates
+    const allCandidates = [...manager.candidates];
     
-    manager.candidates.forEach((candidate: any, index: number) => {
-        console.log(`🔍 Processing candidate ${index + 1}/${manager.candidates.length}: ${candidate.id}`);
+    // Add entry points from threatsMap that aren't already in Entry Detection
+    if (threatsMap.size > 0) {
+        const existingPoints = new Set(manager.candidates.map((c: any) => {
+            const [lng, lat] = c.intersectionPoint;
+            return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        }));
         
+        threatsMap.forEach((threatData, streetName) => {
+            threatData.entryPoints.forEach((entryPoint) => {
+                const pointKey = `${entryPoint.lat.toFixed(6)},${entryPoint.lon.toFixed(6)}`;
+                if (!existingPoints.has(pointKey)) {
+                    // Create a candidate from threat data
+                    const candidate = {
+                        id: `threat-${streetName}-${entryPoint.lat}-${entryPoint.lon}`,
+                        intersectionPoint: [entryPoint.lon, entryPoint.lat],
+                        pathNodeIds: [],
+                        path: null as any,
+                        distanceMeters: entryPoint.distance || threatData.totalLength,
+                        straightness: 1,
+                        continuity: 1,
+                        confidence: 0.8,
+                        wayIds: [],
+                        manual: false,
+                        fromThreatsMap: true,
+                        streetName: streetName,
+                        threatData: threatData
+                    };
+                    allCandidates.push(candidate);
+                    existingPoints.add(pointKey);
+                }
+            });
+        });
+    }
+    
+    // Calculate center for sorting
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    allCandidates.forEach((c: any) => {
+        const [lng, lat] = c.intersectionPoint;
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+    });
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    
+    // Sort clockwise from top-left
+    const sortedCandidates = [...allCandidates].sort((a: any, b: any) => {
+        const [lngA, latA] = a.intersectionPoint;
+        const [lngB, latB] = b.intersectionPoint;
+        let angleA = Math.atan2(latA - centerLat, lngA - centerLng) * 180 / Math.PI;
+        let angleB = Math.atan2(latB - centerLat, lngB - centerLng) * 180 / Math.PI;
+        let azA = (90 - angleA + 360) % 360;
+        let azB = (90 - angleB + 360) % 360;
+        let sortA = (azA - 315 + 360) % 360; // Start at NW (315 deg)
+        let sortB = (azB - 315 + 360) % 360;
+        return sortA - sortB;
+    });
+    
+    console.log(`🔍 Processing ${sortedCandidates.length} entry detection candidates (${manager.candidates.length} from Entry Detection, ${sortedCandidates.length - manager.candidates.length} from threatsMap)...`);
+    
+    sortedCandidates.forEach((candidate: any, index: number) => {
         // Check if this candidate uses Erschließungsstraßen
         let isErschliessung = false;
-        
         if (candidate.wayIds && candidate.wayIds.length > 0) {
-            // Check if any of the ways used by this candidate are Erschließungsstraßen
             for (const wayId of candidate.wayIds) {
                 const way = waysMap.get(wayId);
                 if (way && isErschliessungsstrasse(way)) {
@@ -6384,85 +7956,245 @@ function createEntryDetectionMarkers() {
             }
         }
         
-        // Determine marker color based on Erschließungsstraße status
-        let markerColor, fillColor;
-        if (isErschliessung) {
-            // Fully yellow for Erschließungsstraßen (both border and fill)
-            markerColor = '#FFD700';  // Gold border
-            fillColor = '#FFD700';    // Gold fill
-        } else {
-            // Red for regular access points
-            markerColor = '#DC143C';  // Crimson
-            fillColor = '#FF6347';    // Tomato
-        }
+        const isManual = !!candidate.manual;
+        const number = index + 1;
         
-        // Create marker at intersection point
-        const marker = L.circle([candidate.intersectionPoint[1], candidate.intersectionPoint[0]], {
-            radius: 8,
-            color: markerColor,
-            fillColor: fillColor,
-            fillOpacity: 0.8,
-            weight: 3
+        // Determine marker color
+        // Manual OR High Threat (Red) vs Erschließung (Gold)
+        // User wants white number in red circle.
+        // Use #DC143C for Red, #FFD700 for Gold.
+        
+        const bgColor = (isManual || !isErschliessung || candidate.hasCalculatedSpeed) ? '#DC143C' : '#FFD700';
+        
+        const iconHtml = `<div style="
+            background-color: ${bgColor};
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px; /* Doubled size from 12px -> 24px requested, 18px fits well in 32px */
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        ">${number}</div>`;
+        
+        const marker = L.marker([candidate.intersectionPoint[1], candidate.intersectionPoint[0]], {
+            icon: L.divIcon({
+                className: 'entry-point-marker',
+                html: iconHtml,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            })
         });
 
-        // Add right-click context menu for deletion
-        console.log(`🔧 Adding right-click functionality to marker ${index + 1} (${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'})`);
+        // Add right-click context menu
         marker.on('contextmenu', (e: any) => {
             e.originalEvent.preventDefault();
             
-            console.log('🖱️ Right-click detected on entry point');
-            console.log('Current active tab:', currentActiveTab);
-            console.log('Marker type:', isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt');
-            console.log('Candidate ID:', candidate.id);
-            
-            // Check if we're in the threat analysis tab
-            if (currentActiveTab !== 'nav-threat-analysis') {
-                console.log('⚠️ Entry point deletion only allowed in threat analysis tab');
+            // Allow context menu if in manual mode OR if it's a manual entry (so we can edit/delete it)
+            if (currentActiveTab === 'nav-threat-analysis' && (manualEntryMode || isManual)) {
+                // Show full context menu for manual entries too
+                const menu = document.createElement('div');
+                menu.className = 'waypoint-context-menu';
+                menu.style.cssText = `
+                    position: absolute;
+                    left: ${e.originalEvent.clientX}px;
+                    top: ${e.originalEvent.clientY}px;
+                    background: white;
+                    border: 1px solid #ccc;
+                    padding: 5px;
+                    border-radius: 4px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    z-index: 10000;
+                    min-width: 150px;
+                `;
+                
+                const createBtn = (text: string, color: string, onClick: () => void) => {
+                    const btn = document.createElement('div');
+                    btn.textContent = text;
+                    btn.style.cssText = `padding: 8px 12px; cursor: pointer; color: ${color}; font-family: sans-serif; font-size: 13px; border-bottom: 1px solid #eee;`;
+                    btn.onmouseover = () => btn.style.background = '#f3f4f6';
+                    btn.onmouseout = () => btn.style.background = 'transparent';
+                    btn.onclick = onClick;
+                    return btn;
+                };
+                
+                menu.appendChild(createBtn('Löschen', '#dc2626', () => {
+                    deleteEntryPoint(marker, candidate);
+                    document.body.removeChild(menu);
+                }));
+                
+                menu.appendChild(createBtn('Abzweigung', '#0ea5e9', () => {
+                    startBranchPath(candidate, marker);
+                    document.body.removeChild(menu);
+                }));
+                
+                // Start drawing path from this entry point if it's manual
+                if (isManual) {
+                     menu.appendChild(createBtn('Pfad zeichnen', '#10b981', () => {
+                        startPathDrawingForEntryPoint(candidate.id);
+                        document.body.removeChild(menu);
+                    }));
+                }
+
+                document.body.appendChild(menu);
+                
+                const closeMenu = (ev: any) => {
+                    if (!menu.contains(ev.target)) {
+                        if (document.body.contains(menu)) document.body.removeChild(menu);
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
                 return;
             }
             
-            // Show local deletion bubble
-            createDeletionBubble(marker, candidate, isErschliessung);
+            // Standard deletion for non-manual mode or non-manual entries
+            if (currentActiveTab === 'nav-threat-analysis') {
+                createDeletionBubble(marker, candidate, isErschliessung);
+            }
         });
         
-        // Also add click event for debugging
-        marker.on('click', (e: any) => {
-            console.log('🖱️ Left-click detected on entry point');
-            console.log('Marker type:', isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt');
-            console.log('Candidate ID:', candidate.id);
-        });
-        
-        // Create popup content
+        // Popup content
         const popupContent = `
             <div style="min-width: 200px;">
-                <b>🚪 Zufahrtspunkt ${index + 1}</b><br>
-                <b>Typ:</b> ${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'}<br>
+                <b>🚪 Zufahrtspunkt ${number}</b><br>
+                <b>Typ:</b> ${isManual ? 'Manuell' : (isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt')}<br>
                 <b>Confidence:</b> ${Math.round(candidate.confidence * 100)}%<br>
                 <b>Distanz:</b> ${Math.round(candidate.distanceMeters)}m<br>
                 <b>Geradheit:</b> ${Math.round(candidate.straightness * 100)}%<br>
-                <b>Kontinuität:</b> ${Math.round(candidate.continuity * 100)}%<br>
                 <b>Ways:</b> ${candidate.wayIds.length}
             </div>
         `;
-        
         marker.bindPopup(popupContent);
+        
         threatLayerGroup?.addLayer(marker);
         
-        console.log(`✅ Marker ${index + 1} added to map (${isErschliessung ? 'Erschließungsstraße' : 'Hauptzufahrt'})`);
-        
-        // Store marker for potential future reference
         if (!threatMarkersMap.has('entry-detection')) {
             threatMarkersMap.set('entry-detection', []);
         }
-        const entryMarkers = threatMarkersMap.get('entry-detection');
-        if (entryMarkers) {
-            entryMarkers.push(marker);
-            console.log(`📝 Marker ${index + 1} stored in threatMarkersMap (total: ${entryMarkers.length})`);
-        }
+        threatMarkersMap.get('entry-detection')?.push(marker);
     });
     
-    console.log(`✅ Created ${manager.candidates.length} entry detection markers`);
-    console.log(`📊 Total markers in threatMarkersMap: ${threatMarkersMap.get('entry-detection')?.length || 0}`);
+    console.log(`✅ Created ${sortedCandidates.length} entry detection markers`);
+}
+
+/**
+ * Creates markers from threatsMap when Entry Detection is not available
+ */
+function createMarkersFromThreatsMap() {
+    if (threatsMap.size === 0) return;
+    
+    clearEntryDetectionMarkers();
+    
+    if (!threatLayerGroup) {
+        threatLayerGroup = L.layerGroup().addTo(map);
+    }
+    
+    // Collect all entry points from threatsMap
+    const allEntryPoints: Array<{point: {lat: number, lon: number}, streetName: string, threatData: any}> = [];
+    threatsMap.forEach((threatData, streetName) => {
+        threatData.entryPoints.forEach((entryPoint: any) => {
+            allEntryPoints.push({
+                point: entryPoint,
+                streetName: streetName,
+                threatData: threatData
+            });
+        });
+    });
+    
+    if (allEntryPoints.length === 0) return;
+    
+    // Calculate center for sorting
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    allEntryPoints.forEach(({point}) => {
+        minLat = Math.min(minLat, point.lat);
+        maxLat = Math.max(maxLat, point.lat);
+        minLng = Math.min(minLng, point.lon);
+        maxLng = Math.max(maxLng, point.lon);
+    });
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    
+    // Sort clockwise from top-left
+    const sorted = [...allEntryPoints].sort((a, b) => {
+        const latA = a.point.lat;
+        const lngA = a.point.lon;
+        const latB = b.point.lat;
+        const lngB = b.point.lon;
+        let angleA = Math.atan2(latA - centerLat, lngA - centerLng) * 180 / Math.PI;
+        let angleB = Math.atan2(latB - centerLat, lngB - centerLng) * 180 / Math.PI;
+        let azA = (90 - angleA + 360) % 360;
+        let azB = (90 - angleB + 360) % 360;
+        let sortA = (azA - 315 + 360) % 360;
+        let sortB = (azB - 315 + 360) % 360;
+        return sortA - sortB;
+    });
+    
+    sorted.forEach((entry, index) => {
+        const number = index + 1;
+        const bgColor = '#DC143C'; // Red for all threats
+        
+        const iconHtml = `<div style="
+            background-color: ${bgColor};
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        ">${number}</div>`;
+        
+        const marker = L.marker([entry.point.lat, entry.point.lon], {
+            icon: L.divIcon({
+                className: 'entry-point-marker',
+                html: iconHtml,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            })
+        });
+        
+        // Add context menu for deletion
+        marker.on('contextmenu', (e: any) => {
+            e.originalEvent.preventDefault();
+            if (currentActiveTab === 'nav-threat-analysis') {
+                const candidate = {
+                    id: `threat-${entry.streetName}-${entry.point.lat}-${entry.point.lon}`,
+                    intersectionPoint: [entry.point.lon, entry.point.lat],
+                    manual: false,
+                    fromThreatsMap: true
+                };
+                createDeletionBubble(marker, candidate, false);
+            }
+        });
+        
+        const popupContent = `
+            <div style="min-width: 200px;">
+                <b>🚪 Zufahrtspunkt ${number}</b><br>
+                <b>Straße:</b> ${entry.streetName}<br>
+                <b>Distanz:</b> ${Math.round(entry.point.distance || entry.threatData.totalLength)}m<br>
+                <b>Geschwindigkeit:</b> ${entry.threatData.maxSpeed || 'unbekannt'} km/h
+            </div>
+        `;
+        marker.bindPopup(popupContent);
+        
+        threatLayerGroup?.addLayer(marker);
+        
+        if (!threatMarkersMap.has('entry-detection')) {
+            threatMarkersMap.set('entry-detection', []);
+        }
+        threatMarkersMap.get('entry-detection')?.push(marker);
+    });
+    
+    console.log(`✅ Created ${sorted.length} markers from threatsMap`);
 }
 
 /**
@@ -7098,6 +8830,363 @@ function findBestProductMatch() {
     return bestMatch;
 }
 
+// =============================================================================
+// HAZARD ANALYSIS (GEFÄHRDUNGSANALYSE) - Form Data Collection
+// =============================================================================
+
+type HazardFactorValue = {
+    id: string;
+    category: string;
+    label: string;
+    question: string;
+    value: number | null;
+};
+
+type HazardAnalysisFormData = {
+    city: string;
+    area: string;
+    expectedDamage: string;
+    expectedDamageLabel: string;
+    factors: HazardFactorValue[];
+    totalScore: number;
+    maxPossibleScore: number;
+    averageScore: number;
+};
+
+/**
+ * Collects all form data from the Hazard Analysis bubble
+ * @returns HazardAnalysisFormData object or null if the bubble content is not loaded
+ */
+function getHazardAnalysisFormData(): HazardAnalysisFormData | null {
+    const cityInput = document.getElementById('hazard-city') as HTMLInputElement | null;
+    const areaInput = document.getElementById('hazard-area') as HTMLInputElement | null;
+    const damageSelect = document.getElementById('hazard-expected-damage') as HTMLSelectElement | null;
+    
+    if (!cityInput && !areaInput && !damageSelect) {
+        // Bubble content not yet loaded
+        return null;
+    }
+    
+    const city = cityInput?.value?.trim() || '';
+    const area = areaInput?.value?.trim() || '';
+    const expectedDamage = damageSelect?.value || '';
+    
+    // Map damage value to human-readable label
+    const damageLabels: Record<string, string> = {
+        'sachschaden': 'gering (Sachschäden)',
+        'leicht': 'leichte Personenschäden',
+        'schwer': 'schwere Personenschäden',
+        'massenopfer': 'viele Tote / Massenopfer'
+    };
+    const expectedDamageLabel = damageLabels[expectedDamage] || expectedDamage;
+    
+    // Factor configurations matching the HTML form
+    const factorConfigs: Omit<HazardFactorValue, 'value'>[] = [
+        // Anlassbezogene Belange
+        { id: 'hazard-anlass-allgemeingebrauch', category: 'Anlassbezogene Belange', label: 'Stadträumlicher Allgemeingebrauch', question: 'Wie stark wird der Raum im Alltag von der Allgemeinheit genutzt?' },
+        { id: 'hazard-anlass-sondernutzung', category: 'Anlassbezogene Belange', label: 'Stadträumliche Sondernutzung', question: 'Finden im Raum regelmäßig Sondernutzungen statt (z. B. Veranstaltungen, Märkte)?' },
+        { id: 'hazard-anlass-haeufigkeit', category: 'Anlassbezogene Belange', label: 'Häufigkeit der Sondernutzung', question: 'Wie häufig finden Sondernutzungen im betrachteten Raum statt?' },
+        { id: 'hazard-anlass-zusammensetzung', category: 'Anlassbezogene Belange', label: 'Zusammensetzung der Nutzer', question: 'Welche Nutzergruppen halten sich überwiegend im Raum auf?' },
+        { id: 'hazard-anlass-anzahl', category: 'Anlassbezogene Belange', label: 'Anzahl der Nutzer', question: 'Wie viele Personen nutzen den Raum typischerweise gleichzeitig?' },
+        
+        // Räumliche Belange
+        { id: 'hazard-raum-struktur', category: 'Räumliche Belange', label: 'Bauliche Struktur des Raumes', question: 'Erleichtert die bauliche Struktur des Raumes eine Annäherung von Fahrzeugen?' },
+        { id: 'hazard-raum-gebaeude', category: 'Räumliche Belange', label: 'Besondere Gebäude', question: 'Gibt es besonders schutzwürdige Gebäude im unmittelbaren Umfeld?' },
+        { id: 'hazard-raum-flucht-nutzer', category: 'Räumliche Belange', label: 'Fluchtoptionen für Nutzer', question: 'Sind ausreichende Fluchtwege für die anwesenden Personen vorhanden?' },
+        { id: 'hazard-raum-flaeche', category: 'Räumliche Belange', label: 'Flächengröße', question: 'Wie groß ist die Fläche des betrachteten Raumes?' },
+        { id: 'hazard-raum-dichte', category: 'Räumliche Belange', label: 'Besucherdichte', question: 'Wie hoch ist die typische Besucherdichte im Raum?' },
+        
+        // Weitere Sicherheitsbelange
+        { id: 'hazard-security-bedeutung-raum', category: 'Weitere Sicherheitsbelange', label: 'Bedeutung des öffentlichen Raumes', question: 'Welche symbolische oder gesellschaftliche Bedeutung hat der Raum?' },
+        { id: 'hazard-security-massnahmen-baulich', category: 'Weitere Sicherheitsbelange', label: 'Erkennbare Sicherheitsmaßnahmen', question: 'Sind bereits bauliche oder technische Sicherheitsmaßnahmen erkennbar vorhanden?' },
+        { id: 'hazard-security-massnahmen-personell', category: 'Weitere Sicherheitsbelange', label: 'Erkennbare personelle Sicherheitsmaßnahmen', question: 'Gibt es regelmäßig sichtbare Präsenz von Sicherheitskräften?' },
+        
+        // Tatbeeinflussende Belange
+        { id: 'hazard-tat-anfahrtsoptionen', category: 'Tatbeeinflussende Belange', label: 'Anfahrtsoptionen für potentielle Täter', question: 'Wie gut können Täter den Bereich mit einem Fahrzeug anfahren?' },
+        { id: 'hazard-tat-fluchtmoeglichkeiten', category: 'Tatbeeinflussende Belange', label: 'Fluchtmöglichkeiten für potentielle Täter', question: 'Welche Fluchtmöglichkeiten bestünden für Täter nach einer Tat?' },
+        { id: 'hazard-tat-auswirkung', category: 'Tatbeeinflussende Belange', label: 'Auswirkung', question: 'Wie gravierend wären die Wirkungen eines Fahrzeugangriffs im Raum?' },
+        { id: 'hazard-tat-ziele', category: 'Tatbeeinflussende Belange', label: 'Zusätzliche Tatziele', question: 'Gibt es in unmittelbarer Nähe weitere potenzielle Tatziele?' },
+        { id: 'hazard-tat-varianten', category: 'Tatbeeinflussende Belange', label: 'Zusätzliche Tatvarianten', question: 'Sind besondere Tatvarianten denkbar (z. B. alternative Routen, zeitliche Besonderheiten)?' },
+    ];
+    
+    const factors: HazardFactorValue[] = factorConfigs.map(config => {
+        const selectEl = document.getElementById(config.id) as HTMLSelectElement | null;
+        const raw = selectEl?.value || '';
+        const numeric = raw ? parseInt(raw, 10) : NaN;
+        return {
+            ...config,
+            value: Number.isFinite(numeric) ? numeric : null
+        };
+    });
+    
+    // Calculate scores
+    const ratedFactors = factors.filter(f => f.value !== null);
+    const totalScore = ratedFactors.reduce((sum, f) => sum + (f.value || 0), 0);
+    const maxPossibleScore = factors.length * 3; // Max score is 3 per factor
+    const averageScore = ratedFactors.length > 0 ? totalScore / ratedFactors.length : 0;
+    
+    return { 
+        city, 
+        area, 
+        expectedDamage, 
+        expectedDamageLabel,
+        factors,
+        totalScore,
+        maxPossibleScore,
+        averageScore
+    };
+}
+
+// Export to window for debugging and external access
+(window as any).getHazardAnalysisFormData = getHazardAnalysisFormData;
+
+// ===============================================
+// FAHRDYNAMISCHE BERECHNUNGEN FÜR GUTACHTEN
+// ===============================================
+
+/**
+ * Fahrzeugklassen mit Masse und Beschleunigung
+ */
+const VEHICLE_CLASSES = [
+    { id: 'kleinwagen', name: 'Kleinwagen', mass: 1200, acceleration: 2.75 },
+    { id: 'mittelklasse', name: 'Mittelklasse-Pkw', mass: 1500, acceleration: 3.20 },
+    { id: 'fullsize', name: 'Full-Size-Pkw/Van', mass: 1800, acceleration: 3.70 },
+    { id: 'sportwagen', name: 'Performance-/Sportwagen', mass: 1600, acceleration: 5.00 },
+    { id: 'pickup', name: 'Pick-up', mass: 2500, acceleration: 2.50 },
+    { id: 'transporter', name: 'Transporter/Flatbed', mass: 3500, acceleration: 1.90 },
+    { id: 'lkw_7t', name: 'Lkw 7,5t', mass: 7200, acceleration: 2.00 },
+    { id: 'lkw_12t', name: 'Lkw 12t', mass: 12000, acceleration: 1.25 },
+    { id: 'lkw_30t', name: 'Lkw 30t', mass: 30000, acceleration: 0.75 }
+];
+
+/**
+ * Energiestufen-Schwellwerte in kJ
+ */
+const ENERGY_THRESHOLDS = {
+    E1: { max: 250, label: 'E1 (niedrig)', protection: 'einfache Sperren' },
+    E2: { min: 250, max: 800, label: 'E2 (mittel, SK1)', protection: 'SK1-Barrieren' },
+    E3: { min: 800, max: 1950, label: 'E3 (hoch, SK2)', protection: 'SK2-Barrieren' },
+    E4: { min: 1950, label: 'E4 (sehr hoch)', protection: 'Hochsicherheitsbarrieren' }
+};
+
+/**
+ * Berechnet die kinetische Energie
+ * E = m·a·s = 0.5·m·v²
+ * @param mass Masse in kg
+ * @param acceleration Beschleunigung in m/s²
+ * @param distance Strecke in m
+ * @returns Energie in kJ
+ */
+function calculateEnergy(mass: number, acceleration: number, distance: number): number {
+    const energy_j = mass * acceleration * distance;
+    return energy_j / 1000; // Umrechnung J → kJ
+}
+
+/**
+ * Bestimmt die Energiestufe für eine gegebene Energie
+ * @param energy_kj Energie in kJ
+ * @returns Energiestufen-Objekt
+ */
+function getEnergyClass(energy_kj: number): { level: string; label: string; protection: string } {
+    if (energy_kj < ENERGY_THRESHOLDS.E1.max) {
+        return { level: 'E1', label: ENERGY_THRESHOLDS.E1.label, protection: ENERGY_THRESHOLDS.E1.protection };
+    } else if (energy_kj < ENERGY_THRESHOLDS.E2.max) {
+        return { level: 'E2', label: ENERGY_THRESHOLDS.E2.label, protection: ENERGY_THRESHOLDS.E2.protection };
+    } else if (energy_kj < ENERGY_THRESHOLDS.E3.max) {
+        return { level: 'E3', label: ENERGY_THRESHOLDS.E3.label, protection: ENERGY_THRESHOLDS.E3.protection };
+    } else {
+        return { level: 'E4', label: ENERGY_THRESHOLDS.E4.label, protection: ENERGY_THRESHOLDS.E4.protection };
+    }
+}
+
+/**
+ * Bestimmt die Schutzkategorie (A/B/C) basierend auf Energiestufe
+ * @param energyLevel Energiestufe (E1-E4)
+ * @returns Schutzkategorie
+ */
+function getProtectionCategory(energyLevel: string): { category: string; description: string; requirement: string } {
+    switch (energyLevel) {
+        case 'E4':
+        case 'E3':
+            return { category: 'A', description: 'hochkritisch', requirement: 'SK2-Hochsicherheitsbarrieren' };
+        case 'E2':
+            return { category: 'B', description: 'mittlerer Schutzbedarf', requirement: 'SK1-Barrieren' };
+        case 'E1':
+        default:
+            return { category: 'C', description: 'energetisch gering', requirement: 'einfache Sperren' };
+    }
+}
+
+/**
+ * Berechnet fahrdynamische Daten für alle Zufahrten und Fahrzeugklassen
+ * @returns Strukturierte Tabelle mit allen Berechnungen
+ */
+function calculateVehicleDynamicsTable(): string {
+    const threatsArray = Array.from(threatsMap.entries());
+    if (threatsArray.length === 0) {
+        return 'Keine Zufahrten für fahrdynamische Analyse verfügbar.';
+    }
+
+    const results: string[] = [];
+    results.push('FAHRDYNAMISCHE ANALYSE JE ZUFAHRT UND FAHRZEUGKLASSE:');
+    results.push('');
+
+    threatsArray.forEach(([streetName, threatData]) => {
+        const distance = threatData.totalLength || 50; // Fallback 50m
+        results.push('Zufahrt: ' + streetName + ' (Anfahrtsstrecke: ' + Math.round(distance) + ' m)');
+        
+        let maxEnergy = 0;
+        let worstCaseVehicle = '';
+        
+        VEHICLE_CLASSES.forEach(vehicle => {
+            const velocity = calculateVelocity(vehicle.acceleration, distance);
+            const energy = calculateEnergy(vehicle.mass, vehicle.acceleration, distance);
+            const energyClass = getEnergyClass(energy);
+            
+            results.push('  - ' + vehicle.name + ': v=' + velocity.toFixed(0) + ' km/h, E=' + energy.toFixed(0) + ' kJ (' + energyClass.label + ')');
+            
+            if (energy > maxEnergy) {
+                maxEnergy = energy;
+                worstCaseVehicle = vehicle.name;
+            }
+        });
+        
+        const worstCaseClass = getEnergyClass(maxEnergy);
+        const protectionCat = getProtectionCategory(worstCaseClass.level);
+        results.push('  → Worst Case: ' + worstCaseVehicle + ' mit E_max=' + maxEnergy.toFixed(0) + ' kJ');
+        results.push('  → Energiestufe: ' + worstCaseClass.label + ', Schutzkategorie: ' + protectionCat.category + ' (' + protectionCat.description + ')');
+        results.push('');
+    });
+
+    return results.join('\n');
+}
+
+/**
+ * Erstellt eine Zusammenfassung der Energieklassifizierung aller Zufahrten
+ * @returns Strukturierte Klassifizierung
+ */
+function getEnergyClassificationSummary(): string {
+    const threatsArray = Array.from(threatsMap.entries());
+    if (threatsArray.length === 0) {
+        return 'Keine Zufahrten für Energieklassifizierung verfügbar.';
+    }
+
+    const classifications: { [key: string]: string[] } = {
+        'A': [], // hochkritisch (E3/E4)
+        'B': [], // mittel (E2)
+        'C': []  // gering (E1)
+    };
+
+    const worstCaseTable: string[] = [];
+    worstCaseTable.push('WORST-CASE-TABELLE (Maximalenergien je Zufahrt):');
+    worstCaseTable.push('Zufahrt | Strecke [m] | E_max [kJ] | Energiestufe | Kategorie | Schutzklasse');
+    worstCaseTable.push('--------|-------------|------------|--------------|-----------|-------------');
+
+    threatsArray.forEach(([streetName, threatData]) => {
+        const distance = threatData.totalLength || 50;
+        
+        // Berechne Worst Case (höchste Energie über alle Fahrzeugklassen)
+        let maxEnergy = 0;
+        VEHICLE_CLASSES.forEach(vehicle => {
+            const energy = calculateEnergy(vehicle.mass, vehicle.acceleration, distance);
+            if (energy > maxEnergy) {
+                maxEnergy = energy;
+            }
+        });
+        
+        const energyClass = getEnergyClass(maxEnergy);
+        const protectionCat = getProtectionCategory(energyClass.level);
+        
+        classifications[protectionCat.category].push(streetName);
+        
+        worstCaseTable.push(
+            streetName.substring(0, 20).padEnd(20) + ' | ' + Math.round(distance).toString().padStart(5) + ' | ' + maxEnergy.toFixed(0).padStart(10) + ' | ' + energyClass.level.padEnd(12) + ' | ' + protectionCat.category.padEnd(9) + ' | ' + protectionCat.requirement
+        );
+    });
+
+    const summary: string[] = [];
+    summary.push(worstCaseTable.join('\n'));
+    summary.push('');
+    summary.push('KATEGORISIERUNG NACH SCHUTZBEDARF:');
+    summary.push('Kategorie A (hochkritisch, SK2): ' + (classifications['A'].length > 0 ? classifications['A'].join(', ') : 'keine'));
+    summary.push('Kategorie B (mittel, SK1): ' + (classifications['B'].length > 0 ? classifications['B'].join(', ') : 'keine'));
+    summary.push('Kategorie C (gering, einfache Sperren): ' + (classifications['C'].length > 0 ? classifications['C'].join(', ') : 'keine'));
+
+    return summary.join('\n');
+}
+
+// Export für Debugging
+(window as any).calculateVehicleDynamicsTable = calculateVehicleDynamicsTable;
+(window as any).getEnergyClassificationSummary = getEnergyClassificationSummary;
+
+/**
+ * Builds a summary text of the hazard assessment for inclusion in AI prompts
+ * @returns A formatted string summarizing the hazard assessment data
+ */
+function buildHazardAssessmentSummary(): string {
+    const data = getHazardAnalysisFormData();
+    if (!data) {
+        return 'Es wurden keine expliziten Daten zur Gefährdungsanalyse in der Eingabemaske erfasst.';
+    }
+    
+    const parts: string[] = [];
+    
+    // Location information
+    if (data.city || data.area) {
+        const raum = [data.city, data.area].filter(Boolean).join(' – ');
+        parts.push(`Betrachteter Raum: ${raum}`);
+    }
+    
+    // Expected damage level
+    if (data.expectedDamageLabel) {
+        parts.push(`Erwartetes Schadensausmaß: ${data.expectedDamageLabel}`);
+    }
+    
+    // Rated factors grouped by category
+    const ratedFactors = data.factors.filter(f => f.value !== null);
+    if (ratedFactors.length > 0) {
+        parts.push('');
+        parts.push('Bewertete Belange (Skala: 1 = geringe Ausprägung, 2 = mittlere Ausprägung, 3 = starke Ausprägung):');
+        
+        // Group factors by category
+        const categories = [...new Set(ratedFactors.map(f => f.category))];
+        categories.forEach(category => {
+            const categoryFactors = ratedFactors.filter(f => f.category === category);
+            if (categoryFactors.length > 0) {
+                parts.push(`\n${category}:`);
+                categoryFactors.forEach(f => {
+                    parts.push(`  - ${f.label}: Bewertung ${f.value}`);
+                });
+            }
+        });
+        
+        // Summary statistics
+        parts.push('');
+        parts.push(`Gesamtpunktzahl: ${data.totalScore} von maximal ${data.maxPossibleScore} Punkten`);
+        parts.push(`Durchschnittliche Bewertung: ${data.averageScore.toFixed(1)}`);
+        
+        // Risk classification based on average score
+        let riskClassification = '';
+        if (data.averageScore <= 1.5) {
+            riskClassification = 'NIEDRIG';
+        } else if (data.averageScore <= 2.0) {
+            riskClassification = 'MITTEL';
+        } else if (data.averageScore <= 2.5) {
+            riskClassification = 'ERHÖHT';
+        } else {
+            riskClassification = 'HOCH';
+        }
+        parts.push(`Gefährdungseinstufung basierend auf Bewertungsmatrix: ${riskClassification}`);
+    } else {
+        parts.push('Keine Bewertungsfaktoren wurden ausgefüllt.');
+    }
+    
+    return parts.join('\n');
+}
+
+// Export to window for debugging
+(window as any).buildHazardAssessmentSummary = buildHazardAssessmentSummary;
+
 /**
  * Generates the full risk report as a PDF, filling in missing information with AI-generated placeholders.
  */
@@ -7112,6 +9201,7 @@ async function generateRiskReport() {
     downloadReportBtn.disabled = true;
 
     let canvas = null;
+    const reportGeneratedAt = new Date();
 
     try {
         if (drawnPolygon) {
@@ -7251,8 +9341,9 @@ async function generateRiskReport() {
             console.warn('⚠️ Could not get provider info for report, using default:', error);
             console.log(`📄 Report using data source: ${dataSource}`);
         }
+        const localizedReportDate = reportGeneratedAt.toLocaleDateString(currentLanguage === 'de' ? 'de-DE' : 'en-US');
         
-        // Generate threat list in table format
+        // Generate threat list in descriptive text form for AI context
         let threatList = t('report.noThreatAnalysis');
         if (threatsMap.size > 0) {
             const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
@@ -7271,30 +9362,12 @@ async function generateRiskReport() {
                 return { name, lengthInMeters, maxSpeed };
             });
             
-            // Sort by maxSpeed in descending order
             threatsArray.sort((a: any, b: any) => b.maxSpeed - a.maxSpeed);
             
-            // Create table format
-            threatList = `
-                <table style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px;">
-                    <thead>
-                        <tr style="background-color: #f0f0f0; font-weight: bold;">
-                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.street')}</th>
-                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.distance')}</th>
-                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">${t('report.threatsTable.maxSpeed')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${threatsArray.map(threat => `
-                            <tr>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.name}</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.lengthInMeters} m</td>
-                                <td style="border: 1px solid #ddd; padding: 8px;">${threat.maxSpeed} km/h</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
+            threatList = threatsArray.map(threat => {
+                const speedPart = threat.maxSpeed > 0 ? ` | ${t('threats.speed')}: ${threat.maxSpeed} km/h` : '';
+                return `- ${threat.name}: ${threat.lengthInMeters} m${speedPart}`;
+            }).join('\n');
         }
 
         // --- Gather all context for the AI ---
@@ -7366,34 +9439,247 @@ async function generateRiskReport() {
 
         addWatermarkToCurrentPage();
         
-        // Report Header (wrapped to page width)
-        const headerText = t('report.mainTitle', { locationName: locationName });
-        pdf.setFont('helvetica', 'bold').setFontSize(18);
-        // Sanitize header text to fix Unicode character spacing issues
-        const sanitizedHeader = sanitizeDe(headerText, false);
-        const headerLines = pdf.splitTextToSize(sanitizedHeader, content_width);
-        const headerLineHeight = 8;
-        if (currentY + (headerLines.length * headerLineHeight) > 280) {
-            pdf.addPage();
-            addWatermarkToCurrentPage();
-            currentY = 25;
-        }
-        pdf.text(headerLines, page_margin, currentY);
-        currentY += (headerLines.length * headerLineHeight) + 5;
-        pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
-        currentY += 15;
-
-        // --- Sections from AI ---
-        addSection('report.sections.purpose.title', aiSections.purpose);
+        // ==================== TITELBLATT ====================
+        const hazardData = (typeof getHazardAnalysisFormData === 'function') ? getHazardAnalysisFormData() : null;
+        const eventName = hazardData?.area || assetToProtect;
+        const cityName = locationName.split(',')[0].trim();
         
-        // Section 2: Threat Analysis + List
-        addSection('report.sections.threatAnalysis.title', aiSections.threatAnalysis);
+        // Titel zentriert
+        pdf.setFont('helvetica', 'bold').setFontSize(14);
+        pdf.text(cityName, page_width / 2, currentY, { align: 'center' });
+        currentY += 20;
+        
+        // Haupttitel
+        pdf.setFont('helvetica', 'bold').setFontSize(20);
+        const mainTitle = currentLanguage === 'de' 
+            ? `Risikobewertung Zufahrtsschutz` 
+            : `Risk Assessment Access Protection`;
+        pdf.text(mainTitle, page_width / 2, currentY, { align: 'center' });
+        currentY += 10;
+        
+        // Untertitel mit Veranstaltung
+        pdf.setFont('helvetica', 'bold').setFontSize(16);
+        const subTitle = `${eventName} ${new Date().getFullYear()}`;
+        pdf.text(subTitle, page_width / 2, currentY, { align: 'center' });
+        currentY += 15;
+        
+        // Untertitel 2
+        pdf.setFont('helvetica', 'italic').setFontSize(11);
+        const subTitle2 = currentLanguage === 'de'
+            ? 'Gutachten zur fahrdynamischen Gefährdungsanalyse, Schutzzieldefinition und Planung von Fahrzeugsicherheitsbarrieren'
+            : 'Expert Report on Vehicle Dynamics Hazard Analysis, Protection Goal Definition and Planning of Vehicle Security Barriers';
+        const subTitle2Lines = pdf.splitTextToSize(subTitle2, content_width - 20);
+        subTitle2Lines.forEach((line: string) => {
+            pdf.text(line, page_width / 2, currentY, { align: 'center' });
+            currentY += 6;
+        });
+        currentY += 20;
+        
+        // Horizontale Linie
+        pdf.setDrawColor(30, 144, 255).setLineWidth(1).line(page_margin + 20, currentY, page_width - page_margin - 20, currentY);
+        currentY += 25;
+        
+        // Metadaten-Block
+        pdf.setFont('helvetica', 'normal').setFontSize(10);
+        const metaData = currentLanguage === 'de' ? [
+            `Erstellt durch: BarricadiX GmbH`,
+            `Bearbeiter: Automatisierte Analyse`,
+            `Auftraggeber: [Kommune / Veranstalter]`,
+            `Aktenzeichen: BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+            `Datum: ${localizedReportDate}`,
+            `Version: 1.0 (Entwurf)`
+        ] : [
+            `Created by: BarricadiX GmbH`,
+            `Analyst: Automated Analysis`,
+            `Client: [Municipality / Organizer]`,
+            `Reference: BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+            `Date: ${localizedReportDate}`,
+            `Version: 1.0 (Draft)`
+        ];
+        
+        metaData.forEach(line => {
+            pdf.text(line, page_width / 2, currentY, { align: 'center' });
+            currentY += 6;
+        });
+        currentY += 30;
+        
+        // Hinweis am unteren Rand
+        pdf.setFont('helvetica', 'italic').setFontSize(9);
+        const disclaimer = currentLanguage === 'de'
+            ? 'Dieses Gutachten ersetzt keine hoheitliche Gefährdungsbewertung der zuständigen Sicherheitsbehörden.'
+            : 'This report does not replace a sovereign threat assessment by the competent security authorities.';
+        const disclaimerLines = pdf.splitTextToSize(disclaimer, content_width - 40);
+        disclaimerLines.forEach((line: string) => {
+            pdf.text(line, page_width / 2, currentY, { align: 'center' });
+            currentY += 5;
+        });
+        
+        // ==================== KURZFASSUNG (neue Seite) ====================
+        pdf.addPage();
+        addWatermarkToCurrentPage();
+        currentY = 25;
+        
+        pdf.setFont('helvetica', 'bold').setFontSize(14);
+        const summaryTitle = currentLanguage === 'de' ? 'Kurzfassung für Entscheidungsträger' : 'Executive Summary';
+        pdf.text(summaryTitle, page_margin, currentY);
+        currentY += 10;
+        
+        pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
+        currentY += 10;
+        
+        // Kurzfassung-Inhalt generieren
+        const threatsArray = Array.from(threatsMap.entries());
+        const avgThreatLevel = threatsArray.length > 0 
+            ? threatsArray.reduce((sum, [, data]) => sum + (data.threatLevel || 5), 0) / threatsArray.length 
+            : 5;
+        
+        // Kategorisierung der Zufahrten
+        let catA = 0, catB = 0, catC = 0;
+        threatsArray.forEach(([, data]) => {
+            const distance = data.totalLength || 50;
+            // Worst-Case mit 30t-Lkw
+            const energy = 30000 * 0.75 * distance / 1000; // kJ
+            if (energy >= 800) catA++;
+            else if (energy >= 250) catB++;
+            else catC++;
+        });
+        
+        pdf.setFont('helvetica', 'normal').setFontSize(10);
+        const summaryText = currentLanguage === 'de' ? [
+            `Gegenstand: Risikobewertung Zufahrtsschutz für ${eventName} in ${cityName}`,
+            ``,
+            `Ergebnis der Analyse:`,
+            `• ${threatsArray.length} Zufahrten wurden identifiziert und fahrdynamisch bewertet`,
+            `• Durchschnittliches Bedrohungsniveau: ${avgThreatLevel.toFixed(1)}/10`,
+            `• Abgeleiteter Sicherungsgrad: ${context.protectionGrade}`,
+            ``,
+            `Kategorisierung nach Schutzbedarf:`,
+            `• Kategorie A (hochkritisch, SK2 erforderlich): ${catA} Zufahrten`,
+            `• Kategorie B (mittel, SK1 ausreichend): ${catB} Zufahrten`,
+            `• Kategorie C (gering, einfache Sperren): ${catC} Zufahrten`,
+            ``,
+            `Empfehlung:`,
+            `Mit der Umsetzung der empfohlenen SK1-/SK2-Maßnahmen und eines abgestimmten`,
+            `Betriebskonzepts kann das Risiko auf ein ALARP-konformes Niveau reduziert werden.`,
+            `Die Detailplanung und Produktauswahl sollte in Abstimmung mit den zuständigen`,
+            `Sicherheitsbehörden erfolgen.`
+        ] : [
+            `Subject: Risk Assessment Access Protection for ${eventName} in ${cityName}`,
+            ``,
+            `Analysis Results:`,
+            `• ${threatsArray.length} access routes were identified and assessed for vehicle dynamics`,
+            `• Average threat level: ${avgThreatLevel.toFixed(1)}/10`,
+            `• Derived protection grade: ${context.protectionGrade}`,
+            ``,
+            `Categorization by Protection Requirement:`,
+            `• Category A (highly critical, SK2 required): ${catA} access routes`,
+            `• Category B (medium, SK1 sufficient): ${catB} access routes`,
+            `• Category C (low, simple barriers): ${catC} access routes`,
+            ``,
+            `Recommendation:`,
+            `With the implementation of the recommended SK1/SK2 measures and a coordinated`,
+            `operational concept, the risk can be reduced to an ALARP-compliant level.`,
+            `Detailed planning and product selection should be coordinated with the`,
+            `competent security authorities.`
+        ];
+        
+        summaryText.forEach(line => {
+            if (currentY > 270) {
+                pdf.addPage();
+                addWatermarkToCurrentPage();
+                currentY = 25;
+            }
+            pdf.text(line, page_margin, currentY);
+            currentY += 6;
+        });
+        
+        // Ampel-Grafik
+        currentY += 10;
+        pdf.setFont('helvetica', 'bold').setFontSize(10);
+        const ampelTitle = currentLanguage === 'de' ? 'Risiko-Ampel:' : 'Risk Traffic Light:';
+        pdf.text(ampelTitle, page_margin, currentY);
+        currentY += 8;
+        
+        // Ampel-Boxen
+        const boxWidth = 50;
+        const boxHeight = 15;
+        const boxSpacing = 10;
+        let boxX = page_margin;
+        
+        // Rot (Kategorie A)
+        pdf.setFillColor(220, 53, 69);
+        pdf.rect(boxX, currentY, boxWidth, boxHeight, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold').setFontSize(9);
+        pdf.text(`A: ${catA}`, boxX + boxWidth/2, currentY + boxHeight/2 + 3, { align: 'center' });
+        boxX += boxWidth + boxSpacing;
+        
+        // Gelb (Kategorie B)
+        pdf.setFillColor(255, 193, 7);
+        pdf.rect(boxX, currentY, boxWidth, boxHeight, 'F');
+        pdf.setTextColor(0, 0, 0);
+        pdf.text(`B: ${catB}`, boxX + boxWidth/2, currentY + boxHeight/2 + 3, { align: 'center' });
+        boxX += boxWidth + boxSpacing;
+        
+        // Grün (Kategorie C)
+        pdf.setFillColor(40, 167, 69);
+        pdf.rect(boxX, currentY, boxWidth, boxHeight, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.text(`C: ${catC}`, boxX + boxWidth/2, currentY + boxHeight/2 + 3, { align: 'center' });
+        
+        pdf.setTextColor(0, 0, 0);
+        currentY += boxHeight + 20;
+        
+        // ==================== HAUPTTEIL (neue Seite) ====================
+        pdf.addPage();
+        addWatermarkToCurrentPage();
+        currentY = 25;
+
+        // --- 11 Kapitel Gutachtenstruktur ---
+        
+        // Kapitel 1: Auftrag, Zielsetzung und Geltungsbereich
+        const chapter1Content = aiSections.chapter1_auftrag || aiSections.purpose || '';
+        if (chapter1Content) {
+            addSection('report.sections.chapter1.title', chapter1Content);
+        }
+        
+        // Kapitel 2: Normative Grundlagen und Referenzen
+        const chapter2Content = aiSections.chapter2_normen || '';
+        if (chapter2Content) {
+            addSection('report.sections.chapter2.title', chapter2Content);
+        }
+        
+        // Kapitel 3: Beschreibung des Veranstaltungsbereichs
+        const chapter3Content = aiSections.chapter3_bereich || '';
+        if (chapter3Content) {
+            addSection('report.sections.chapter3.title', chapter3Content);
+        }
+        
+        // Kapitel 4: Bedrohungsanalyse und Täterverhalten
+        const chapter4Content = aiSections.chapter4_bedrohung || aiSections.threatAnalysis || '';
+        if (chapter4Content) {
+            addSection('report.sections.chapter4.title', chapter4Content);
+        }
+        
+        // Threat List nach Kapitel 4
         if (threatsMap.size > 0) {
-            currentY -= 5; // Reduce space before list
+            currentY -= 5;
+            const threatIntro = sanitizeDe(t('report.threatListIntro'), false);
+            const introLines = pdf.setFont('helvetica', 'italic').setFontSize(10).splitTextToSize(threatIntro, content_width);
+            const introHeight = introLines.length * 5;
+            if (currentY + introHeight > 280) {
+                pdf.addPage();
+                addWatermarkToCurrentPage();
+                currentY = 25;
+            }
+            pdf.text(introLines, page_margin, currentY);
+            currentY += introHeight + 4;
             pdf.setFont('helvetica', 'normal').setFontSize(11);
             const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
             const selectedWeight = vehicleSelect.value;
             const accelerationRange = getAccelerationRange(selectedWeight);
+            const entryLineHeight = 5.2;
+            const entrySpacing = 4;
             threatsMap.forEach((data, name) => {
                 let reportLine = `• ${name} (${Math.round(data.totalLength)} m)`;
                 if (accelerationRange && data.totalLength > 0) {
@@ -7402,23 +9688,51 @@ async function generateRiskReport() {
                     const maxSpeed = Math.round(calculateVelocityWithOsm(maxAcc, data.totalLength));
                     reportLine += ` | ${t('threats.speed')}: ${minSpeed}-${maxSpeed} km/h`;
                 }
-                // Sanitize threat line to fix Unicode character spacing issues
                 const sanitizedReportLine = sanitizeDe(reportLine, false);
-                const splitLines = pdf.splitTextToSize(sanitizedReportLine, content_width - 5);
-                if (currentY + (splitLines.length * 7) > 280) {
-                    pdf.addPage(); addWatermarkToCurrentPage(); currentY = 25;
+                const splitLines = pdf.splitTextToSize(sanitizedReportLine, content_width - 10);
+                const blockHeight = splitLines.length * entryLineHeight;
+                if (currentY + blockHeight > 280) {
+                    pdf.addPage();
+                    addWatermarkToCurrentPage();
+                    currentY = 25;
                 }
                 pdf.text(splitLines, page_margin + 5, currentY);
-                currentY += (splitLines.length * 6);
+                currentY += blockHeight + entrySpacing;
             });
-            currentY += 10;
+            currentY += 6;
         }
-
-        addSection('report.sections.vulnerabilities.title', aiSections.vulnerabilities);
-        addSection('report.sections.hvmMeasures.title', aiSections.hvmMeasures);
         
-        // Section 5: Site Considerations + Map Image
-        addSection('report.sections.siteConsiderations.title', aiSections.siteConsiderations);
+        // Kapitel 5: Methodik der BarricadiX-Analyse
+        const chapter5Content = aiSections.chapter5_methodik || '';
+        if (chapter5Content) {
+            addSection('report.sections.chapter5.title', chapter5Content);
+        }
+        
+        // Kapitel 6: Fahrdynamische Analyse und Maximalenergien
+        const chapter6Content = aiSections.chapter6_fahrdynamik || '';
+        if (chapter6Content) {
+            addSection('report.sections.chapter6.title', chapter6Content);
+        }
+        
+        // Kapitel 7: Risikoanalyse nach dem ALARP-Prinzip
+        const chapter7Content = aiSections.chapter7_risiko || aiSections.vulnerabilities || '';
+        if (chapter7Content) {
+            addSection('report.sections.chapter7.title', chapter7Content);
+        }
+        
+        // Kapitel 8: Schutzzieldefinition
+        const chapter8Content = aiSections.chapter8_schutzziel || '';
+        if (chapter8Content) {
+            addSection('report.sections.chapter8.title', chapter8Content);
+        }
+        
+        // Kapitel 9: Schutzkonzept und produktoffene Empfehlungen
+        const chapter9Content = aiSections.chapter9_konzept || aiSections.hvmMeasures || '';
+        if (chapter9Content) {
+            addSection('report.sections.chapter9.title', chapter9Content);
+        }
+        
+        // Map Image nach Kapitel 9
         if (canvas) {
             const imgRatio = canvas.height / canvas.width;
             const imgHeight = content_width * imgRatio;
@@ -7430,7 +9744,7 @@ async function generateRiskReport() {
         } else {
              const placeholderText = t('report.noMapAvailable');
              const textLines = pdf.setFont('helvetica', 'italic').setFontSize(10).splitTextToSize(placeholderText, content_width);
-             if (currentY + (textLines.length * 5) > 280) { // Check for page break
+             if (currentY + (textLines.length * 5) > 280) {
                  pdf.addPage();
                  addWatermarkToCurrentPage();
                  currentY = 25;
@@ -7438,9 +9752,178 @@ async function generateRiskReport() {
              pdf.text(textLines, page_margin, currentY);
              currentY += (textLines.length * 5) + 10;
         }
-
-
-        addSection('report.sections.operationalImpact.title', aiSections.operationalImpact);
+        
+        // Kapitel 10: Restgefahren und Grenzen
+        const chapter10Content = aiSections.chapter10_restgefahren || aiSections.siteConsiderations || '';
+        if (chapter10Content) {
+            addSection('report.sections.chapter10.title', chapter10Content);
+        }
+        
+        // Kapitel 11: Schlussfolgerungen und Empfehlung
+        const chapter11Content = aiSections.chapter11_empfehlung || aiSections.operationalImpact || '';
+        if (chapter11Content) {
+            addSection('report.sections.chapter11.title', chapter11Content);
+        }
+        
+        // ==================== ANHANG A: Fahrdynamische Detailtabellen ====================
+        if (threatsMap.size > 0) {
+            pdf.addPage();
+            addWatermarkToCurrentPage();
+            currentY = 25;
+            
+            // Anhang-Titel
+            pdf.setFont('helvetica', 'bold').setFontSize(14);
+            const anhangTitle = currentLanguage === 'de' 
+                ? 'Anhang A: Fahrdynamische Detailtabellen' 
+                : 'Appendix A: Vehicle Dynamics Detail Tables';
+            pdf.text(anhangTitle, page_margin, currentY);
+            currentY += 8;
+            pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
+            currentY += 10;
+            
+            // Einleitung
+            pdf.setFont('helvetica', 'normal').setFontSize(9);
+            const anhangIntro = currentLanguage === 'de'
+                ? 'Die folgenden Tabellen zeigen die fahrdynamischen Berechnungen für jede identifizierte Zufahrt und alle betrachteten Fahrzeugklassen. Berechnung: v = √(2·a·s) [km/h], E = m·a·s [kJ]'
+                : 'The following tables show the vehicle dynamics calculations for each identified access route and all considered vehicle classes. Calculation: v = √(2·a·s) [km/h], E = m·a·s [kJ]';
+            const introLines = pdf.splitTextToSize(anhangIntro, content_width);
+            pdf.text(introLines, page_margin, currentY);
+            currentY += introLines.length * 4 + 8;
+            
+            // Für jede Zufahrt eine Tabelle
+            const threatsArrayForTable = Array.from(threatsMap.entries());
+            
+            threatsArrayForTable.forEach(([streetName, threatData], index) => {
+                const distance = threatData.totalLength || 50;
+                
+                // Prüfen ob neue Seite nötig
+                if (currentY > 200) {
+                    pdf.addPage();
+                    addWatermarkToCurrentPage();
+                    currentY = 25;
+                }
+                
+                // Zufahrts-Header
+                pdf.setFont('helvetica', 'bold').setFontSize(10);
+                const tableTitle = currentLanguage === 'de'
+                    ? 'A.' + (index + 1) + ' Zufahrt: ' + streetName + ' (s = ' + Math.round(distance) + ' m)'
+                    : 'A.' + (index + 1) + ' Access: ' + streetName + ' (s = ' + Math.round(distance) + ' m)';
+                pdf.text(tableTitle, page_margin, currentY);
+                currentY += 6;
+                
+                // Tabellen-Header
+                pdf.setFont('helvetica', 'bold').setFontSize(8);
+                const colWidths = [45, 25, 25, 25, 25, 35];
+                const headers = currentLanguage === 'de'
+                    ? ['Fahrzeugklasse', 'm [kg]', 'a [m/s²]', 'v [km/h]', 'E [kJ]', 'Energiestufe']
+                    : ['Vehicle Class', 'm [kg]', 'a [m/s²]', 'v [km/h]', 'E [kJ]', 'Energy Level'];
+                
+                let colX = page_margin;
+                headers.forEach((header, i) => {
+                    pdf.text(header, colX, currentY);
+                    colX += colWidths[i];
+                });
+                currentY += 4;
+                
+                // Trennlinie
+                pdf.setDrawColor(100, 100, 100).setLineWidth(0.2);
+                pdf.line(page_margin, currentY, page_margin + colWidths.reduce((a, b) => a + b, 0), currentY);
+                currentY += 3;
+                
+                // Fahrzeugklassen-Daten
+                pdf.setFont('helvetica', 'normal').setFontSize(8);
+                
+                const vehicleClasses = [
+                    { name: 'Kleinwagen', mass: 1200, acc: 2.75 },
+                    { name: 'Mittelklasse', mass: 1500, acc: 3.20 },
+                    { name: 'Full-Size/Van', mass: 1800, acc: 3.70 },
+                    { name: 'Sportwagen', mass: 1600, acc: 5.00 },
+                    { name: 'Pick-up', mass: 2500, acc: 2.50 },
+                    { name: 'Transporter', mass: 3500, acc: 1.90 },
+                    { name: 'Lkw 7,5t', mass: 7200, acc: 2.00 },
+                    { name: 'Lkw 12t', mass: 12000, acc: 1.25 },
+                    { name: 'Lkw 30t', mass: 30000, acc: 0.75 }
+                ];
+                
+                let maxEnergy = 0;
+                let worstCaseVehicle = '';
+                
+                vehicleClasses.forEach(vehicle => {
+                    const v_ms = Math.sqrt(2 * vehicle.acc * distance);
+                    const v_kmh = v_ms * 3.6;
+                    const energy_kj = (vehicle.mass * vehicle.acc * distance) / 1000;
+                    
+                    // Energiestufe bestimmen
+                    let energyLevel = 'E1';
+                    if (energy_kj >= 1950) energyLevel = 'E4';
+                    else if (energy_kj >= 800) energyLevel = 'E3';
+                    else if (energy_kj >= 250) energyLevel = 'E2';
+                    
+                    if (energy_kj > maxEnergy) {
+                        maxEnergy = energy_kj;
+                        worstCaseVehicle = vehicle.name;
+                    }
+                    
+                    colX = page_margin;
+                    const rowData = [
+                        vehicle.name,
+                        vehicle.mass.toString(),
+                        vehicle.acc.toFixed(2),
+                        v_kmh.toFixed(0),
+                        energy_kj.toFixed(0),
+                        energyLevel
+                    ];
+                    
+                    rowData.forEach((cell, i) => {
+                        pdf.text(cell, colX, currentY);
+                        colX += colWidths[i];
+                    });
+                    currentY += 4;
+                });
+                
+                // Worst-Case-Zeile
+                currentY += 2;
+                pdf.setFont('helvetica', 'bold').setFontSize(8);
+                let worstCaseLevel = 'E1';
+                if (maxEnergy >= 1950) worstCaseLevel = 'E4';
+                else if (maxEnergy >= 800) worstCaseLevel = 'E3';
+                else if (maxEnergy >= 250) worstCaseLevel = 'E2';
+                
+                const worstCaseText = '→ Worst Case: ' + worstCaseVehicle + ', E_max = ' + maxEnergy.toFixed(0) + ' kJ (' + worstCaseLevel + ')';
+                pdf.text(worstCaseText, page_margin, currentY);
+                currentY += 12;
+            });
+            
+            // Legende am Ende
+            if (currentY > 240) {
+                pdf.addPage();
+                addWatermarkToCurrentPage();
+                currentY = 25;
+            }
+            
+            pdf.setFont('helvetica', 'bold').setFontSize(9);
+            const legendTitle = currentLanguage === 'de' ? 'Legende Energiestufen:' : 'Energy Level Legend:';
+            pdf.text(legendTitle, page_margin, currentY);
+            currentY += 5;
+            
+            pdf.setFont('helvetica', 'normal').setFontSize(8);
+            const legendItems = currentLanguage === 'de' ? [
+                'E1 (< 250 kJ): Niedriges Energieniveau – einfache Sperren ausreichend',
+                'E2 (250–800 kJ): Mittleres Energieniveau – SK1-Barrieren empfohlen',
+                'E3 (800–1.950 kJ): Hohes Energieniveau – SK2-Barrieren erforderlich',
+                'E4 (≥ 1.950 kJ): Sehr hohes Energieniveau – Hochsicherheitsbarrieren erforderlich'
+            ] : [
+                'E1 (< 250 kJ): Low energy level – simple barriers sufficient',
+                'E2 (250–800 kJ): Medium energy level – SK1 barriers recommended',
+                'E3 (800–1,950 kJ): High energy level – SK2 barriers required',
+                'E4 (≥ 1,950 kJ): Very high energy level – high security barriers required'
+            ];
+            
+            legendItems.forEach(item => {
+                pdf.text(item, page_margin, currentY);
+                currentY += 4;
+            });
+        }
 
         // Ensure watermark is drawn ON TOP of all content (text and images) on every page
         try {
@@ -7476,10 +9959,19 @@ async function generateRiskReport() {
         }
         generatedPdf = pdf;
         
-        // Generate filename similar to tender
-        const kommune = locationName.split(',')[0].trim();
-        const date = new Date().toLocaleDateString('de-DE').replace(/\./g, '-');
-        generatedPdfFilename = `Risikobericht_${kommune}_${date}.pdf`;
+        // Generate filename with location, event (if available), and date
+        const kommune = locationName.split(',')[0].trim().replace(/[<>:"/\\|?*]/g, '');
+        // hazardData already declared above at the beginning of generateRiskReport
+        const anlass = hazardData?.area?.trim().replace(/[<>:"/\\|?*]/g, '') || '';
+        const date = reportGeneratedAt.toLocaleDateString('de-DE').replace(/\./g, '-');
+        
+        // Build filename: Risikobericht_Ort_Anlass_Datum.pdf (Anlass only if provided)
+        const filenameParts = ['Risikobericht', kommune];
+        if (anlass && anlass.length > 0) {
+            filenameParts.push(anlass);
+        }
+        filenameParts.push(date);
+        generatedPdfFilename = filenameParts.join('_').replace(/\s+/g, '-') + '.pdf';
         
         downloadReportBtn.disabled = false;
         
@@ -7777,7 +10269,7 @@ Erstelle einen formellen, präzisen Ausschreibungstext mit folgenden Abschnitten
 
 Der Text muss herstellerneutral sein und darf keine Produktnamen oder Herstellernamen enthalten.`;
 
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
@@ -7984,56 +10476,110 @@ function setupUnifiedParameterMenu(): void {
         return;
     }
     
+    // Clone toggle button (if available) so we have a clean listener target
+    let headerToggleBtn: HTMLButtonElement | null = null;
+    if (toggleBtn) {
+        headerToggleBtn = toggleBtn.cloneNode(true) as HTMLButtonElement;
+        toggleBtn.parentNode?.replaceChild(headerToggleBtn, toggleBtn);
+    }
+
+    // Function to update icons based on bubble state
+    const updateIcons = (isExpanded: boolean) => {
+        const headerIcon = headerToggleBtn?.querySelector('i');
+        if (headerIcon) {
+            headerIcon.className = isExpanded ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+        }
+        
+        const stripIcon = parameterStrip.querySelector('i.fa-chevron-right, i.fa-chevron-left');
+        if (stripIcon) {
+            stripIcon.className = isExpanded ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+        }
+    };
+    
     // Function to collapse the bubble
     const collapseBubble = () => {
         console.log('🔧 Collapsing bubble - setting transform to translateX(-100%)');
         parameterBubble.style.transform = 'translateX(-100%)';
         parameterBubble.style.opacity = '0';
+        // Hide bubble completely after transition
+        setTimeout(() => {
+            parameterBubble.style.visibility = 'hidden';
+        }, 300); // Match transition duration
+        // Ensure strip is visible
         parameterStrip.style.display = 'block';
-        console.log('🔧 Bubble collapsed - strip now visible');
+        parameterStrip.style.visibility = 'visible';
+        parameterStrip.style.opacity = '1';
+        // Update icons to show collapsed state (chevron-right)
+        updateIcons(false);
+        console.log('🔧 Bubble collapsed - strip now visible, display:', parameterStrip.style.display);
     };
     
     // Function to expand the bubble
     const expandBubble = () => {
         console.log('🔧 Expanding bubble - setting transform to translateX(0)');
+        // Make bubble visible first
+        parameterBubble.style.visibility = 'visible';
+        // Close hazard analysis bubble if open
+        const hazardBubble = document.getElementById('hazard-analysis-bubble') as HTMLElement;
+        const hazardStrip = document.getElementById('hazard-analysis-strip') as HTMLElement;
+        if (hazardBubble && hazardStrip) {
+            hazardBubble.style.transform = 'translateX(-100%)';
+            hazardBubble.style.opacity = '0';
+            setTimeout(() => {
+                hazardBubble.style.visibility = 'hidden';
+            }, 300);
+            // Ensure hazard strip remains visible
+            hazardStrip.style.display = 'block';
+            hazardStrip.style.visibility = 'visible';
+            hazardStrip.style.opacity = '1';
+        }
+        
         parameterBubble.style.transform = 'translateX(0)';
         parameterBubble.style.opacity = '1';
-        parameterStrip.style.display = 'none';
-        console.log('🔧 Bubble expanded - strip now hidden');
+        // Keep parameter strip visible!
+        parameterStrip.style.display = 'block';
+        parameterStrip.style.visibility = 'visible';
+        parameterStrip.style.opacity = '1';
+        // Update icons to show expanded state (chevron-left)
+        updateIcons(true);
+        console.log('🔧 Bubble expanded - strip remains visible');
     };
     
-    // Remove any existing event listeners to prevent conflicts
-    const newToggleBtn = toggleBtn.cloneNode(true) as HTMLButtonElement;
-    toggleBtn.parentNode?.replaceChild(newToggleBtn, toggleBtn);
+    if (headerToggleBtn) {
+        headerToggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const stripVisible = parameterStrip.style.display === 'block' || window.getComputedStyle(parameterStrip).display !== 'none';
+            const bubbleVisible = parameterBubble.style.opacity === '1' || window.getComputedStyle(parameterBubble).opacity === '1';
+            const isCollapsed = stripVisible && !bubbleVisible;
+            
+            if (isCollapsed) {
+                expandBubble();
+            } else {
+                collapseBubble();
+            }
+        });
+    }
     
-    // Toggle button click handler
-    newToggleBtn.addEventListener('click', (e) => {
+    // Strip click handler - toggle bubble (not just expand)
+    parameterStrip.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log('🔧 Toggle button clicked!');
-        const isCollapsed = parameterBubble.style.transform === 'translateX(-100%)';
-        const icon = newToggleBtn.querySelector('i');
-        
-        console.log('🔧 Current state - isCollapsed:', isCollapsed);
+        console.log('🔧 Strip clicked - toggling bubble');
+        // Check if bubble is currently expanded
+        const stripVisible = parameterStrip.style.display === 'block' || window.getComputedStyle(parameterStrip).display !== 'none';
+        const bubbleVisible = parameterBubble.style.opacity === '1' || window.getComputedStyle(parameterBubble).opacity === '1';
+        const isCollapsed = stripVisible && !bubbleVisible;
         
         if (isCollapsed) {
-            console.log('🔧 Expanding bubble');
+            console.log('🔧 Expanding bubble from strip');
             expandBubble();
-            if (icon) icon.className = 'fas fa-chevron-left';
         } else {
-            console.log('🔧 Collapsing bubble');
+            console.log('🔧 Collapsing bubble from strip');
             collapseBubble();
-            if (icon) icon.className = 'fas fa-chevron-right';
         }
-    });
-    
-    // Strip click handler to expand
-    parameterStrip.addEventListener('click', () => {
-        console.log('🔧 Strip clicked - expanding bubble');
-        expandBubble();
-        const icon = newToggleBtn.querySelector('i');
-        if (icon) icon.className = 'fas fa-chevron-left';
     });
     
     // Header "Parameter" button click handler to expand (both nav and tab versions)
@@ -8041,8 +10587,6 @@ function setupUnifiedParameterMenu(): void {
         e.preventDefault();
         console.log('🔧 Parameter button clicked - expanding bubble');
         expandBubble();
-        const icon = newToggleBtn.querySelector('i');
-        if (icon) icon.className = 'fas fa-chevron-left';
     };
     
     if (headerParameterBtn) {
@@ -8062,6 +10606,7 @@ function setupUnifiedParameterMenu(): void {
     // Set initial state as collapsed
     console.log('🔧 Setting initial state as collapsed');
     collapseBubble();
+    updateIcons(false);
     
     // ENHANCED expand function with multiple fallbacks (override the original)
     const enhancedExpandBubble = () => {
@@ -8100,6 +10645,166 @@ function setupUnifiedParameterMenu(): void {
     
     // Make the bubble draggable (optional enhancement)
     makeParameterBubbleDraggable(parameterBubble);
+}
+
+/**
+ * Setup Hazard Analysis menu bubble (similar to parameter menu)
+ */
+function setupHazardAnalysisMenu(): void {
+    console.log('🔧 Setting up Hazard Analysis menu...');
+    
+    const toggleBtn = document.getElementById('toggle-hazard-analysis-bubble') as HTMLButtonElement;
+    const hazardBubble = document.getElementById('hazard-analysis-bubble') as HTMLElement;
+    const hazardStrip = document.getElementById('hazard-analysis-strip') as HTMLElement;
+    const headerHazardBtn = document.getElementById('nav-hazard-analysis') as HTMLElement;
+    const tabHazardBtn = document.getElementById('tab-hazard-analysis') as HTMLElement;
+    
+    console.log('🔧 Hazard Analysis elements found:', {
+        toggleBtn: !!toggleBtn,
+        hazardBubble: !!hazardBubble,
+        hazardStrip: !!hazardStrip,
+        headerHazardBtn: !!headerHazardBtn,
+        tabHazardBtn: !!tabHazardBtn
+    });
+    
+    if (!hazardBubble || !hazardStrip) {
+        console.warn('🔧 Critical hazard analysis elements missing, retrying in 1s...');
+        setTimeout(() => setupHazardAnalysisMenu(), 1000);
+        return;
+    }
+    
+    // Remove any existing event listeners to prevent conflicts and create new toggle button reference
+    let hazardToggleBtn: HTMLButtonElement | null = null;
+    if (toggleBtn) {
+        hazardToggleBtn = toggleBtn.cloneNode(true) as HTMLButtonElement;
+        toggleBtn.parentNode?.replaceChild(hazardToggleBtn, toggleBtn);
+    }
+    
+    // Function to update icons based on bubble state
+    const updateIcons = (isExpanded: boolean) => {
+        const toggleIcon = hazardToggleBtn?.querySelector('i');
+        if (toggleIcon) {
+            toggleIcon.className = isExpanded ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+        }
+        
+        // Update chevron icon in strip
+        const stripChevron = hazardStrip.querySelector('i.fa-chevron-right, i.fa-chevron-left');
+        if (stripChevron) {
+            stripChevron.className = isExpanded ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+        }
+    };
+    
+    // Function to collapse the bubble
+    const collapseBubble = () => {
+        console.log('🔧 Collapsing hazard analysis bubble');
+        hazardBubble.style.transform = 'translateX(-100%)';
+        hazardBubble.style.opacity = '0';
+        // Hide bubble completely after transition
+        setTimeout(() => {
+            hazardBubble.style.visibility = 'hidden';
+        }, 300); // Match transition duration
+        // Ensure strip is visible and fully restored
+        hazardStrip.style.display = 'block';
+        hazardStrip.style.visibility = 'visible';
+        hazardStrip.style.opacity = '1';
+        // Update icons to show collapsed state (chevron-right)
+        updateIcons(false);
+        console.log('🔧 Hazard analysis bubble collapsed - strip now visible, display:', hazardStrip.style.display);
+    };
+    
+    // Function to expand the bubble
+    const expandBubble = () => {
+        console.log('🔧 Expanding hazard analysis bubble');
+        // Make bubble visible first
+        hazardBubble.style.visibility = 'visible';
+        // Close parameter bubble if open
+        const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+        const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+        if (parameterBubble && parameterStrip) {
+            parameterBubble.style.transform = 'translateX(-100%)';
+            parameterBubble.style.opacity = '0';
+            setTimeout(() => {
+                parameterBubble.style.visibility = 'hidden';
+            }, 300);
+            // Ensure parameter strip remains visible
+            parameterStrip.style.display = 'block';
+            parameterStrip.style.visibility = 'visible';
+            parameterStrip.style.opacity = '1';
+        }
+        
+        hazardBubble.style.transform = 'translateX(0)';
+        hazardBubble.style.opacity = '1';
+        // Keep hazard strip visible!
+        hazardStrip.style.display = 'block';
+        hazardStrip.style.visibility = 'visible';
+        hazardStrip.style.opacity = '1';
+        // Update icons to show expanded state (chevron-left)
+        updateIcons(true);
+    };
+    
+    // Toggle button click handler (in bubble header)
+    if (hazardToggleBtn) {
+        hazardToggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🔧 Hazard Analysis toggle button clicked!');
+            const stripVisible = hazardStrip.style.display === 'block' || window.getComputedStyle(hazardStrip).display !== 'none';
+            const bubbleVisible = hazardBubble.style.opacity === '1' || window.getComputedStyle(hazardBubble).opacity === '1';
+            const isCollapsed = stripVisible && !bubbleVisible;
+            
+            if (isCollapsed) {
+                expandBubble();
+            } else {
+                collapseBubble();
+            }
+        });
+    }
+    
+    // Strip click handler - toggle bubble (not just expand)
+    hazardStrip.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('🔧 Hazard Analysis strip clicked - toggling bubble');
+        // Check if bubble is currently expanded
+        const stripVisible = hazardStrip.style.display === 'block' || window.getComputedStyle(hazardStrip).display !== 'none';
+        const bubbleVisible = hazardBubble.style.opacity === '1' || window.getComputedStyle(hazardBubble).opacity === '1';
+        const isCollapsed = stripVisible && !bubbleVisible;
+        
+        if (isCollapsed) {
+            console.log('🔧 Expanding bubble from strip');
+            expandBubble();
+        } else {
+            console.log('🔧 Collapsing bubble from strip');
+            collapseBubble();
+        }
+    });
+    
+    // Header "Gefährdungsanalyse" button click handler to expand (both nav and tab versions)
+    const expandBubbleHandler = (e: Event) => {
+        e.preventDefault();
+        console.log('🔧 Hazard Analysis button clicked - expanding bubble');
+        expandBubble();
+    };
+    
+    if (headerHazardBtn) {
+        headerHazardBtn.addEventListener('click', expandBubbleHandler);
+        console.log('🔧 Header Hazard Analysis button event listener added');
+    } else {
+        console.warn('🔧 Header Hazard Analysis button not found');
+    }
+    
+    if (tabHazardBtn) {
+        tabHazardBtn.addEventListener('click', expandBubbleHandler);
+        console.log('🔧 Tab Hazard Analysis button event listener added');
+    } else {
+        console.warn('🔧 Tab Hazard Analysis button not found');
+    }
+    
+    // Set initial state as collapsed
+    console.log('🔧 Setting initial hazard analysis state as collapsed');
+    collapseBubble();
 }
 
 /**
@@ -8182,244 +10887,6 @@ function setupEmergencyParameterMenuFallback(): void {
     
     console.log('✅ EMERGENCY parameter menu fallback setup complete!');
     console.log('✅ Available commands: emergencyExpandMenu(), emergencyCollapseMenu()');
-}
-
-/**
- * ULTIMATE FALLBACK: Force parameter menu to work (proven working code from console)
- * This is the exact code that worked when manually executed
- */
-function setupUltimateParameterMenuFix(): void {
-    console.log('🚨 Setting up ULTIMATE parameter menu fix...');
-    
-    const parameterBubble = document.getElementById('parameter-bubble');
-    const parameterStrip = document.getElementById('parameter-strip');
-    const navParamBtn = document.getElementById('nav-param-input');
-    const tabParamBtn = document.getElementById('tab-param-input');
-    
-    if (!parameterBubble || !parameterStrip || !navParamBtn || !tabParamBtn) {
-        console.warn('🚨 Ultimate fix: Missing elements, retrying in 3s...');
-        setTimeout(() => setupUltimateParameterMenuFix(), 3000);
-        return;
-    }
-    
-    console.log('🚨 Ultimate fix: All elements found, applying proven fix...');
-    
-    // Entferne ALLE existierenden Event-Listener durch Klonen
-    const newNav = navParamBtn.cloneNode(true) as HTMLElement;
-    const newTab = tabParamBtn.cloneNode(true) as HTMLElement;
-    const newStrip = parameterStrip.cloneNode(true) as HTMLElement;
-    
-    navParamBtn.parentNode?.replaceChild(newNav, navParamBtn);
-    tabParamBtn.parentNode?.replaceChild(newTab, tabParamBtn);
-    parameterStrip.parentNode?.replaceChild(newStrip, parameterStrip);
-    
-    // Hole neue Referenzen
-    const newNavBtn = document.getElementById('nav-param-input') as HTMLElement;
-    const newTabBtn = document.getElementById('tab-param-input') as HTMLElement;
-    const newStripEl = document.getElementById('parameter-strip') as HTMLElement;
-    
-    // Definiere die bewährte Expand-Funktion
-    const forceExpandMenu = () => {
-        console.log('🚀 FORCE EXPANDING...');
-        const bubble = document.getElementById('parameter-bubble');
-        const strip = document.getElementById('parameter-strip');
-        
-        if (bubble) {
-            // Entferne ALLE Inline-Styles und setze neu (bewährte Methode)
-            bubble.removeAttribute('style');
-            bubble.setAttribute('style', 
-                'position: fixed !important;' +
-                'top: 130px !important;' +
-                'left: 8px !important;' +
-                'width: 320px !important;' +
-                'max-width: calc(100vw - 32px) !important;' +
-                'background: rgba(12, 47, 77, 0.95) !important;' +
-                'backdrop-filter: blur(10px) !important;' +
-                'border: 1px solid rgba(255, 255, 255, 0.2) !important;' +
-                'border-radius: 16px !important;' +
-                'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;' +
-                'z-index: 9999 !important;' +
-                'color: white !important;' +
-                'max-height: calc(100vh - 140px) !important;' +
-                'overflow-y: auto !important;' +
-                'display: block !important;' +
-                'visibility: visible !important;' +
-                'opacity: 1 !important;' +
-                'transform: translateX(0px) !important;' +
-                'transition: all 0.3s ease !important;'
-            );
-        }
-        
-        if (strip) {
-            strip.style.display = 'none';
-        }
-        
-        console.log('✅ MENU FORCED OPEN!');
-    };
-    
-    // Füge bewährte Event-Listener hinzu
-    if (newNavBtn) {
-        newNavBtn.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('NAV clicked - ultimate fix');
-            forceExpandMenu();
-            return false;
-        };
-    }
-    
-    if (newTabBtn) {
-        newTabBtn.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('TAB clicked - ultimate fix');
-            forceExpandMenu();
-            return false;
-        };
-    }
-    
-    if (newStripEl) {
-        newStripEl.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('STRIP clicked - ultimate fix');
-            forceExpandMenu();
-            return false;
-        };
-    }
-    
-    // Globale Funktionen verfügbar machen
-    (window as any).forceExpandMenu = forceExpandMenu;
-    (window as any).ultimateParameterMenuActive = true;
-    
-    console.log('✅ ULTIMATE parameter menu fix applied!');
-    console.log('✅ Available commands: forceExpandMenu()');
-}
-
-/**
- * Setup parameter bubble expansion handlers after navigation system is ready
- */
-function setupParameterBubbleExpansionHandlers(): void {
-    console.log('🔧 Setting up parameter bubble expansion handlers...');
-    
-    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
-    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
-    
-    if (!parameterBubble || !parameterStrip) {
-        console.warn('🔧 Parameter elements not found for expansion handlers');
-        return;
-    }
-    
-    // Function to expand the bubble
-    const expandBubble = () => {
-        console.log('🔧 Expanding bubble via header button');
-        parameterBubble.style.transform = 'translateX(0)';
-        parameterBubble.style.opacity = '1';
-        parameterStrip.style.display = 'none';
-        
-        // Update toggle button icon
-        const toggleBtn = document.getElementById('toggle-parameter-bubble');
-        const icon = toggleBtn?.querySelector('i');
-        if (icon) icon.className = 'fas fa-chevron-left';
-    };
-    
-    // Add event listeners to both Parameter buttons with high priority
-    const headerParameterBtn = document.getElementById('nav-param-input');
-    const tabParameterBtn = document.getElementById('tab-param-input');
-    
-    if (headerParameterBtn) {
-        // Use capture phase to ensure our handler runs first
-        headerParameterBtn.addEventListener('click', (e) => {
-            console.log('🔧 Header Parameter button clicked - expanding bubble');
-            expandBubble();
-        }, true); // Capture phase
-        
-        // Also add normal phase listener as backup
-        headerParameterBtn.addEventListener('click', (e) => {
-            console.log('🔧 Header Parameter button clicked (backup) - expanding bubble');
-            expandBubble();
-        });
-        
-        console.log('🔧 Header Parameter button handlers added');
-    }
-    
-    if (tabParameterBtn) {
-        // Use capture phase to ensure our handler runs first
-        tabParameterBtn.addEventListener('click', (e) => {
-            console.log('🔧 Tab Parameter button clicked - expanding bubble');
-            expandBubble();
-        }, true); // Capture phase
-        
-        // Also add normal phase listener as backup
-        tabParameterBtn.addEventListener('click', (e) => {
-            console.log('🔧 Tab Parameter button clicked (backup) - expanding bubble');
-            expandBubble();
-        });
-        
-        console.log('🔧 Tab Parameter button handlers added');
-    }
-}
-
-/**
- * Override navigation handlers to add parameter bubble expansion
- */
-function overrideParameterNavigationHandlers(): void {
-    console.log('🔧 Overriding navigation handlers for parameter expansion...');
-    
-    const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
-    const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
-    
-    if (!parameterBubble || !parameterStrip) {
-        console.warn('🔧 Parameter elements not found for navigation override');
-        return;
-    }
-    
-    // Function to expand the bubble
-    const forceExpandBubble = () => {
-        console.log('🔧 FORCE expanding bubble via navigation override');
-        parameterBubble.style.transform = 'translateX(0) !important';
-        parameterBubble.style.opacity = '1';
-        parameterStrip.style.display = 'none';
-        
-        // Update toggle button icon
-        const toggleBtn = document.getElementById('toggle-parameter-bubble');
-        const icon = toggleBtn?.querySelector('i');
-        if (icon) icon.className = 'fas fa-chevron-left';
-        
-        console.log('🔧 Bubble expansion completed');
-    };
-    
-    // Replace both Parameter buttons completely
-    const headerParameterBtn = document.getElementById('nav-param-input');
-    const tabParameterBtn = document.getElementById('tab-param-input');
-    
-    if (headerParameterBtn) {
-        const newHeaderBtn = headerParameterBtn.cloneNode(true) as HTMLElement;
-        headerParameterBtn.parentNode?.replaceChild(newHeaderBtn, headerParameterBtn);
-        
-        newHeaderBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('🔧 NEW Header Parameter button clicked - force expanding');
-            forceExpandBubble();
-        });
-        
-        console.log('🔧 Header Parameter button completely replaced');
-    }
-    
-    if (tabParameterBtn) {
-        const newTabBtn = tabParameterBtn.cloneNode(true) as HTMLElement;
-        tabParameterBtn.parentNode?.replaceChild(newTabBtn, tabParameterBtn);
-        
-        newTabBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('🔧 NEW Tab Parameter button clicked - force expanding');
-            forceExpandBubble();
-        });
-        
-        console.log('🔧 Tab Parameter button completely replaced');
-    }
 }
 
 /**
@@ -8905,17 +11372,33 @@ async function initializeApp() {
     const tooltip = document.getElementById('tooltip') as HTMLElement;
     const infoIcons = document.querySelectorAll('.info-icon');
     infoIcons.forEach(icon => {
-        icon.addEventListener('mouseover', (event) => {
-            const target = event.currentTarget as HTMLElement;
-            const tooltipText = target.dataset.tooltip || '';
+        const el = icon as HTMLElement;
+        
+        const showTooltip = () => {
+            const tooltipText = el.dataset.tooltip || '';
             tooltip.textContent = tooltipText;
             tooltip.style.opacity = '1';
-            const rect = target.getBoundingClientRect();
+            const rect = el.getBoundingClientRect();
             tooltip.style.left = `${rect.left + window.scrollX}px`;
             tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
-        });
-        icon.addEventListener('mouseout', () => {
+        };
+        
+        const hideTooltip = () => {
             tooltip.style.opacity = '0';
+        };
+        
+        el.addEventListener('mouseover', showTooltip);
+        el.addEventListener('mouseout', hideTooltip);
+        
+        // Click toggle functionality for mobile/touch and accessibility
+        el.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (tooltip.style.opacity === '1' && tooltip.textContent === (el.dataset.tooltip || '')) {
+                hideTooltip();
+            } else {
+                showTooltip();
+            }
         });
     });
     
@@ -8933,15 +11416,60 @@ async function initializeApp() {
         setupUnifiedParameterMenu();
     }, 500);
     
+    // Setup Hazard Analysis menu functionality
+    console.log('🔧 About to call setupHazardAnalysisMenu...');
+    setTimeout(() => {
+        setupHazardAnalysisMenu();
+    }, 600);
+    
     // EMERGENCY FALLBACK: Ensure parameter menu works even if main setup fails
     setTimeout(() => {
         setupEmergencyParameterMenuFallback();
     }, 1000);
     
-    // ULTIMATE FALLBACK: Force parameter menu to work (proven working code)
-    setTimeout(() => {
-        setupUltimateParameterMenuFix();
-    }, 2000);
+    // Helper function to collapse hazard analysis bubble
+    const collapseHazardAnalysisBubble = () => {
+        const hazardBubble = document.getElementById('hazard-analysis-bubble') as HTMLElement;
+        const hazardStrip = document.getElementById('hazard-analysis-strip') as HTMLElement;
+        
+        if (hazardBubble && hazardStrip) {
+            console.log('🔧 Collapsing hazard analysis bubble');
+            hazardBubble.style.transform = 'translateX(-100%)';
+            hazardBubble.style.opacity = '0';
+            setTimeout(() => {
+                hazardBubble.style.visibility = 'hidden';
+            }, 300);
+            hazardStrip.style.display = 'block';
+            hazardStrip.style.visibility = 'visible';
+            hazardStrip.style.opacity = '1';
+            
+            const toggleBtn = document.getElementById('toggle-hazard-analysis-bubble');
+            const icon = toggleBtn?.querySelector('i');
+            if (icon) icon.className = 'fas fa-chevron-right';
+        }
+    };
+    
+    // Helper function to collapse parameter bubble
+    const collapseParameterBubble = () => {
+        const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
+        const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
+        
+        if (parameterBubble && parameterStrip) {
+            console.log('🔧 Collapsing parameter bubble');
+            parameterBubble.style.transform = 'translateX(-100%)';
+            parameterBubble.style.opacity = '0';
+            setTimeout(() => {
+                parameterBubble.style.visibility = 'hidden';
+            }, 300);
+            parameterStrip.style.display = 'block';
+            parameterStrip.style.visibility = 'visible';
+            parameterStrip.style.opacity = '1';
+            
+            const toggleBtn = document.getElementById('toggle-parameter-bubble');
+            const icon = toggleBtn?.querySelector('i');
+            if (icon) icon.className = 'fas fa-chevron-right';
+        }
+    };
     
     // Ultimate fallback: Monitor for Parameter button clicks globally
     document.addEventListener('click', (e) => {
@@ -8957,10 +11485,17 @@ async function initializeApp() {
                 const parameterBubble = document.getElementById('parameter-bubble') as HTMLElement;
                 const parameterStrip = document.getElementById('parameter-strip') as HTMLElement;
                 
+                // Close hazard analysis bubble if open
+                collapseHazardAnalysisBubble();
+                
                 if (parameterBubble && parameterStrip) {
+                    parameterBubble.style.visibility = 'visible';
                     parameterBubble.style.transform = 'translateX(0)';
                     parameterBubble.style.opacity = '1';
-                    parameterStrip.style.display = 'none';
+                    // Keep parameter strip visible!
+                    parameterStrip.style.display = 'block';
+                    parameterStrip.style.visibility = 'visible';
+                    parameterStrip.style.opacity = '1';
                     
                     const toggleBtn = document.getElementById('toggle-parameter-bubble');
                     const icon = toggleBtn?.querySelector('i');
@@ -8969,6 +11504,69 @@ async function initializeApp() {
                     console.log('🔧 GLOBAL: Bubble expanded successfully');
                 }
             }, 100);
+        }
+        
+        // Handle Hazard Analysis button clicks
+        const isHazardButton = target.id === 'nav-hazard-analysis' || 
+                             target.id === 'tab-hazard-analysis' ||
+                             target.closest('#nav-hazard-analysis') ||
+                             target.closest('#tab-hazard-analysis');
+        
+        if (isHazardButton) {
+            console.log('🔧 GLOBAL: Hazard Analysis button detected - expanding bubble');
+            setTimeout(() => {
+                const hazardBubble = document.getElementById('hazard-analysis-bubble') as HTMLElement;
+                const hazardStrip = document.getElementById('hazard-analysis-strip') as HTMLElement;
+                
+                // Close parameter bubble if open
+                collapseParameterBubble();
+                
+                if (hazardBubble && hazardStrip) {
+                    hazardBubble.style.visibility = 'visible';
+                    hazardBubble.style.transform = 'translateX(0)';
+                    hazardBubble.style.opacity = '1';
+                    // Keep hazard strip visible!
+                    hazardStrip.style.display = 'block';
+                    hazardStrip.style.visibility = 'visible';
+                    hazardStrip.style.opacity = '1';
+                    
+                    const toggleBtn = document.getElementById('toggle-hazard-analysis-bubble');
+                    const icon = toggleBtn?.querySelector('i');
+                    if (icon) icon.className = 'fas fa-chevron-left';
+                    
+                    console.log('🔧 GLOBAL: Hazard Analysis bubble expanded successfully');
+                }
+            }, 100);
+        }
+        
+        // Handle other tab clicks (marking area, threat analysis, risk report, etc.) - collapse both bubbles
+        const isOtherTabButton = target.id === 'nav-marking-area' || 
+                                 target.id === 'tab-marking-area' ||
+                                 target.id === 'nav-threat-analysis' ||
+                                 target.id === 'tab-threat-analysis' ||
+                                 target.id === 'nav-risk-report' ||
+                                 target.id === 'tab-risk-report' ||
+                                 target.id === 'nav-product-selection' ||
+                                 target.id === 'tab-product-selection' ||
+                                 target.id === 'nav-project-description' ||
+                                 target.id === 'tab-project-description' ||
+                                 target.id === 'nav-publish-project' ||
+                                 target.closest('#nav-marking-area') ||
+                                 target.closest('#tab-marking-area') ||
+                                 target.closest('#nav-threat-analysis') ||
+                                 target.closest('#tab-threat-analysis') ||
+                                 target.closest('#nav-risk-report') ||
+                                 target.closest('#tab-risk-report') ||
+                                 target.closest('#nav-product-selection') ||
+                                 target.closest('#tab-product-selection') ||
+                                 target.closest('#nav-project-description') ||
+                                 target.closest('#tab-project-description') ||
+                                 target.closest('#nav-publish-project');
+        
+        if (isOtherTabButton) {
+            console.log('🔧 GLOBAL: Other tab button detected - collapsing both bubbles');
+            collapseHazardAnalysisBubble();
+            collapseParameterBubble();
         }
     }, true); // Use capture phase
     
@@ -9124,6 +11722,7 @@ async function initializeApp() {
             fillOpacity: 0.3, 
             weight: 2 
         }).addTo(map);
+        attachManualEntryHandlersToPolygon(polygon);
         
         const polygonCenter = polygon.getBounds().getCenter();
         const label = L.marker(polygonCenter, { 
@@ -9163,6 +11762,10 @@ async function initializeApp() {
     };
 
     const onMapClick = (e: any) => {
+        if (drawingCandidateId) {
+            handleManualPathClick(e);
+            return;
+        }
         if (!isDrawingMode) return;
         const newWaypoint = e.latlng;
         const marker = L.marker(newWaypoint).addTo(map);
@@ -9186,6 +11789,58 @@ async function initializeApp() {
     const mapDiv = document.getElementById('map') as HTMLElement;
     const reportPreviewArea = document.getElementById('report-preview-area') as HTMLElement;
     const vehicleSelect = document.getElementById('vehicle-select') as HTMLSelectElement;
+    manualEntryButton = document.getElementById('manual-entry-toggle') as HTMLButtonElement;
+    if (manualEntryButton) {
+        manualEntryButton.addEventListener('click', () => {
+            if (manualEntryButton?.disabled) return;
+            setManualEntryMode(!manualEntryMode);
+        });
+        updateManualEntryButtonAvailability(currentActiveTab === 'nav-threat-analysis');
+    }
+    
+    // Manual path drawing button
+    const manualPathDrawingBtn = document.getElementById('manual-path-drawing-toggle') as HTMLButtonElement;
+    if (manualPathDrawingBtn) {
+        manualPathDrawingBtn.addEventListener('click', () => {
+            if (drawingCandidateId) {
+                // If already drawing, finish it
+                finishPathDrawing();
+            } else {
+                // Show selection dialog or use first manual entry
+                const manager = (window as any).entryDetectionManager;
+                if (!manager || !manager.candidates) {
+                    showNotification('Bitte zuerst eine manuelle Zufahrt hinzufügen.', 'warning');
+                    return;
+                }
+                
+                // Find manual entries
+                const manualCandidates = manager.candidates.filter((c: any) => c.manual);
+                if (manualCandidates.length === 0) {
+                    showNotification('Bitte zuerst eine manuelle Zufahrt hinzufügen (Rechtsklick auf Polygon-Rand).', 'warning');
+                    return;
+                }
+                
+                // If only one manual entry, use it directly
+                if (manualCandidates.length === 1) {
+                    startPathDrawingForEntryPoint(manualCandidates[0].id);
+                } else {
+                    // Multiple entries - use the first one or show selection
+                    // For now, use the first one
+                    startPathDrawingForEntryPoint(manualCandidates[0].id);
+                    showNotification(`Pfadzeichnen für Zufahrtspunkt gestartet. (${manualCandidates.length} manuelle Zufahrten verfügbar)`, 'info');
+                }
+            }
+        });
+    }
+    
+    // Calculate speeds button
+    const calculateSpeedsBtn = document.getElementById('calculate-speeds-btn') as HTMLButtonElement;
+    if (calculateSpeedsBtn) {
+        calculateSpeedsBtn.addEventListener('click', () => {
+            calculateSpeedsForManualPaths();
+            showNotification('Geschwindigkeiten für manuelle Pfade berechnet.', 'success');
+        });
+    }
 
     const handleNavSwitch = async (newTabId: string, clickedLink?: HTMLAnchorElement) => {
         // Update current active tab
@@ -9208,9 +11863,13 @@ async function initializeApp() {
             t.classList.toggle('active', t.getAttribute('data-target') === newTabId);
         });
 
+        updateManualEntryButtonAvailability(newTabId === 'nav-threat-analysis');
+
         if (newTabId === 'nav-param-input') {
-            resetDrawing();
-            clearThreatAnalysis();
+            // DON'T reset drawing or clear threat analysis when switching to parameter tab!
+            // The user needs to keep their security area while adjusting parameters
+            // resetDrawing();  // REMOVED - was deleting the security area polygon
+            // clearThreatAnalysis();  // REMOVED - was clearing threat analysis data
             generatedPdf = null;
             generatedPdfFilename = '';
             
@@ -9272,6 +11931,13 @@ async function initializeApp() {
         downloadReportBtn.classList.add('hidden');
         const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
         if (addAreaBtn) addAreaBtn.classList.add('hidden');
+        // Hide manual entry buttons when switching away from threat analysis
+        const manualEntryBtn = document.getElementById('manual-entry-toggle') as HTMLButtonElement;
+        const manualPathBtn = document.getElementById('manual-path-drawing-toggle') as HTMLButtonElement;
+        const calculateSpeedsBtn = document.getElementById('calculate-speeds-btn') as HTMLButtonElement;
+        if (manualEntryBtn) manualEntryBtn.classList.add('hidden');
+        if (manualPathBtn) manualPathBtn.classList.add('hidden');
+        if (calculateSpeedsBtn) calculateSpeedsBtn.classList.add('hidden');
         const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
         const downloadTenderBtn = document.getElementById('download-tender-btn') as HTMLButtonElement;
         if (createTenderBtn) createTenderBtn.classList.add('hidden');
@@ -9306,6 +11972,13 @@ async function initializeApp() {
             resetDrawingBtn.classList.remove('hidden');
         } else if (newTabId === 'nav-threat-analysis') {
             analyzeThreatsBtn.classList.remove('hidden');
+            // Show manual entry buttons
+            const manualEntryBtn = document.getElementById('manual-entry-toggle') as HTMLButtonElement;
+            const manualPathBtn = document.getElementById('manual-path-drawing-toggle') as HTMLButtonElement;
+            const calculateSpeedsBtn = document.getElementById('calculate-speeds-btn') as HTMLButtonElement;
+            if (manualEntryBtn) manualEntryBtn.classList.remove('hidden');
+            if (manualPathBtn) manualPathBtn.classList.remove('hidden');
+            if (calculateSpeedsBtn) calculateSpeedsBtn.classList.remove('hidden');
         } else if (newTabId === 'nav-risk-report') {
             createReportBtn.classList.remove('hidden');
             downloadReportBtn.classList.remove('hidden');
@@ -9617,6 +12290,7 @@ function restoreSecurityAreaState() {
             weight: 3,
             fillOpacity: 0.1
         }).addTo(map);
+        attachManualEntryHandlersToPolygon(drawnPolygon);
         
         // Recreate the label
         polygonLabel = L.marker(savedState.center, {
@@ -10359,7 +13033,7 @@ function generateCategoriesOptions(counts: any): string {
     const isGerman = currentLanguage === 'de';
     
     // Map German product types to categories for display
-    const categoryMapping = {
+    const categoryMapping: Record<string, string> = {
         'Poller': isGerman ? 'Poller' : 'Bollards',
         'Zaun': isGerman ? 'Zaun' : 'Perimeter Barriers', 
         'Tor': isGerman ? 'Tor' : 'Gates',

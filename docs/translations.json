@@ -243,7 +243,7 @@
       "productClass": "Informationen zur empfohlenen Produktklasse."
     },
     "map": {
-      "searchPlaceholder": "Paderborn, Innenstadt",
+      "searchPlaceholder": "Soest",
       "searchButton": "Suchen",
       "setWaypoints": "Wegpunkte setzen",
       "setWaypointsActive": "Zeichnen aktiv",
@@ -504,7 +504,7 @@
         "assetToProtect": "Please enter"
     },
     "map": {
-      "searchPlaceholder": "Dortmund, City Center",
+      "searchPlaceholder": "Soest",
       "searchButton": "Search",
       "setWaypoints": "Set Waypoints",
       "setWaypointsActive": "Waypoints Active",

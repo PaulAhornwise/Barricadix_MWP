@@ -2,7 +2,8 @@
  * OSM-based speed limit integration for vehicle dynamics
  */
 
-import { OsmBundle, OsmWayLite, OsmTrafficNode } from './osm.js';
+import type { OsmBundle } from '../core/geodata/provider';
+import type { OsmNode, OsmWay, OsmNodeId } from '../shared/graph/types';
 import { 
   parseMaxspeed, 
   muFromSurface, 
@@ -37,6 +38,7 @@ export interface SpeedConstraints {
  */
 export class OsmSpeedLimiter {
   private osmData: OsmBundle | null = null;
+  private nodeIndex = new Map<OsmNodeId, OsmNode>();
   private config: SpeedLimitConfig;
 
   constructor(config: SpeedLimitConfig) {
@@ -45,6 +47,10 @@ export class OsmSpeedLimiter {
 
   setOsmData(data: OsmBundle): void {
     this.osmData = data;
+    this.nodeIndex.clear();
+    if (data?.nodes) {
+      data.nodes.forEach(node => this.nodeIndex.set(node.id, node));
+    }
   }
 
   updateConfig(config: Partial<SpeedLimitConfig>): void {
@@ -84,24 +90,19 @@ export class OsmSpeedLimiter {
     let closestDistance = Infinity;
 
     for (const way of this.osmData.ways) {
-      if (!way.tags.maxspeed || way.nodes.length < 2) continue;
+      if (!way.tags?.maxspeed) continue;
+      const tags = way.tags!;
 
-      // Check distance to way segments
-      for (let i = 0; i < way.nodes.length - 1; i++) {
-        const segStart = { lat: way.nodes[i].lat, lng: way.nodes[i].lon };
-        const segEnd = { lat: way.nodes[i + 1].lat, lng: way.nodes[i + 1].lon };
-        
+      this.forEachWaySegment(way, (segStart, segEnd) => {
         const closest = closestPointOnSegment(point, segStart, segEnd);
-        
-        // Within 15m tolerance
         if (closest.distance < 15 && closest.distance < closestDistance) {
-          const parsed = parseMaxspeed(way.tags.maxspeed);
+          const parsed = parseMaxspeed(String(tags.maxspeed));
           if (parsed !== undefined) {
             closestMaxspeed = parsed;
             closestDistance = closest.distance;
           }
         }
-      }
+      });
     }
 
     return closestMaxspeed;
@@ -112,7 +113,7 @@ export class OsmSpeedLimiter {
 
     let lowestCap: number | undefined;
 
-    for (const calmingNode of this.osmData.calming) {
+    for (const calmingNode of (this.osmData.calming || [])) {
       const nodePoint = { lat: calmingNode.lat, lng: calmingNode.lon };
       const distance = getDistance(point, nodePoint);
 
@@ -135,27 +136,35 @@ export class OsmSpeedLimiter {
     let closestDistance = Infinity;
 
     for (const way of this.osmData.ways) {
-      if (!way.tags.surface || way.nodes.length < 2) continue;
+      if (!way.tags?.surface) continue;
+      const tags = way.tags!;
 
-      // Check distance to way segments
-      for (let i = 0; i < way.nodes.length - 1; i++) {
-        const segStart = { lat: way.nodes[i].lat, lng: way.nodes[i].lon };
-        const segEnd = { lat: way.nodes[i + 1].lat, lng: way.nodes[i + 1].lon };
-        
+      this.forEachWaySegment(way, (segStart, segEnd) => {
         const closest = closestPointOnSegment(point, segStart, segEnd);
-        
-        // Within 15m tolerance
         if (closest.distance < 15 && closest.distance < closestDistance) {
-          const baseMu = muFromSurface(way.tags.surface, way.tags.smoothness);
+          const baseMu = muFromSurface(String(tags.surface), tags.smoothness ? String(tags.smoothness) : undefined);
           if (baseMu !== undefined) {
             closestMu = baseMu * weatherMultiplier(this.config.weather);
             closestDistance = closest.distance;
           }
         }
-      }
+      });
     }
 
     return closestMu;
+  }
+
+  private forEachWaySegment(
+    way: OsmWay,
+    cb: (segStart: {lat: number; lng: number}, segEnd: {lat: number; lng: number}) => void
+  ): void {
+    if (!way.nodeIds || way.nodeIds.length < 2) return;
+    for (let i = 0; i < way.nodeIds.length - 1; i++) {
+      const start = this.nodeIndex.get(way.nodeIds[i]);
+      const end = this.nodeIndex.get(way.nodeIds[i + 1]);
+      if (!start || !end) continue;
+      cb({ lat: start.lat, lng: start.lon }, { lat: end.lat, lng: end.lon });
+    }
   }
 
   /**

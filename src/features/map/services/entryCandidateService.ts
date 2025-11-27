@@ -86,11 +86,13 @@ export function prepareEntryDetectionInput(
       return null;
     }
 
+    const maxSearchMeters = Math.max(outerBufferMeters * 4, 120);
+    
     return {
       polygon,
       osm: { nodes, ways },
       outerBufferMeters,
-      maxSearchMeters: outerBufferMeters * 2
+      maxSearchMeters
     };
   } catch (error) {
     console.error('❌ Error preparing entry detection input:', error);

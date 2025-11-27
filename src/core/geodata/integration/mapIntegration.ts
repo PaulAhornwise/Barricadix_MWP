@@ -215,3 +215,64 @@ export function getCurrentProvider(): GeoDataProvider | null {
 export function getCurrentProviderId(): string {
   return currentProvider?.id || 'unknown';
 }
+
+/**
+ * Toggle between GEONRW and OSM basemap providers.
+ * 
+ * This function allows manual switching between the two available basemap providers
+ * regardless of the current map location.
+ * 
+ * @param map Leaflet map instance
+ * @returns Promise resolving when toggle is complete
+ */
+export async function toggleBasemapProvider(map: any): Promise<void> {
+  console.log('[mapIntegration] Toggling basemap provider');
+  
+  try {
+    // Import both providers
+    const { nrwProvider } = await import("../providers/nrwProvider");
+    const { osmProvider } = await import("../providers/osmProvider");
+    
+    // Determine target provider (switch from current to the other)
+    const targetProviderId = currentProvider?.id === 'nrw' ? 'osm' : 'nrw';
+    const targetProvider = targetProviderId === 'nrw' ? nrwProvider : osmProvider;
+    
+    console.log(`[mapIntegration] Switching from ${currentProvider?.id || 'unknown'} to ${targetProviderId}`);
+    
+    // Remove current basemap layer
+    const currentBasemapLayer = (map as any)._currentBasemapLayer;
+    if (currentBasemapLayer) {
+      map.removeLayer(currentBasemapLayer);
+      console.log('[mapIntegration] Removed current basemap layer');
+    }
+    
+    // Create and add new basemap layer
+    const newBasemapLayer = targetProvider.makeBasemapLayer();
+    if (newBasemapLayer) {
+      newBasemapLayer.addTo(map);
+      (map as any)._currentBasemapLayer = newBasemapLayer;
+      currentProvider = targetProvider;
+      console.log(`[mapIntegration] Added new basemap layer from ${targetProviderId} provider`);
+    } else {
+      console.error(`[mapIntegration] Failed to create basemap layer from ${targetProviderId} provider`);
+      return;
+    }
+    
+    // Update source attribution
+    addSourceAttributionControl(map, targetProviderId);
+    
+    // Update attribution div if it exists (for compatibility with index.tsx)
+    const attributionDiv = document.getElementById('provider-attribution');
+    if (attributionDiv) {
+      attributionDiv.textContent = targetProviderId === 'nrw' ? 'Quelle: GEOBASIS.NRW' : 'Quelle: OSM';
+    }
+    
+    // Store provider globally for data fetching (for compatibility with index.tsx)
+    (window as any).currentProvider = targetProvider;
+    
+    console.log(`[mapIntegration] Successfully toggled to ${targetProviderId} provider`);
+    
+  } catch (error) {
+    console.error('[mapIntegration] Failed to toggle basemap provider:', error);
+  }
+}

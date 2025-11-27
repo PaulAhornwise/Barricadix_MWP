@@ -145,45 +145,114 @@ function lineFromNodeIds(g: OsmGraph, nodeIds: OsmNodeId[]): Feature<LineString>
 }
 
 /** Finde Knoten außerhalb des Polygons im Außenbuffer (Startkandidaten) - OPTIMIERT mit Grid */
-function findOutsideStartNodes(g: OsmGraph, poly: Feature<Polygon>, outerBufferMeters: number): OsmNodeId[] {
-  const buf = makeOuterBuffer(poly, outerBufferMeters);
-  const result: OsmNodeId[] = [];
+function findOutsideStartNodes(
+  g: OsmGraph,
+  poly: Feature<Polygon>,
+  outerBufferMeters: number,
+  maxSearchMeters: number
+): OsmNodeId[] {
+  const MIN_START_NODES = 12;
+  const result = new Set<OsmNodeId>();
   
   // Nutze Spatial Grid für bessere Performance (adaptive cell size)
   const cellSize = g.nodes.size < 100 ? 0.0005 : 50; // Small cells for test data, large for production
   const grid = new SpatialGrid(g.nodes, cellSize);
   grid.index(g.nodes);
   
-  // Verwende Grid für schnelle Suche, aber mit Fallback
+  // Verwende Grid für schnelle Suche basierend auf polygonzentriertem Radius
   const polyBbox = poly.geometry.coordinates[0];
   const centerLon = polyBbox.reduce((sum, c) => sum + c[0], 0) / polyBbox.length;
   const centerLat = polyBbox.reduce((sum, c) => sum + c[1], 0) / polyBbox.length;
   
-  // Erweitere Suchradius für kleine Datensätze (z.B. Tests)
-  const searchRadius = g.nodes.size < 100 ? outerBufferMeters * 10 : outerBufferMeters * 3;
-  const candidateIds = grid.nearNodes(centerLon, centerLat, searchRadius);
-  
-  for (const id of candidateIds) {
-    const n = g.nodes.get(id);
-    if (!n) continue;
-    const coord: Position = [n.lon, n.lat];
-    // Im Buffer aber NICHT im Polygon => „außen nah am Rand"
-    if (!isInside(poly, coord) && isInside(buf, coord)) {
-      result.push(id);
-    }
-  }
-  
-  // Fallback: Falls Grid keine Ergebnisse liefert, verwende vollständige Suche
-  if (result.length === 0 && g.nodes.size < 10000) {
-    for (const [id, n] of g.nodes) {
-      const coord: Position = [n.lon, n.lat];
-      if (!isInside(poly, coord) && isInside(buf, coord)) {
-        result.push(id);
+  // Strategy 1: Robust Crossing Segment Search (finds edges that directly cross the boundary)
+  // This ensures we find entries even if nodes are far apart or outside the buffer
+  console.log('🔍 Running Crossing Segment Search...');
+  let crossingCount = 0;
+  for (const way of g.ways.values()) {
+    const nodeIds = way.nodeIds;
+    for (let i = 0; i < nodeIds.length - 1; i++) {
+      const id1 = nodeIds[i];
+      const id2 = nodeIds[i+1];
+      const n1 = g.nodes.get(id1);
+      const n2 = g.nodes.get(id2);
+      
+      if (!n1 || !n2) continue;
+      
+      // Check if one node is inside and the other is outside
+      const p1: Position = [n1.lon, n1.lat];
+      const p2: Position = [n2.lon, n2.lat];
+      
+      // Simple optimization: check bounding box of segment against polygon bbox could go here
+      
+      const in1 = isInside(poly, p1);
+      const in2 = isInside(poly, p2);
+      
+      if (in1 !== in2) {
+        // Crossing segment found! Add the outside node.
+        const outsideId = in1 ? id2 : id1;
+        result.add(outsideId);
+        crossingCount++;
       }
     }
   }
+  console.log(`✅ Crossing Segment Search found ${crossingCount} crossing edges`);
+
+  // Strategy 2: Spatial Grid Search (finds nodes near the boundary)
+  const maxDistance = Math.max(maxSearchMeters, outerBufferMeters);
   
-  return result;
+  console.log(`🔍 Running Grid Search: center [${centerLon.toFixed(6)}, ${centerLat.toFixed(6)}], maxDist=${maxDistance}m`);
+  
+  for (let distance = outerBufferMeters; distance <= maxDistance; distance += outerBufferMeters) {
+    const buf = makeOuterBuffer(poly, distance);
+    const candidateIds = grid.nearNodes(centerLon, centerLat, distance);
+    
+    let checkedCount = 0;
+    let outsidePolyCount = 0;
+    let inBufferCount = 0;
+    
+    for (const id of candidateIds) {
+      const n = g.nodes.get(id);
+      if (!n) continue;
+      checkedCount++;
+      const coord: Position = [n.lon, n.lat];
+      const isOutsidePoly = !isInside(poly, coord);
+      const isInBuffer = isInside(buf, coord);
+      
+      if (isOutsidePoly) outsidePolyCount++;
+      if (isInBuffer) inBufferCount++;
+      
+      if (isOutsidePoly && isInBuffer) {
+        result.add(id);
+      }
+    }
+    
+    console.log(`  Distance ${distance}m: checked ${checkedCount} nodes, ${outsidePolyCount} outside polygon, ${inBufferCount} in buffer, ${result.size} total start nodes`);
+    
+    if (result.size >= MIN_START_NODES) {
+      console.log(`✅ Found ${result.size} start nodes (>= ${MIN_START_NODES}), stopping search`);
+      break;
+    }
+  }
+  
+  // Fallback: Falls weiterhin keine Startknoten existieren, nutze vollständige Suche
+  if (result.size === 0 && g.nodes.size < 10000) {
+    console.log(`⚠️ No start nodes found with grid search, trying full search through ${g.nodes.size} nodes...`);
+    const fallbackBuffer = makeOuterBuffer(poly, maxDistance);
+    let fallbackChecked = 0;
+    let fallbackAdded = 0;
+    for (const [id, n] of g.nodes) {
+      fallbackChecked++;
+      const coord: Position = [n.lon, n.lat];
+      if (!isInside(poly, coord) && isInside(fallbackBuffer, coord)) {
+        result.add(id);
+        fallbackAdded++;
+      }
+    }
+    console.log(`  Fallback: checked ${fallbackChecked} nodes, added ${fallbackAdded} start nodes`);
+  }
+  
+  console.log(`📊 Total start nodes found: ${result.size}`);
+  return Array.from(result);
 }
 
 /** A* Pathfinding mit Heuristik für bessere Performance */
@@ -359,10 +428,20 @@ function calculateConfidence(
 
 export function detectEntryCandidates(input: EntryDetectionInput): EntryDetectionResult {
   const startTime = performance.now();
-  const { polygon, osm, outerBufferMeters = 30 } = input;
+  const {
+    polygon,
+    osm,
+    outerBufferMeters = 30,
+    maxSearchMeters = outerBufferMeters * 5
+  } = input;
+  
+  console.log(`🔍 Entry Detection Input: ${osm.nodes.length} nodes, ${osm.ways.length} ways, outerBuffer=${outerBufferMeters}m, maxSearch=${maxSearchMeters}m`);
   
   const g = buildGraph(osm.nodes, osm.ways);
-  const starts = findOutsideStartNodes(g, polygon, outerBufferMeters);
+  console.log(`📊 Graph built: ${g.nodes.size} nodes, ${g.ways.size} ways, ${Array.from(g.adj.values()).reduce((sum, adj) => sum + adj.size, 0)} edges`);
+  
+  const starts = findOutsideStartNodes(g, polygon, outerBufferMeters, maxSearchMeters);
+  console.log(`📍 Found ${starts.length} start nodes outside polygon`);
 
   // Verbesserte räumliche Deduplizierung mit Clustering
   const spatialClusters = new Map<string, EntryCandidate[]>();
@@ -370,6 +449,8 @@ export function detectEntryCandidates(input: EntryDetectionInput): EntryDetectio
   console.log(`🔍 Starting OPTIMIZED entry detection with ${starts.length} start nodes`);
 
   let totalVisitedNodes = 0;
+  let pathsFound = 0;
+  let pathsWithoutHit = 0;
   const maxStarts = 1000; // Limitiere auf wichtigste Startpunkte
   
   // Sortiere Startpunkte nach Distanz zum Polygon-Rand (wichtigere zuerst)
@@ -377,7 +458,11 @@ export function detectEntryCandidates(input: EntryDetectionInput): EntryDetectio
 
   for (const s of sortedStarts) {
     const res = bfsToPolygonEdge(g, polygon, s);
-    if (!res.path || !res.hitPoint) continue;
+    if (!res.path || !res.hitPoint) {
+      pathsWithoutHit++;
+      continue;
+    }
+    pathsFound++;
     
     totalVisitedNodes += res.visitedCount || 0;
 
@@ -433,6 +518,15 @@ export function detectEntryCandidates(input: EntryDetectionInput): EntryDetectio
 
   console.log(`✅ OPTIMIZED Entry detection completed: ${deduplicatedCandidates.length} unique candidates found in ${processingTime.toFixed(1)}ms`);
   console.log(`📊 Visited nodes: ${totalVisitedNodes.toLocaleString()}, Efficiency: ${(deduplicatedCandidates.length / totalVisitedNodes * 100).toFixed(2)}%`);
+  console.log(`📊 Paths found: ${pathsFound}, Paths without hit: ${pathsWithoutHit}, Clusters: ${spatialClusters.size}`);
+  
+  if (deduplicatedCandidates.length === 0 && pathsFound > 0) {
+    console.warn(`⚠️ WARNING: Found ${pathsFound} paths but no entry candidates! This might indicate a clustering or confidence filtering issue.`);
+  }
+  
+  if (starts.length === 0) {
+    console.error(`❌ ERROR: No start nodes found! This means no nodes were found outside the polygon. Check polygon bounds and OSM data coverage.`);
+  }
 
   return {
     candidates: deduplicatedCandidates.sort((a, b) => b.confidence - a.confidence),

@@ -39,6 +39,8 @@ export interface EntryCandidate {
   confidence: number;          // 0..1
   /** Referenz auf verwendete wayIds (zur UI-Hervorhebung) */
   wayIds: OsmWayId[];
+  /** Markierung für manuell hinzugefügte Zufahrten */
+  manual?: boolean;
 }
 
 export interface EntryDetectionInput {

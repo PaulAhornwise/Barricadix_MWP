@@ -98,6 +98,7 @@ describe("Entry Detection Integration", () => {
       expect(result!.osm.nodes.length).toBe(2);
       expect(result!.osm.ways.length).toBe(1);
       expect(result!.outerBufferMeters).toBe(50);
+      expect(result!.maxSearchMeters).toBe(200);
     });
 
     it("should convert existing format when needed", () => {
@@ -120,6 +121,7 @@ describe("Entry Detection Integration", () => {
       expect(result!.osm.nodes.length).toBe(2);
       expect(result!.osm.ways.length).toBe(1);
       expect(result!.outerBufferMeters).toBe(30);
+      expect(result!.maxSearchMeters).toBe(120);
     });
 
     it("should return null for invalid input", () => {
@@ -137,6 +139,7 @@ describe("Entry Detection Integration", () => {
       const result = prepareEntryDetectionInput(testPolygon, osmData);
       
       expect(result!.outerBufferMeters).toBe(30); // Default value
+      expect(result!.maxSearchMeters).toBe(120);
     });
   });
 

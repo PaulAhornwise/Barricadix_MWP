@@ -357,7 +357,7 @@ export default function ZufahrtsschutzChatbot({
   // Expose globally so the Bericht-Fallback Chat-Daten nutzen kann
   (window as any).planningState = planningState;
 
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: "bot" | "user"; text: string; field?: string }[]>([]);
   const [currentQ, setCurrentQ] = useState<Question | null>(null);
   const [completed, setCompleted] = useState(false);

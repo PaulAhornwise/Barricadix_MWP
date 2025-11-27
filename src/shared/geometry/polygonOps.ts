@@ -23,7 +23,9 @@ export function intersectLineWithPolygon(line: Feature<LineString>, poly: Featur
 }
 
 export function linestringLengthMeters(line: Feature<LineString>): number {
-  return length(line, { units: "meters" }) * 1000;
+  // length() from turf.js already returns meters when units: "meters" is specified
+  // No need to multiply by 1000 - that was causing distances to be 1000x too large
+  return length(line, { units: "meters" });
 }
 
 /** Grobe „Geradheit" 0..1 aus Segmentwinkeln (1 = gerade) */

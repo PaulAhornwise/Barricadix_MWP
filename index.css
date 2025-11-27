@@ -574,6 +574,56 @@
     filter: hue-rotate(30deg) brightness(1.2);
 }
 
+/* Entry number label styling */
+.entry-number-label {
+    background: transparent !important;
+    border: none !important;
+}
+
+.entry-number-label div {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    text-align: center;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+/* Report entry tooltip styling */
+.leaflet-popup.report-entry-tooltip {
+    pointer-events: none;
+}
+
+.leaflet-popup.report-entry-tooltip .leaflet-popup-content-wrapper {
+    background: white;
+    border: 2px solid #DC143C;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.leaflet-popup.report-entry-tooltip .leaflet-popup-content {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-family: Arial, sans-serif;
+    color: #333;
+    min-width: 150px;
+}
+
+.leaflet-popup.report-entry-tooltip .leaflet-popup-tip {
+    background: white;
+    border: 2px solid #DC143C;
+    border-top: none;
+    border-left: none;
+}
+
 /* Fluid base typography for responsive scaling */
 html {
     font-size: clamp(12px, 0.8vw + 10px, 15px);
@@ -1276,6 +1326,54 @@ input[type="range"]::-moz-range-thumb {
     white-space: nowrap;
 }
 
+/* Special styling for calculate speeds button - same style as map-action-btn */
+.calculate-speeds-btn-toolbar {
+    background-color: rgba(12, 47, 77, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: var(--accent-color) !important;
+}
+
+.calculate-speeds-btn-toolbar:hover {
+    background-color: var(--accent-color) !important;
+    color: white !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.calculate-speeds-btn-toolbar i {
+    color: inherit !important;
+}
+
+/* Manual entry buttons in toolbar - same style as map-action-btn */
+.manual-entry-btn-toolbar {
+    background-color: rgba(12, 47, 77, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: var(--accent-color) !important;
+}
+
+.manual-entry-btn-toolbar:hover {
+    background-color: var(--accent-color) !important;
+    color: white !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.manual-entry-btn-toolbar.active {
+    background-color: rgba(59, 130, 246, 0.15) !important; /* Very transparent blue */
+    border-color: #3b82f6 !important; /* Solid Blue */
+    color: #3b82f6 !important; /* Solid Blue */
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3) !important;
+}
+
+.manual-entry-btn-toolbar.active:hover {
+    background-color: rgba(59, 130, 246, 0.25) !important;
+    color: #3b82f6 !important;
+}
+
+.manual-entry-btn-toolbar i {
+    color: inherit !important;
+}
+
 .map-action-btn:hover {
     background-color: var(--accent-color);
     color: white;
@@ -1297,6 +1395,38 @@ input[type="range"]::-moz-range-thumb {
     color: var(--accent-color);
     transform: none;
     box-shadow: none;
+}
+
+.waypoint-context-menu {
+    position: absolute;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.95);
+    color: white;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transform: translate(-50%, -100%);
+    pointer-events: auto;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    min-width: 120px;
+}
+
+.waypoint-context-menu button {
+    background: #dc2626;
+    border: none;
+    color: white;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.waypoint-context-menu button:hover {
+    background: #b91c1c;
 }
 
 .selection-error { padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-weight: 600; text-align: center; background-color: #a41e1e; color: white; border: 1px solid #c73e3e; }
@@ -1341,7 +1471,12 @@ input[type="range"]::-moz-range-thumb {
 .map-tabs + .map-toolbar .map-actions { order: -1; }
 .map-action-btn { background-color: rgba(12, 47, 77, 0.9); backdrop-filter: blur(4px); border: 1px solid var(--accent-color); color: var(--accent-color); border-radius: 10px; padding: 6px 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s, border-color 0.2s; display: flex; align-items: center; gap: 6px; white-space: nowrap; user-select: none; height: 36px; box-sizing: border-box; }
 .map-action-btn:hover { background-color: var(--accent-color); color: var(--card-bg); }
-.map-action-btn.active { background-color: var(--accent-color); color: white; border-color: var(--accent-color); }
+.map-action-btn.active {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3) !important;
+}
 .map-action-btn:disabled, .map-action-btn:disabled:hover { cursor: not-allowed; background-color: rgba(1, 42, 74, 0.5); border-color: var(--secondary-text); color: var(--secondary-text); }
 
 /* New view container styles */
@@ -1933,26 +2068,70 @@ div.search-marker.leaflet-marker-icon {
 #parameter-bubble,
 .parameter-bubble {
     position: fixed !important; /* Changed from absolute to fixed */
-    top: 80px !important;
-    left: 16px !important;
+    /* Top and Left are set inline via HTML/JS now */
     width: 320px !important;
-    max-width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 56px) !important;
     background: rgba(12, 47, 77, 0.95) !important;
     backdrop-filter: blur(10px) !important;
-    border: 2px solid #00ff00 !important; /* DEBUG: Green border */
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
     border-radius: 16px !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-    z-index: 99999 !important; /* Even higher z-index */
-    transition: none !important; /* Remove transitions for debugging */
-    max-height: calc(100vh - 140px) !important;
-    overflow: visible !important; /* Changed to visible */
+    z-index: 9999 !important;
+    transition: transform 0.3s ease, opacity 0.3s ease !important;
+    opacity: 0;
+    transform: translateX(-100%);
+    visibility: hidden;
+    /* Max-height handled inline */
+    overflow-y: auto !important;
     display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    /* Visibility and opacity controlled by JS */
     pointer-events: auto !important;
-    /* Additional debug styles */
-    min-height: 200px !important;
-    background-color: rgba(255, 0, 0, 0.5) !important; /* DEBUG: Red background */
+}
+
+#hazard-analysis-bubble {
+    position: fixed !important;
+    /* Top and Left are set inline via HTML/JS */
+    width: 416px !important; /* 30% wider than original 320px */
+    max-width: calc(100vw - 56px) !important;
+    max-height: 84vh !important; /* 20% taller (70vh * 1.2 = 84vh) */
+    background: rgba(12, 47, 77, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+    z-index: 9999 !important;
+    transition: transform 0.3s ease, opacity 0.3s ease !important;
+    opacity: 0;
+    transform: translateX(-100%);
+    visibility: hidden;
+    overflow: hidden !important; /* No scrollbar on outer container */
+    display: block !important;
+    pointer-events: auto !important;
+}
+
+/* Hazard Analysis Collapsible Categories */
+.hazard-category {
+    transition: all 0.3s ease;
+}
+
+.hazard-category-header:hover {
+    background: rgba(30, 144, 255, 0.25) !important;
+}
+
+.hazard-category-content {
+    background: rgba(10, 45, 74, 0.4);
+}
+
+.hazard-category.expanded .hazard-category-content {
+    display: block !important;
+}
+
+.hazard-chevron {
+    color: var(--secondary-text, #87CEEB);
+}
+
+.hazard-chevron.rotated {
+    transform: rotate(180deg);
 }
 
 .parameter-bubble-header {
@@ -2681,6 +2860,78 @@ div.search-marker.leaflet-marker-icon {
 .threat-panel-content {
     transition: all 0.3s ease;
     overflow: hidden;
+}
+
+.threat-panel-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    padding-bottom: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.manual-entry-btn {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(13, 148, 136, 0.15);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    white-space: nowrap;
+}
+
+.manual-entry-btn span {
+    flex: 1;
+    text-align: center;
+}
+
+.calculate-speeds-btn {
+    background: rgba(74, 222, 128, 0.2) !important;
+    border-color: rgba(74, 222, 128, 0.4) !important;
+}
+
+.calculate-speeds-btn:hover {
+    background: rgba(74, 222, 128, 0.3) !important;
+    border-color: rgba(74, 222, 128, 0.6) !important;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.3) !important;
+}
+
+.calculate-speeds-btn i {
+    color: #4ade80 !important;
+}
+
+.manual-entry-btn i {
+    color: #5eead4;
+}
+
+.manual-entry-btn:hover:not(:disabled),
+.manual-entry-btn.active {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.6);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+.manual-entry-btn.active {
+    color: #0d9488;
+    background: rgba(190, 242, 100, 0.15);
+    border-color: rgba(190, 242, 100, 0.6);
+}
+
+.manual-entry-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .threat-list {
