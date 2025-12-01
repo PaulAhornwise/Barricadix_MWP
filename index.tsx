@@ -1904,8 +1904,8 @@ async function loadProductDatabase() {
         // Populate filters efficiently
         populateProductFilters(products);
         
-        // Display products with lazy loading
-        await displayProducts(products);
+        // Display products with optimized rendering
+        displayProducts(products);
         
         // Hide loading indicator
         if (loadingIndicator) {
@@ -1922,6 +1922,8 @@ async function loadProductDatabase() {
             if (toggleBtn) {
                 setView('grid'); // Set initial view to grid (Kachelansicht)
             }
+            // Initialize filter system AFTER products are loaded and displayed
+            initializeFilterSystem();
         }, 100);
         
     } catch (error) {
@@ -1980,26 +1982,14 @@ function populateProductFilters(products: any[]) {
 }
 
 /**
- * Display products in the table
+ * Display products in the table - optimized to prevent flickering
  */
-async function displayProducts(products: any[]) {
-    console.log('🎯 displayProducts called with', products.length, 'products');
-    
-    // Check if required HTML elements exist
-    const tableBody = document.getElementById('products-tbody');
-    const gridContainer = document.getElementById('products-grid');
-    console.log('🔍 Table body element:', tableBody ? 'EXISTS' : 'MISSING');
-    console.log('🔍 Grid container element:', gridContainer ? 'EXISTS' : 'MISSING');
-    
-    // Display in table view
-    console.log('🎯 Calling displayProductsTable...');
+function displayProducts(products: any[]) {
+    // Display in table view (synchronous)
     displayProductsTable(products);
     
-    // Display in grid view
-    console.log('🎯 Calling displayProductsGrid...');
-    await displayProductsGrid(products);
-    
-    console.log('✅ displayProducts completed');
+    // Display in grid view (synchronous with debounce)
+    displayProductsGrid(products);
 }
 
 /**
@@ -2084,13 +2074,43 @@ function displayProductsTable(products: any[]) {
     });
 }
 
+// Debounce timer for displayProductsGrid to prevent flickering
+let displayGridDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastDisplayedProductsHash: string = '';
+
 /**
- * Display products in grid format
+ * Display products in grid format - optimized to prevent flickering
  */
-async function displayProductsGrid(products: any[]) {
+function displayProductsGrid(products: any[]) {
     const grid = document.getElementById('products-grid');
     if (!grid) return;
     
+    // Cancel any pending debounced render
+    if (displayGridDebounceTimer) {
+        clearTimeout(displayGridDebounceTimer);
+    }
+    
+    // Create a simple hash to check if products changed
+    const productsHash = products.length + '_' + (products[0]?.product_name || '') + '_' + (products[products.length - 1]?.product_name || '');
+    
+    // Skip if products haven't changed
+    if (productsHash === lastDisplayedProductsHash && grid.children.length > 0) {
+        return;
+    }
+    
+    // Use requestAnimationFrame for smoother rendering
+    displayGridDebounceTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+            renderProductGrid(products, grid);
+            lastDisplayedProductsHash = productsHash;
+        });
+    }, 50); // Small debounce to batch rapid filter changes
+}
+
+/**
+ * Actually render the product grid - called after debounce
+ */
+function renderProductGrid(products: any[], grid: HTMLElement) {
     grid.innerHTML = '';
     
     if (products.length === 0) {
@@ -2107,11 +2127,23 @@ async function displayProductsGrid(products: any[]) {
         noProductsGrid.style.display = 'none';
     }
     
+    // Get translated labels for product cards
+    const isGerman = currentLanguage === 'de';
+    const cardLabels = {
+        noImageAvailable: isGerman ? 'Kein Bild verfügbar' : 'No image available',
+        standard: 'Standard',
+        testSpeed: isGerman ? 'Testgeschwindigkeit' : 'Test Speed',
+        vehicleType: isGerman ? 'Fahrzeugtyp' : 'Vehicle Type',
+        impactAngle: isGerman ? 'Anprallwinkel' : 'Impact Angle',
+        penetrationDepth: isGerman ? 'Eindringtiefe' : 'Penetration Depth',
+        viewDetails: isGerman ? 'Details anzeigen' : 'View Details'
+    };
+    
     // First, remove duplicates and invalid products
     const cleanedProducts = removeDuplicateProducts(products);
     
-    // Sort products: products with REAL images first, then without images
-    const sortedProducts = await sortProductsByImageAvailability(cleanedProducts);
+    // Sort products: products with database images first (synchronous - no flickering)
+    const sortedProducts = sortProductsByImageAvailability(cleanedProducts);
     
     // Debug: Log first few products to see sorting
     console.log('First 5 products after sorting:', sortedProducts.slice(0, 5).map(p => ({
@@ -2152,7 +2184,7 @@ async function displayProductsGrid(products: any[]) {
                      class="product-image">
                 <div class="product-image-placeholder" style="display: none;">
                     <i class="fas fa-image"></i>
-                    <span>Kein Bild verfügbar</span>
+                    <span>${cardLabels.noImageAvailable}</span>
                 </div>
             </div>
             <div class="product-card-content">
@@ -2160,41 +2192,32 @@ async function displayProductsGrid(products: any[]) {
                     <div class="product-card-title">${product.product_name || 'N/A'}</div>
                     <div class="product-card-manufacturer">${product.manufacturer || 'N/A'}</div>
                 </div>
-                <div class="product-card-classification">
-                    <div class="product-card-type">
-                        <span class="type-badge ${product.product_cluster?.toLowerCase() || 'unknown'}">${product.product_type || 'N/A'}</span>
-                        <span class="cluster-badge">${product.product_cluster || 'N/A'}</span>
-                    </div>
-                    <div class="confidence-indicator">
-                        <span class="confidence-label">Vertrauen:</span>
-                        <span class="confidence-value">${product.product_type_confidence ? (product.product_type_confidence * 100).toFixed(0) + '%' : 'N/A'}</span>
-                    </div>
-                </div>
+                <!-- Kategorisierung ausgeblendet / Classification hidden -->
                 <div class="product-card-specs">
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Standard</div>
+                        <div class="product-card-spec-label">${cardLabels.standard}</div>
                         <div class="product-card-spec-value">${product.technical_data?.standard || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec highlight-speed">
-                        <div class="product-card-spec-label">Testgeschwindigkeit</div>
+                        <div class="product-card-spec-label">${cardLabels.testSpeed}</div>
                         <div class="product-card-spec-value"><strong>${product.technical_data?.pr_speed_kph || 'N/A'} km/h</strong></div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Fahrzeugtyp</div>
+                        <div class="product-card-spec-label">${cardLabels.vehicleType}</div>
                         <div class="product-card-spec-value">${product.technical_data?.pr_veh || 'N/A'}</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Anprallwinkel</div>
+                        <div class="product-card-spec-label">${cardLabels.impactAngle}</div>
                         <div class="product-card-spec-value">${product.technical_data?.pr_angle_deg || 'N/A'}°</div>
                     </div>
                     <div class="product-card-spec">
-                        <div class="product-card-spec-label">Eindringtiefe</div>
+                        <div class="product-card-spec-label">${cardLabels.penetrationDepth}</div>
                         <div class="product-card-spec-value">${product.technical_data?.pr_pen_m || 'N/A'} m</div>
                     </div>
                 </div>
                 <div class="product-card-actions">
                     <button class="product-card-btn secondary" data-product-index="${index}">
-                        Details anzeigen
+                        ${cardLabels.viewDetails}
                     </button>
                 </div>
             </div>
@@ -2267,94 +2290,30 @@ function removeDuplicateProducts(products: any[]): any[] {
 }
 
 /**
- * Sort products by ACTUAL image availability - products with real images first
+ * Sort products by image availability - optimized synchronous version
+ * Uses database metadata (product_image_file) for instant sorting without async image loading
+ * This prevents flickering by avoiding multiple DOM re-renders during async operations
  */
-async function sortProductsByImageAvailability(products: any[]): Promise<any[]> {
-    console.log('Sorting products by ACTUAL image availability...');
-    
-    // Check actual image availability for all products
-    const productsWithImageStatus = await Promise.all(
-        products.map(async (product) => {
-            const imagePath = generateProductImagePath(product);
-            const hasRealImage = await checkImageExists(imagePath);
-            const hasDatabaseFilename = product.product_image_file && product.product_image_file !== null && product.product_image_file.trim() !== '';
-            return {
-                ...product,
-                hasRealImage: hasRealImage,
-                hasDatabaseFilename: hasDatabaseFilename
-            };
-        })
-    );
-    
-    // Sort by priority: 1) Products with database filename AND real image, 2) Products with real image (but no database filename), 3) Products without images
-    const sorted = productsWithImageStatus.sort((a: any, b: any) => {
-        // Priority 1: Products with database filename and real image
-        if (a.hasDatabaseFilename && a.hasRealImage && !(b.hasDatabaseFilename && b.hasRealImage)) {
-            console.log(`Sorting: "${a.product_name}" (database image) before "${b.product_name}"`);
-            return -1;
-        }
-        if (b.hasDatabaseFilename && b.hasRealImage && !(a.hasDatabaseFilename && a.hasRealImage)) {
-            console.log(`Sorting: "${b.product_name}" (database image) before "${a.product_name}"`);
-            return 1;
-        }
+function sortProductsByImageAvailability(products: any[]): any[] {
+    // Use synchronous sorting based on database metadata (product_image_file field)
+    const productsWithImageStatus = products.map((product) => {
+        const hasDatabaseFilename = product.product_image_file && 
+            product.product_image_file !== null && 
+            product.product_image_file.trim() !== '' &&
+            product.product_image_file !== 'N/A';
         
-        // Priority 2: Products with real image (fallback to name-based image)
-        if (a.hasRealImage && !b.hasRealImage) {
-            console.log(`Sorting: "${a.product_name}" (has real image) before "${b.product_name}" (no image)`);
-            return -1;
-        }
-        if (!a.hasRealImage && b.hasRealImage) {
-            console.log(`Sorting: "${b.product_name}" (has real image) before "${a.product_name}" (no image)`);
-            return 1;
-        }
-        
-        return 0; // Equal priority
+        return {
+            ...product,
+            hasRealImage: hasDatabaseFilename,
+            hasDatabaseFilename: hasDatabaseFilename
+        };
     });
     
-    // Debug output
-    const withDatabaseImages = sorted.filter(p => p.hasDatabaseFilename && p.hasRealImage);
-    const withTypeBasedImages = sorted.filter(p => !p.hasDatabaseFilename && p.hasRealImage);
-    const withoutImages = sorted.filter(p => !p.hasRealImage);
-    console.log(`Sorting completed: ${withDatabaseImages.length} products with DATABASE images, ${withTypeBasedImages.length} products with TYPE-based images, ${withoutImages.length} products WITHOUT images`);
-    
-    console.log('First 5 products with database images:');
-    withDatabaseImages.slice(0, 5).forEach((p, i) => {
-        console.log(`${i + 1}. "${p.product_name}" - Database filename: ${p.product_image_file}`);
-    });
-    
-    return sorted;
-}
-
-/**
- * Check if an image exists with optimized loading
- */
-function checkImageExists(imagePath: string): Promise<boolean> {
-    return new Promise((resolve) => {
-        const img = new Image();
-        const timeout = setTimeout(() => {
-            resolve(false);
-        }, 1500); // Reduced timeout for faster loading
-        
-        img.onload = () => {
-            clearTimeout(timeout);
-            resolve(true);
-        };
-        
-        img.onerror = () => {
-            clearTimeout(timeout);
-            resolve(false);
-        };
-        
-        // Add loading optimization
-        img.loading = 'lazy';
-        img.decoding = 'async';
-        img.src = imagePath;
-        
-        // Timeout after 2 seconds to avoid hanging
-        setTimeout(() => {
-            console.log('⏰ Image check timeout:', imagePath);
-            resolve(false);
-        }, 2000);
+    // Sort by priority: Products with database image filename first
+    return productsWithImageStatus.sort((a: any, b: any) => {
+        if (a.hasDatabaseFilename && !b.hasDatabaseFilename) return -1;
+        if (!a.hasDatabaseFilename && b.hasDatabaseFilename) return 1;
+        return 0;
     });
 }
 
@@ -2470,16 +2429,9 @@ function initProductSearchAndFilters() {
         speedFilter.addEventListener('change', filterProducts);
     }
     
-    // Parameter menu filters
-    const productPropertySelect = document.getElementById('product-property-select');
-    if (productPropertySelect) {
-        productPropertySelect.addEventListener('change', filterProducts);
-    }
-    
-    const vehicleSelect = document.getElementById('vehicle-select');
-    if (vehicleSelect) {
-        vehicleSelect.addEventListener('change', filterProducts);
-    }
+    // NOTE: Planning parameters (productPropertySelect, vehicleSelect) do NOT trigger filterProducts
+    // They are only used in the planning view, not in the manufacturer product database view
+    // The filterProducts function only applies the visible filters in the manufacturer view
     
     // Initialize view toggle functionality
     initViewToggle();
@@ -2583,92 +2535,61 @@ function setView(view: 'table' | 'grid') {
     console.log('View switch completed');
 }
 
+// Debounce timer for filter operations to prevent rapid re-renders
+let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+// Store last search term to detect actual changes
+let lastSearchTerm: string = '';
+// Flag to prevent filter from running during initialization
+let filterInitialized: boolean = false;
+
+/**
+ * Normalize text for search - handles special characters (ö, ä, ü etc.)
+ */
+function normalizeSearchText(text: string): string {
+    if (!text) return '';
+    return text.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/ö/g, 'o').replace(/ä/g, 'a').replace(/ü/g, 'u')
+        .replace(/ß/g, 'ss');
+}
+
 /**
  * Filter products based on search input and filter selections
+ * This is the MAIN filter function for the manufacturer view
  */
-async function filterProducts() {
-    const products = (window as any).productDatabase || [];
-    const searchTerm = (document.getElementById('product-search') as HTMLInputElement)?.value.toLowerCase() || '';
-    const manufacturer = (document.getElementById('manufacturer-filter') as HTMLSelectElement)?.value || '';
-    const standard = (document.getElementById('standard-filter') as HTMLSelectElement)?.value || '';
-    const vehicleType = (document.getElementById('vehicle-type-filter') as HTMLSelectElement)?.value || '';
-    const minSpeed = (document.getElementById('speed-filter') as HTMLSelectElement)?.value || '';
+function filterProducts() {
+    // Don't run filter until initialization is complete
+    if (!filterInitialized) {
+        console.log('⏳ Filter skipped - not yet initialized');
+        return;
+    }
     
-    // Get parameter selections from parameter menu
-    const productProperty = (document.getElementById('product-property-select') as HTMLSelectElement)?.value || '';
-    const vehicleSelect = (document.getElementById('vehicle-select') as HTMLSelectElement)?.value || '';
+    // Cancel any pending filter operation
+    if (filterDebounceTimer) {
+        clearTimeout(filterDebounceTimer);
+    }
     
-    // Get maximum detected speed from threat analysis
-    const detectedMaxSpeed = getMaxDetectedSpeed();
-    
-    console.log('🔍 Filter Parameters:', {
-        productProperty,
-        vehicleSelect,
-        detectedMaxSpeed,
-        minSpeed
-    });
-    
-    const filteredProducts = products.filter((product: any) => {
-        const matchesSearch = !searchTerm || 
-            product.manufacturer?.toLowerCase().includes(searchTerm) ||
-            product.product_name?.toLowerCase().includes(searchTerm) ||
-            product.technical_data?.standard?.toLowerCase().includes(searchTerm);
-        
-        const matchesManufacturer = !manufacturer || product.manufacturer === manufacturer;
-        const matchesStandard = !standard || product.technical_data?.standard === standard;
-        // Updated to use material filter for new database structure
-        const matchesVehicleType = !vehicleType || product.technical_data?.material === vehicleType;
-        
-        // Speed filter - use detected speed if available, otherwise use manual filter
-        const requiredSpeed = detectedMaxSpeed > 0 ? detectedMaxSpeed : (minSpeed ? parseFloat(minSpeed) : 0);
-        const matchesSpeed = requiredSpeed === 0 || (() => {
-            let productSpeed = 0;
-            
-            // Get product speed from the new technical data fields
-            if (product.technical_data?.pr_speed_kph) {
-                productSpeed = parseFloat(product.technical_data.pr_speed_kph);
-            } else if (product.speed) {
-                productSpeed = parseFloat(product.speed);
-            } else if (product.technical_data?.performance_rating) {
-                // Extract from performance rating as fallback
-                const parts = product.technical_data.performance_rating.split('/');
-                if (parts.length >= 3) {
-                    const speedPart = parts[2];
-                    productSpeed = parseFloat(speedPart) || 0;
-                }
-            }
-            
-            return !isNaN(productSpeed) && productSpeed >= requiredSpeed;
-        })();
-        
-        // Vehicle selection filter based on parameter menu
-        const matchesVehicleSelection = !vehicleSelect || vehicleSelect === 'alle' || (() => {
-            const selectedMass = parseFloat(vehicleSelect);
-            if (isNaN(selectedMass)) return true;
-            
-            const productMass = product.technical_data?.pr_mass_kg;
-            if (!productMass) return false;
-            
-            // Product must be able to handle at least the selected vehicle mass
-            return productMass >= selectedMass;
-        })();
-        
-        // Product property filter - if "entfernbar" is selected, only show freestanding products
-        const matchesProductProperty = !productProperty || productProperty === 'aut./starr' || productProperty === 'versenkbar' || (() => {
-            if (productProperty === 'entfernbar') {
-                const foundationDepth = product.technical_data?.foundation_depth || '';
-                // Only show products that are freestanding (no ground fixings)
-                return foundationDepth.includes('A - Free standing (no ground fixings)');
-            }
-            return true;
-        })();
-        
-        return matchesSearch && matchesManufacturer && matchesStandard && matchesVehicleType && matchesSpeed && matchesVehicleSelection && matchesProductProperty;
-    });
-    
-    console.log(`✅ Filtered ${filteredProducts.length} products from ${products.length} total`);
-    
-    await displayProducts(filteredProducts);
+    // Debounce filter to prevent rapid re-renders
+    filterDebounceTimer = setTimeout(() => {
+        executeFilterProducts();
+    }, 150);
+}
+
+/**
+ * Execute the actual filter logic - called after debounce
+ * This delegates to applyFiltersAndUpdateDisplay to combine all filter systems
+ */
+function executeFilterProducts() {
+    // Delegate to the combined filter function
+    applyFiltersAndUpdateDisplay();
+}
+
+/**
+ * Initialize filter system - call this after products are loaded
+ */
+function initializeFilterSystem() {
+    filterInitialized = true;
+    console.log('✅ Filter system initialized');
 }
 
 /**
@@ -2741,13 +2662,35 @@ function initProductModal() {
 }
 
 /**
- * Show product details in modal
+ * Show product details in modal - with full translation support
  */
 function showProductDetails(productIndex: number) {
     const products = (window as any).productDatabase || [];
     const product = products[productIndex];
     
     if (!product) return;
+    
+    // Get translations for modal labels
+    const isGerman = currentLanguage === 'de';
+    const labels = {
+        productName: isGerman ? 'Produktname' : 'Product Name',
+        standardTestedTo: isGerman ? 'Standard getestet nach' : 'Standard Tested To',
+        downloadDate: isGerman ? 'Download Datum' : 'Download Date',
+        productClassification: isGerman ? 'Produktklassifizierung' : 'Product Classification',
+        productType: isGerman ? 'Produkttyp' : 'Product Type',
+        cluster: 'Cluster',
+        confidenceValue: isGerman ? 'Vertrauenswert' : 'Confidence Value',
+        detectionSource: isGerman ? 'Erkennungsquelle' : 'Detection Source',
+        testParameters: isGerman ? 'Testparameter' : 'Test Parameters',
+        vehicleWeight: isGerman ? 'Fahrzeuggewicht' : 'Vehicle Weight',
+        vehicleType: isGerman ? 'Fahrzeugtyp' : 'Vehicle Type',
+        testSpeed: isGerman ? 'Testgeschwindigkeit' : 'Test Speed',
+        impactAngle: isGerman ? 'Anprallwinkel' : 'Impact Angle',
+        penetrationDepth: isGerman ? 'Eindringtiefe' : 'Penetration Depth',
+        debrisSpread: isGerman ? 'Trümmerstreuweite' : 'Debris Spread',
+        datasheetUrl: isGerman ? 'Datenblatt URL' : 'Datasheet URL',
+        productImage: isGerman ? 'Produktbild' : 'Product Image'
+    };
     
     // Update modal content
     const modalProductName = document.getElementById('modal-product-name');
@@ -2760,7 +2703,7 @@ function showProductDetails(productIndex: number) {
     if (technicalSpecs) {
         technicalSpecs.innerHTML = `
             <p><strong>${t('manufacturer.sidebar.productDatabase.manufacturer')}:</strong> ${product.manufacturer || 'N/A'}</p>
-            <p><strong>Produktname:</strong> ${product.product_name || 'N/A'}</p>
+            <p><strong>${labels.productName}:</strong> ${product.product_name || 'N/A'}</p>
             <p><strong>${t('manufacturer.sidebar.productDatabase.standard')}:</strong> ${product.technical_data?.standard || 'N/A'}</p>
             <p><strong>${t('manufacturer.sidebar.productDatabase.dimensions')}:</strong> ${product.technical_data?.dimensions || 'N/A'}</p>
             <p><strong>${t('manufacturer.sidebar.productDatabase.material')}:</strong> ${product.technical_data?.material || 'N/A'}</p>
@@ -2773,23 +2716,23 @@ function showProductDetails(productIndex: number) {
         performanceData.innerHTML = `
             <p><strong>${t('manufacturer.sidebar.productDatabase.performance')}:</strong> ${product.technical_data?.performance_rating || 'N/A'}</p>
             <p><strong>${t('manufacturer.sidebar.productDatabase.foundation')}:</strong> ${product.technical_data?.foundation_depth || 'N/A'}</p>
-            <p><strong>Standard getestet nach:</strong> ${product.technical_data?.standard_tested_to || 'N/A'}</p>
-            <p><strong>Download Datum:</strong> ${product.technical_data?.download_date || 'N/A'}</p>
-            <div style="margin-top: 20px; padding: 15px; background-color: #e3f2fd; border-radius: 8px;">
-                <h4 style="margin-bottom: 12px; color: #1565c0;">🏷️ Produktklassifizierung</h4>
-                <p><strong>Produkttyp:</strong> ${product.product_type || 'N/A'}</p>
-                <p><strong>Cluster:</strong> ${product.product_cluster || 'N/A'}</p>
-                <p><strong>Vertrauenswert:</strong> ${product.product_type_confidence ? (product.product_type_confidence * 100).toFixed(0) + '%' : 'N/A'}</p>
-                <p><strong>Erkennungsquelle:</strong> ${product.product_type_source || 'N/A'}</p>
+            <p><strong>${labels.standardTestedTo}:</strong> ${product.technical_data?.standard_tested_to || 'N/A'}</p>
+            <p><strong>${labels.downloadDate}:</strong> ${product.technical_data?.download_date || 'N/A'}</p>
+            <div style="margin-top: 20px; padding: 15px; background-color: rgba(30, 144, 255, 0.15); border-radius: 8px; border: 1px solid rgba(30, 144, 255, 0.3);">
+                <h4 style="margin-bottom: 12px; color: #1e90ff;">🏷️ ${labels.productClassification}</h4>
+                <p><strong>${labels.productType}:</strong> ${product.product_type || 'N/A'}</p>
+                <p><strong>${labels.cluster}:</strong> ${product.product_cluster || 'N/A'}</p>
+                <p><strong>${labels.confidenceValue}:</strong> ${product.product_type_confidence ? (product.product_type_confidence * 100).toFixed(0) + '%' : 'N/A'}</p>
+                <p><strong>${labels.detectionSource}:</strong> ${product.product_type_source || 'N/A'}</p>
             </div>
-            <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
-                <h4 style="margin-bottom: 12px; color: #495057;">⚡ Testparameter</h4>
-                <p><strong>Fahrzeuggewicht:</strong> ${product.technical_data?.pr_mass_kg || 'N/A'} kg</p>
-                <p><strong>Fahrzeugtyp:</strong> ${product.technical_data?.pr_veh || 'N/A'}</p>
-                <p><strong>Testgeschwindigkeit:</strong> ${product.technical_data?.pr_speed_kph || 'N/A'} km/h</p>
-                <p><strong>Anprallwinkel:</strong> ${product.technical_data?.pr_angle_deg || 'N/A'}°</p>
-                <p><strong>Eindringtiefe:</strong> ${product.technical_data?.pr_pen_m || 'N/A'} m</p>
-                <p><strong>Trümmerstreuweite:</strong> ${product.technical_data?.pr_debris_m || 'N/A'} m</p>
+            <div style="margin-top: 20px; padding: 15px; background-color: rgba(255, 193, 7, 0.15); border-radius: 8px; border: 1px solid rgba(255, 193, 7, 0.3);">
+                <h4 style="margin-bottom: 12px; color: #ffc107;">⚡ ${labels.testParameters}</h4>
+                <p><strong>${labels.vehicleWeight}:</strong> ${product.technical_data?.pr_mass_kg || 'N/A'} kg</p>
+                <p><strong>${labels.vehicleType}:</strong> ${product.technical_data?.pr_veh || 'N/A'}</p>
+                <p><strong>${labels.testSpeed}:</strong> ${product.technical_data?.pr_speed_kph || 'N/A'} km/h</p>
+                <p><strong>${labels.impactAngle}:</strong> ${product.technical_data?.pr_angle_deg || 'N/A'}°</p>
+                <p><strong>${labels.penetrationDepth}:</strong> ${product.technical_data?.pr_pen_m || 'N/A'} m</p>
+                <p><strong>${labels.debrisSpread}:</strong> ${product.technical_data?.pr_debris_m || 'N/A'} m</p>
             </div>
         `;
     }
@@ -2799,8 +2742,8 @@ function showProductDetails(productIndex: number) {
     if (certification) {
         certification.innerHTML = `
             <p><strong>${t('manufacturer.sidebar.productDatabase.standard')}:</strong> ${product.technical_data?.standard || 'N/A'}</p>
-            <p><strong>Datenblatt URL:</strong> ${product.datasheet_url ? `<a href="${product.datasheet_url}" target="_blank">${product.datasheet_url}</a>` : 'N/A'}</p>
-            <p><strong>Produktbild:</strong> ${product.product_image_file || 'N/A'}</p>
+            <p><strong>${labels.datasheetUrl}:</strong> ${product.datasheet_url ? `<a href="${product.datasheet_url}" target="_blank" style="color: #1e90ff;">${product.datasheet_url}</a>` : 'N/A'}</p>
+            <p><strong>${labels.productImage}:</strong> ${product.product_image_file || 'N/A'}</p>
         `;
     }
     
@@ -2810,6 +2753,28 @@ function showProductDetails(productIndex: number) {
         modal.style.display = 'flex';
         // Store current product index for language switching
         (modal as any).currentProductIndex = productIndex;
+        
+        // Translate modal section headings
+        const sectionHeadings = modal.querySelectorAll('[data-translate-key]');
+        sectionHeadings.forEach(element => {
+            const key = element.getAttribute('data-translate-key');
+            if (key) {
+                const translatedText = t(key);
+                if (translatedText && translatedText !== key) {
+                    element.textContent = translatedText;
+                }
+            }
+        });
+        
+        // Translate modal buttons
+        const exportBtn = modal.querySelector('[data-translate-key="manufacturer.sidebar.productDatabase.modal.exportData"]');
+        if (exportBtn) {
+            exportBtn.textContent = t('manufacturer.sidebar.productDatabase.modal.exportData');
+        }
+        const printBtn = modal.querySelector('[data-translate-key="manufacturer.sidebar.productDatabase.modal.printSpecs"]');
+        if (printBtn) {
+            printBtn.textContent = t('manufacturer.sidebar.productDatabase.modal.printSpecs');
+        }
     }
 }
 
@@ -5275,21 +5240,87 @@ const analyzeAndMarkThreats = async () => {
             }
         };
         
-        // Use optimized Overpass helper with fallback endpoints
-        let data;
+        // ============================================================
+        // PROVIDER-SYSTEM INTEGRATION für Threat Analysis
+        // Priorisiert NRW WFS-Daten über OSM Overpass
+        // ============================================================
+        let data: { elements: any[] } = { elements: [] };
+        let dataSource = 'unknown';
+        
         try {
-            const { fetchOverpassWithFallback, createThreatAnalysisQuery } = await import('./src/utils/overpassHelper.js');
-            const query = createThreatAnalysisQuery(bbox, 25);
-            console.log('🔍 THREAT ANALYSIS Query:', query);
+            // STRATEGIE 1: Versuche Provider-System (NRW WFS oder OSM via Provider)
+            console.log('🗺️ THREAT ANALYSIS: Attempting Provider System...');
             
-            data = await fetchOverpassWithFallback(query, {
-                timeout: 25,
-                maxRetries: 2,
-                retryDelay: 2000
-            });
+            // Extrahiere Polygon-Koordinaten für Provider
+            const flatCoords = (polygonCoords as any).flat ? (polygonCoords as any).flat() : polygonCoords;
+            const providerPolygonCoords = flatCoords.map((p: any) => ({ lat: p.lat, lng: p.lng }));
+            
+            try {
+                // Importiere Provider-System
+                const { fetchRoadNetworkForPolygon } = await import('./src/core/geodata/integration/entryDetectionIntegration.js');
+                const { getCurrentProviderId } = await import('./src/core/geodata/integration/mapIntegration.js');
+                
+                // Hole Daten vom Provider
+                const providerData = await fetchRoadNetworkForPolygon(providerPolygonCoords);
+                const providerId = getCurrentProviderId();
+                
+                if (providerData && providerData.nodes && providerData.ways && providerData.ways.length > 0) {
+                    console.log(`✅ THREAT ANALYSIS: Provider ${providerId.toUpperCase()} lieferte ${providerData.nodes.length} nodes, ${providerData.ways.length} ways`);
+                    dataSource = providerId;
+                    
+                    // Konvertiere Provider-Daten in das erwartete Overpass-Format
+                    const convertedElements: any[] = [];
+                    
+                    // Konvertiere Nodes
+                    for (const node of providerData.nodes) {
+                        convertedElements.push({
+                            type: 'node',
+                            id: node.id,
+                            lat: node.lat,
+                            lon: node.lon
+                        });
+                    }
+                    
+                    // Konvertiere Ways
+                    for (const way of providerData.ways) {
+                        const tags = way.tags || {};
+                        // Setze highway-Tag, falls nicht vorhanden (wichtig für NRW-Daten)
+                        if (!tags.highway && !tags.railway) {
+                            tags.highway = 'road'; // Default für NRW-Straßendaten
+                        }
+                        
+                        convertedElements.push({
+                            type: 'way',
+                            id: way.id,
+                            nodes: way.nodeIds,
+                            tags: tags
+                        });
+                    }
+                    
+                    data = { elements: convertedElements };
+                    console.log(`🎯 THREAT ANALYSIS: Konvertierte ${convertedElements.length} Elemente aus ${providerId.toUpperCase()}`);
+                } else {
+                    throw new Error('Provider returned empty or invalid data');
+                }
+            } catch (providerError) {
+                console.warn('⚠️ THREAT ANALYSIS: Provider-System fehlgeschlagen:', providerError);
+                console.log('🔄 THREAT ANALYSIS: Fallback zu Overpass API...');
+                
+                // STRATEGIE 2: Fallback zu Overpass API
+                const { fetchOverpassWithFallback, createThreatAnalysisQuery } = await import('./src/utils/overpassHelper.js');
+                const query = createThreatAnalysisQuery(bbox, 25);
+                console.log('🔍 THREAT ANALYSIS Overpass Query:', query);
+                
+                data = await fetchOverpassWithFallback(query, {
+                    timeout: 25,
+                    maxRetries: 2,
+                    retryDelay: 2000
+                });
+                dataSource = 'osm-overpass';
+            }
             
             const elementCount = data?.elements?.length || 0;
-            console.log('🎯 THREAT ANALYSIS OSM Data received:', elementCount, 'elements');
+            console.log(`🎯 THREAT ANALYSIS: ${elementCount} Elemente von ${dataSource.toUpperCase()}`);
             
             // Count different road types for better debugging
             const roadTypes: Record<string, number> = {};
@@ -5318,8 +5349,10 @@ const analyzeAndMarkThreats = async () => {
             });
             
             console.log(`🚫 Pre-filtering: ${excludedCount} recreational/restricted ways will be excluded from threat analysis`);
+            console.log(`📡 Datenquelle: ${dataSource === 'nrw' ? 'GEOBASIS.NRW (ATKIS)' : dataSource === 'osm' ? 'OpenStreetMap (Provider)' : 'OpenStreetMap (Overpass)'}`);
+            
         } catch (error) {
-            console.error('🚨 THREAT ANALYSIS Overpass API error:', error);
+            console.error('🚨 THREAT ANALYSIS Data fetch error:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
             alert(`Fehler bei der Gefahrenanalyse: ${errorMsg}. Bitte versuchen Sie es später erneut.`);
             loadingIndicator.classList.add('hidden');
@@ -5906,8 +5939,7 @@ const analyzeAndMarkThreats = async () => {
         }
         
         // Update product filter after threat analysis completes
-        console.log('🔄 Updating product filter with detected parameters...');
-        await filterProducts();
+        filterProducts();
     }
 };
 
@@ -7510,7 +7542,7 @@ function handleManualPathClick(e: any) {
     if (!paths || paths.length === 0) return;
     
     const pathData = paths[paths.length - 1];
-    const newPoint = e.latlng;
+    let newPoint = e.latlng;
     
     // Duplicate check (lenient)
     if (pathData.waypoints.length > 0) {
@@ -12879,26 +12911,43 @@ function setupFilterSidebarEvents() {
  * Get current filter values
  */
 function getCurrentFilters() {
+    // Get checkbox selections - these return empty arrays if no checkboxes selected
+    const vehicleMass = getSelectedCheckboxes('vehicle-mass-content');
+    const standard = getSelectedCheckboxes('standards-content');
+    const foundation = getSelectedCheckboxes('foundation-content');
+    const operation = getSelectedCheckboxes('operation-content');
+    const deployment = getSelectedCheckboxes('deployment-content');
+    const category = getSelectedCheckboxes('categories-content');
+    
+    // Get range inputs with proper defaults
+    const minSpeedEl = document.getElementById('min-speed') as HTMLInputElement;
+    const maxSpeedEl = document.getElementById('max-speed') as HTMLInputElement;
+    const minAngleEl = document.getElementById('min-angle') as HTMLInputElement;
+    const maxAngleEl = document.getElementById('max-angle') as HTMLInputElement;
+    const minDistanceEl = document.getElementById('min-distance') as HTMLInputElement;
+    const maxDistanceEl = document.getElementById('max-distance') as HTMLInputElement;
+    const manufacturerEl = document.getElementById('manufacturer-select') as HTMLSelectElement;
+    
     const filters = {
-        vehicleMass: getSelectedCheckboxes('vehicle-mass-content'),
+        vehicleMass,
         impactSpeed: {
-            min: parseInt((document.getElementById('min-speed') as HTMLInputElement)?.value || '16'),
-            max: parseInt((document.getElementById('max-speed') as HTMLInputElement)?.value || '112')
+            min: minSpeedEl ? parseInt(minSpeedEl.value) || 16 : 16,
+            max: maxSpeedEl ? parseInt(maxSpeedEl.value) || 112 : 112
         },
         impactAngle: {
-            min: parseInt((document.getElementById('min-angle') as HTMLInputElement)?.value || '15'),
-            max: parseInt((document.getElementById('max-angle') as HTMLInputElement)?.value || '90')
+            min: minAngleEl ? parseInt(minAngleEl.value) || 15 : 15,
+            max: maxAngleEl ? parseInt(maxAngleEl.value) || 90 : 90
         },
         penetrationDistance: {
-            min: parseFloat((document.getElementById('min-distance') as HTMLInputElement)?.value || '0'),
-            max: parseFloat((document.getElementById('max-distance') as HTMLInputElement)?.value || '60')
+            min: minDistanceEl ? parseFloat(minDistanceEl.value) || 0 : 0,
+            max: maxDistanceEl ? parseFloat(maxDistanceEl.value) || 60 : 60
         },
-        standard: getSelectedCheckboxes('standards-content'),
-        foundation: getSelectedCheckboxes('foundation-content'),
-        operation: getSelectedCheckboxes('operation-content'),
-        deployment: getSelectedCheckboxes('deployment-content'),
-        category: getSelectedCheckboxes('categories-content'),
-        manufacturer: (document.getElementById('manufacturer-select') as HTMLSelectElement)?.value || ''
+        standard,
+        foundation,
+        operation,
+        deployment,
+        category,
+        manufacturer: manufacturerEl?.value || ''
     };
     
     return filters;
@@ -13173,18 +13222,66 @@ function calculateProductCounts() {
 
 /**
  * Apply filters and update product display
+ * This function combines the sidebar filters with the top search bar
  */
 function applyFiltersAndUpdateDisplay() {
-    console.log('🔄 Applying filters and updating display...');
+    // Guard: Don't run if filter system not initialized
+    if (!filterInitialized) {
+        console.log('⏳ applyFiltersAndUpdateDisplay skipped - not yet initialized');
+        return;
+    }
     
     const filters = getCurrentFilters();
-    console.log('📊 Current filters:', filters);
-    
     const allProducts = (window as any).productDatabase || [];
-    console.log('📦 Total products in database:', allProducts.length);
     
-    const filteredProducts = filterProductsByFilters(allProducts, filters);
-    console.log('✅ Filtered products:', filteredProducts.length);
+    // Guard: Don't filter if no products loaded yet
+    if (!allProducts || allProducts.length === 0) {
+        console.log('⚠️ No products in database, skipping filter');
+        return;
+    }
+    
+    // Get the search term from the top search bar
+    const searchTerm = (document.getElementById('product-search') as HTMLInputElement)?.value.toLowerCase().trim() || '';
+    
+    // Debug: Log all filter values
+    console.log('🔍 FILTER DEBUG - All values:', JSON.stringify(filters, null, 2));
+    console.log('🔍 FILTER DEBUG - Search term:', searchTerm);
+    console.log('🔍 FILTER DEBUG - Total products in database:', allProducts.length);
+    
+    // First apply sidebar filters (only if there are actual active filters)
+    let filteredProducts = filterProductsByFilters(allProducts, filters);
+    
+    console.log(`📊 After sidebar filters: ${filteredProducts.length} of ${allProducts.length} products`);
+    
+    // Then apply search filter on top of sidebar results
+    if (searchTerm) {
+        const normalizedSearchTerm = normalizeSearchText(searchTerm);
+        const beforeSearchCount = filteredProducts.length;
+        filteredProducts = filteredProducts.filter((product: any) => {
+            const normalizedProductName = normalizeSearchText(product.product_name || '');
+            const normalizedManufacturer = normalizeSearchText(product.manufacturer || '');
+            const normalizedStandard = normalizeSearchText(product.technical_data?.standard || '');
+            const normalizedProductType = normalizeSearchText(product.product_type || '');
+            const normalizedCluster = normalizeSearchText(product.product_cluster || '');
+            const originalProductName = (product.product_name || '').toLowerCase();
+            const originalManufacturer = (product.manufacturer || '').toLowerCase();
+            const originalStandard = (product.technical_data?.standard || '').toLowerCase();
+            
+            const matches = normalizedProductName.includes(normalizedSearchTerm) ||
+                normalizedManufacturer.includes(normalizedSearchTerm) ||
+                normalizedStandard.includes(normalizedSearchTerm) ||
+                normalizedProductType.includes(normalizedSearchTerm) ||
+                normalizedCluster.includes(normalizedSearchTerm) ||
+                originalProductName.includes(searchTerm) ||
+                originalManufacturer.includes(searchTerm) ||
+                originalStandard.includes(searchTerm);
+            
+            return matches;
+        });
+        console.log(`📊 After search "${searchTerm}": ${filteredProducts.length} of ${beforeSearchCount} products`);
+    }
+    
+    console.log(`✅ FINAL RESULT: Displaying ${filteredProducts.length} of ${allProducts.length} products`);
     
     // Update the display
     displayProducts(filteredProducts);
@@ -13192,119 +13289,129 @@ function applyFiltersAndUpdateDisplay() {
 
 /**
  * Filter products based on all filter types
+ * NOTE: This function allows products without technical_data to pass through
+ * and only applies filters when explicitly selected
  */
 function filterProductsByFilters(products: any[], filters: any) {
+    // Check if any advanced filters are actually set
+    const hasVehicleMassFilter = filters.vehicleMass && filters.vehicleMass.length > 0;
+    const hasStandardFilter = filters.standard && filters.standard.length > 0;
+    const hasFoundationFilter = filters.foundation && filters.foundation.length > 0;
+    const hasDeploymentFilter = filters.deployment && filters.deployment.length > 0;
+    const hasCategoryFilter = filters.category && filters.category.length > 0;
+    const hasManufacturerFilter = filters.manufacturer && filters.manufacturer !== '';
+    const hasSpeedFilter = filters.impactSpeed && (filters.impactSpeed.min > 16 || filters.impactSpeed.max < 112);
+    const hasAngleFilter = filters.impactAngle && (filters.impactAngle.min > 15 || filters.impactAngle.max < 90);
+    const hasDistanceFilter = filters.penetrationDistance && (filters.penetrationDistance.min > 0 || filters.penetrationDistance.max < 60);
+    
+    const hasAnyActiveFilter = hasVehicleMassFilter || hasStandardFilter || hasFoundationFilter || 
+        hasDeploymentFilter || hasCategoryFilter || hasManufacturerFilter || 
+        hasSpeedFilter || hasAngleFilter || hasDistanceFilter;
+    
+    // If no filters are active, return all products
+    if (!hasAnyActiveFilter) {
+        console.log('📋 No active filters - returning all products');
+        return products;
+    }
+    
+    console.log('📋 Active filters:', {
+        vehicleMass: hasVehicleMassFilter ? filters.vehicleMass : 'none',
+        standard: hasStandardFilter ? filters.standard : 'none',
+        foundation: hasFoundationFilter ? filters.foundation : 'none',
+        deployment: hasDeploymentFilter ? filters.deployment : 'none',
+        category: hasCategoryFilter ? filters.category : 'none',
+        manufacturer: hasManufacturerFilter ? filters.manufacturer : 'none',
+        speed: hasSpeedFilter ? filters.impactSpeed : 'default',
+        angle: hasAngleFilter ? filters.impactAngle : 'default',
+        distance: hasDistanceFilter ? filters.penetrationDistance : 'default'
+    });
+    
     return products.filter(product => {
-        const techData = product.technical_data;
-        if (!techData) return false;
+        const techData = product.technical_data || {};
         
         // Vehicle Mass filter (checkbox selection)
-        if (filters.vehicleMass.length > 0) {
+        if (hasVehicleMassFilter) {
             const vehicleMass = techData.pr_mass_kg;
             const vehicleCategory = techData.pr_veh;
-            if (!vehicleMass || !vehicleCategory) return false;
-            
-            const matchesVehicleMass = filters.vehicleMass.some((filterValue: string) => {
-                const [massStr, category] = filterValue.split(' ');
-                const mass = parseInt(massStr);
-                return vehicleMass === mass && vehicleCategory === category.replace(/[\[\]]/g, '');
-            });
-            
-            if (!matchesVehicleMass) return false;
+            // If product has no vehicle data, include it (don't filter out)
+            if (vehicleMass && vehicleCategory) {
+                const matchesVehicleMass = filters.vehicleMass.some((filterValue: string) => {
+                    const [massStr, category] = filterValue.split(' ');
+                    const mass = parseInt(massStr);
+                    return vehicleMass === mass && vehicleCategory === category.replace(/[\[\]]/g, '');
+                });
+                if (!matchesVehicleMass) return false;
+            }
         }
         
-        // Impact Speed filter (range)
-        const impactSpeed = techData.pr_speed_kph;
-        if (impactSpeed && (impactSpeed < filters.impactSpeed.min || impactSpeed > filters.impactSpeed.max)) {
-            return false;
+        // Impact Speed filter (range) - only apply if filter is non-default
+        if (hasSpeedFilter) {
+            const impactSpeed = techData.pr_speed_kph;
+            if (impactSpeed && (impactSpeed < filters.impactSpeed.min || impactSpeed > filters.impactSpeed.max)) {
+                return false;
+            }
         }
         
-        // Impact Angle filter (range)
-        const impactAngle = techData.pr_angle_deg;
-        if (impactAngle && (impactAngle < filters.impactAngle.min || impactAngle > filters.impactAngle.max)) {
-            return false;
+        // Impact Angle filter (range) - only apply if filter is non-default
+        if (hasAngleFilter) {
+            const impactAngle = techData.pr_angle_deg;
+            if (impactAngle && (impactAngle < filters.impactAngle.min || impactAngle > filters.impactAngle.max)) {
+                return false;
+            }
         }
         
-        // Penetration Distance filter (range)
-        const penetrationDistance = techData.pr_pen_m;
-        if (penetrationDistance && (penetrationDistance < filters.penetrationDistance.min || penetrationDistance > filters.penetrationDistance.max)) {
-            return false;
+        // Penetration Distance filter (range) - only apply if filter is non-default
+        if (hasDistanceFilter) {
+            const penetrationDistance = techData.pr_pen_m;
+            if (penetrationDistance && (penetrationDistance < filters.penetrationDistance.min || penetrationDistance > filters.penetrationDistance.max)) {
+                return false;
+            }
         }
         
         // Standard filter (checkbox selection)
-        if (filters.standard.length > 0) {
+        if (hasStandardFilter) {
             const standard = techData.standard;
-            if (!standard || !filters.standard.includes(standard)) {
+            // Only filter if product has standard data
+            if (standard && !filters.standard.some((s: string) => standard.includes(s) || s.includes(standard))) {
                 return false;
             }
         }
         
         // Foundation filter (checkbox selection)
-        if (filters.foundation.length > 0) {
+        if (hasFoundationFilter) {
             const foundation = techData.foundation_depth;
-            if (!foundation || !filters.foundation.includes(foundation)) {
+            // Only filter if product has foundation data
+            if (foundation && !filters.foundation.includes(foundation)) {
                 return false;
             }
         }
         
-        // Operation filter (checkbox selection)
-        if (filters.operation.length > 0) {
-            // This would need to be mapped from product data - for now, skip if no operation data
-            // const operation = techData.operation;
-            // if (!operation || !filters.operation.includes(operation)) {
-            //     return false;
-            // }
+        // Category filter (checkbox selection) - NEW: Actually apply category filter
+        if (hasCategoryFilter) {
+            const productType = product.product_type;
+            if (productType && !filters.category.includes(productType)) {
+                return false;
+            }
         }
         
         // Deployment filter (checkbox selection)
-        if (filters.deployment.length > 0) {
-            // Check if "temporary" deployment is selected
+        if (hasDeploymentFilter) {
             const temporarySelected = filters.deployment.includes('temporary');
             const permanentSelected = filters.deployment.includes('permanent');
-            
-            // Check if product is free-standing (suitable for temporary deployment)
             const isFreeStanding = techData.foundation_depth === 'A - Free standing (no ground fixings)';
             
-            let matchesDeployment = false;
-            
-            // If temporary is selected, free-standing products automatically match
-            if (temporarySelected && isFreeStanding) {
-                matchesDeployment = true;
-            }
-            
-            // If permanent is selected, all products except purely temporary ones match
-            // (since most products can be used permanently)
-            if (permanentSelected) {
-                matchesDeployment = true;
-            }
-            
-            // If both are selected, all products match
+            // If both are selected, allow all
             if (temporarySelected && permanentSelected) {
-                matchesDeployment = true;
+                // Both selected = allow all
+            } else if (temporarySelected && !permanentSelected) {
+                // Only temporary = only free-standing products
+                if (!isFreeStanding) return false;
             }
-            
-            // If only temporary is selected and product is NOT free-standing, exclude it
-            if (!matchesDeployment && temporarySelected && !isFreeStanding) {
-                return false;
-            }
-            
-            // If no match found, exclude the product
-            if (!matchesDeployment) {
-                return false;
-            }
-        }
-        
-        // Category filter (checkbox selection)
-        if (filters.category.length > 0) {
-            // This would need to be mapped from product data - for now, skip if no category data
-            // const category = product.product_type;
-            // if (!category || !filters.category.includes(category)) {
-            //     return false;
-            // }
+            // permanentSelected only = allow all (most products can be permanent)
         }
         
         // Manufacturer filter (dropdown selection)
-        if (filters.manufacturer && filters.manufacturer !== '') {
+        if (hasManufacturerFilter) {
             if (product.manufacturer !== filters.manufacturer) {
                 return false;
             }

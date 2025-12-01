@@ -3,11 +3,37 @@ import type { OsmBundle } from "../provider";
 import { pickProvider, getCurrentMapBbox4326, geoCache, cacheKey, simplePolygonHash } from "../index";
 
 /**
+ * Check if the proxy server is available.
+ * Required for NRW WFS access which has CORS restrictions.
+ */
+async function isProxyAvailable(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    
+    const res = await fetch('http://localhost:3001/health', {
+      method: 'GET',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch road network data using the provider abstraction system.
  * 
  * This function replaces direct calls to fetchOsmBundleForPolygon with
  * a provider-aware approach that automatically selects the best available
  * data source (NRW WFS or OSM) based on location and availability.
+ * 
+ * Enhanced with:
+ * - Proxy availability check for NRW WFS
+ * - Multi-layer support matching main.py implementation
+ * - Automatic fallback to OSM if NRW fails
  * 
  * @param polygonCoords Array of {lat, lng} coordinates defining the analysis area
  * @param signal Optional AbortSignal for request cancellation
@@ -32,7 +58,22 @@ export async function fetchRoadNetworkForPolygon(
     }
     
     const bbox4326 = getCurrentMapBbox4326(map);
-    const provider = await pickProvider(bbox4326);
+    let provider = await pickProvider(bbox4326);
+    
+    // Check proxy availability for NRW provider
+    if (provider.id === 'nrw') {
+      const proxyAvailable = await isProxyAvailable();
+      if (!proxyAvailable) {
+        console.warn('[entryDetectionIntegration] Proxy server not available - NRW WFS requires proxy for CORS');
+        console.log('[entryDetectionIntegration] Start proxy server with: node proxy-server.js');
+        console.log('[entryDetectionIntegration] Falling back to OSM provider');
+        
+        const { osmProvider } = await import("../providers/osmProvider");
+        provider = osmProvider;
+      } else {
+        console.log('[entryDetectionIntegration] Proxy server available at localhost:3001');
+      }
+    }
     
     // Check cache first
     const cacheKeyStr = cacheKey(provider.id, polygonHash);
@@ -63,7 +104,17 @@ export async function fetchRoadNetworkForPolygon(
         throw new Error('NRW returned no features');
       }
       
-      console.log(`[entryDetectionIntegration] Received bundle: ${bundle.nodes.length} nodes, ${bundle.ways.length} ways`);
+      console.log(`[entryDetectionIntegration] ✅ Received bundle from ${provider.id}: ${bundle.nodes.length} nodes, ${bundle.ways.length} ways`);
+      
+      // Log statistics about road types found (useful for debugging)
+      if (bundle.ways.length > 0) {
+        const roadTypes = new Map<string, number>();
+        for (const way of bundle.ways) {
+          const highway = (way.tags as any)?.highway || 'unknown';
+          roadTypes.set(highway, (roadTypes.get(highway) || 0) + 1);
+        }
+        console.log(`[entryDetectionIntegration] Road types found:`, Object.fromEntries(roadTypes));
+      }
       
     } catch (error) {
       console.warn(`[entryDetectionIntegration] Provider ${provider.id} failed:`, error);
@@ -75,7 +126,7 @@ export async function fetchRoadNetworkForPolygon(
         
         try {
           bundle = await osmProvider.fetchRoadNetwork(polygonFeature);
-          console.log(`[entryDetectionIntegration] OSM fallback successful: ${bundle.nodes.length} nodes, ${bundle.ways.length} ways`);
+          console.log(`[entryDetectionIntegration] ✅ OSM fallback successful: ${bundle.nodes.length} nodes, ${bundle.ways.length} ways`);
           usedFallback = true;
           
           // Cache OSM result separately
