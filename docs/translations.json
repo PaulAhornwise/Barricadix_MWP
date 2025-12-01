@@ -259,20 +259,29 @@
     },
     "report": {
       "generating": "Bericht wird erstellt...",
-      "mainTitle": "Reduzierter Erstbericht – Zufahrtsschutzkonzept für {locationName}",
+      "mainTitle": "Risikobeurteilung und Zufahrtsschutzkonzept nach DIN SPEC 91414-2 für {locationName}",
       "sections": {
         "purpose": { "title": "1. Zweck und Schutzziele" },
         "threatAnalysis": { "title": "2. Bedrohungsanalyse & Risikobewertung" },
-        "vulnerabilities": { "title": "3. Schwachstellenanalyse" },
-        "hvmMeasures": { "title": "4. Vorgeschlagene HVM-Maßnahmen" },
+        "vulnerabilities": { "title": "3. Schwachstellenanalyse der Zufahrten" },
+        "hvmMeasures": { "title": "4. Zufahrtsschutzkonzept & HVM-Maßnahmen" },
         "siteConsiderations": { "title": "5. Standortspezifische Überlegungen & Integration" },
-        "operationalImpact": { "title": "6. Betriebliche und Ästhetische Auswirkungen" }
+        "operationalImpact": { "title": "6. Betriebliche Anforderungen & Restrisiko" }
       },
-      "watermark": "Erstentwurf",
+      "watermark": "Arbeitsstand – ersetzt keine polizeiliche Gefährdungsbewertung",
+      "keyFacts": {
+        "title": "Key Facts",
+        "location": "Standort",
+        "asset": "Schutzgut / Veranstaltung",
+        "securityLevel": "Angestrebtes Sicherheitsniveau",
+        "protectionGrade": "Abgeleiteter Sicherungsgrad",
+        "dataBasis": "Datenbasis: {source}, Barricadix-Auswertung Stand: {date}"
+      },
       "reportFilename": "Risikobericht-BarricadiX.pdf",
       "not_applicable": "N/A",
       "undefinedLocation": "[Standort nicht auf Karte definiert]",
       "undefinedAsset": "[Kein spezifisches Schutzobjekt angegeben]",
+      "threatListIntro": "Aus der Analyse der Anfahrkorridore ergeben sich folgende Zufahrten mit potenziell kritischen Annäherungswegen:",
       "threatsTable": {
         "title": "Identifizierte Bedrohungsstraßen",
         "street": "Straße",
@@ -399,7 +408,7 @@
       "geminiError": "Die KI-gestützte Analyse konnte aufgrund eines Fehlers nicht generiert werden."
     },
     "ai": {
-      "reportPrompt": "Du bist ein Spezialist für physischen Zufahrtsschutz und erstellst einen Sicherheitsbericht für den Schutz vor Fahrzeugangriffen und unbefugtem Eindringen mit Kraftfahrzeugen (Vehicle Security Barriers / Hostile Vehicle Mitigation). Der Fokus liegt auf dem physischen Schutz von Gebäuden, Plätzen und Infrastruktur vor Terroranschlägen mit Fahrzeugen, Amokfahrten oder Unfällen. WICHTIG: Dies ist KEIN Cybersecurity-Bericht! Generiere ein JSON-Objekt mit sechs Schlüsseln: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. Die Sprache des Inhalts muss {language} sein. Hier sind die Kontextdaten:\n\n- **Standortname**: {locationName}\n- **Zu schützendes Objekt**: {assetToProtect}\n- **Angestrebtes Sicherheitsniveau**: {securityLevel}\n- **Abgeleiteter Sicherungsgrad**: {protectionGrade}\n- **Hauptbedrohungen (Zufahrtsstraßen)**: {threatList}\n- **Art der HVM-Lösung**: {protectionPeriod}\n- **Empfohlener FSB-Typ**: {productType}\n- **Erwartete Mindestanprallleistung**: Eindringtiefe von {penetration} m und Trümmerflugweite von {debrisDistance} m.\n\nFokussiere ausschließlich auf: Fahrzeugbarrieren, Poller, physische Sperren, Fahrzeuganprallschutz, Rammangriffe, Teststandards wie PAS 68 oder IWA 14, Geschwindigkeiten, Fahrzeugmassen, Anprallwinkel, Eindringtiefen. Erwähne NIEMALS: Malware, Cyberangriffe, Netzwerksicherheit, Software, IT-Systeme. Fülle jeden der folgenden Abschnitte mit sinnvollem, professionellem Text, der auf den bereitgestellten Daten basiert."
+      "reportPrompt": "Du bist ein auf polizeiliche Überfahrtaten, Hostile Vehicle Mitigation (HVM) und Zufahrtsschutz spezialisierter Sicherheitsplaner.\n\nDu arbeitest normorientiert nach:\n- DIN SPEC 91414-1 und DIN SPEC 91414-2 (Zufahrtsschutzkonzepte und Risikobeurteilung)\n- DIN ISO 22343-1/-2 (Security & Resilience - Protective Security - Urban Public Spaces)\n- der polizeilichen Handreichung von Weicht zu Überfahrtaten (polizeiliche Perspektive, Anfahrkorridore, Angriffsmittel, Schutzkonzepte)\n- der TR Mobile Fahrzeugsperren sowie relevanten europäischen Leitlinien wie JRC-Publikationen und Security-by-Design-Grundsätzen\n\nDu erhältst folgende Platzhalterwerte aus dem System: {language}, {locationName}, {assetToProtect}, {securityLevel}, {protectionGrade}, {threatList}, {protectionPeriod}, {productType}, {penetration}, {debrisDistance}, {highestThreatRoads}, {threatLevelDistribution}, {recommendedProductTypes}, {productTypeJustification}, {locationContext}, {averageThreatLevel}. Zusätzlich können vorberechnete Zufahrtsdaten und Geschwindigkeiten aus threatsMap in diesen Feldern enthalten sein.\n\nDeine Aufgabe: Erstelle einen normnahen, textlichen Risikobericht zum Zufahrtsschutz als Unterstützung für Planer und Polizei.\n\nDer Bericht besteht aus GENAU 6 Textblöcken, in genau dieser Reihenfolge:\n\n1. purpose - Zweck, Anlass, Schutzziele\n   - Beschreibe Anlass und Zielsetzung der Risikobeurteilung.\n   - Nenne {assetToProtect}, den Standort {locationName} sowie das Sicherheitsniveau {securityLevel} und den Sicherungsgrad {protectionGrade}.\n   - Ordne den Bericht kurz in den Planungsprozess nach DIN SPEC 91414-2 und der polizeilichen Handreichung von Weicht ein.\n\n2. threatAnalysis - Bedrohungsanalyse & Risikobewertung\n   - Beschreibe typische Überfahrtaten/Vehicle-as-a-Weapon-Szenarien aus polizeilicher Sicht.\n   - Nutze {threatList}, {highestThreatRoads}, {threatLevelDistribution} und {averageThreatLevel}, um die Bedrohung für den konkreten Standort einzuordnen.\n   - Erkläre das angewandte qualitative Risikomodell (Eintrittswahrscheinlichkeit x Schadensausmaß) und leite den Sicherungsgrad {protectionGrade} her.\n\n3. vulnerabilities - Schwachstellenanalyse der Zufahrten\n   - Interpretiere jede in {threatList} und {highestThreatRoads} enthaltene Zufahrt als eigenen Zufahrtskorridor.\n   - Beschreibe je Korridor Annäherungsrichtung, mögliche Beschleunigungsstrecken, erreichbare Geschwindigkeit, vorhandene oder fehlende Hindernisse sowie die Nutzung (Lieferverkehr, Fußgängerzone etc.).\n   - Verknüpfe die Analyse explizit mit der Schwachstellenbetrachtung von Zone 0 zur Schutzzone gemäß DIN SPEC 91414-2 und markiere lange, freie Achsen als kritisch.\n\n4. hvmMeasures - Zufahrtsschutzkonzept & HVM-Maßnahmen\n   - Leite aus den Schwachstellen konkrete Schutzziele pro Zufahrt ab (z. B. Durchbruch verhindern, Geschwindigkeit reduzieren, Lastaufnahme gewährleisten).\n   - Nutze {productType}, {recommendedProductTypes}, {productTypeJustification}, {penetration}, {debrisDistance} und {protectionPeriod}, um passende Barrieretypen, Prüfstandards (IWA/ISO, DIN ISO 22343-1/-2, TR Mobile Fahrzeugsperren) und Integrationsansätze zu begründen.\n   - Weisen auf zertifizierte Lösungen hin und betone die Notwendigkeit der polizeilichen Abstimmung.\n\n5. siteConsiderations - Standortspezifische Überlegungen & Integration\n   - Verwende {locationContext}, um städtebauliche und funktionale Aspekte wie Integration in den öffentlichen Raum, Flucht- und Rettungswege, Barrierefreiheit und Lieferlogistik zu adressieren.\n   - Orientiere dich an Security-by-Design-Prinzipien, damit der Raum nutzbar bleibt und dennoch wirksam geschützt wird.\n\n6. operationalImpact - Betriebliche Anforderungen & Restrisiko\n   - Beschreibe organisatorische Anforderungen an Betreiber oder Veranstalter (Auf- und Abbau, regelmäßige Kontrollen, Winterdienst, Freihalten von Zufahrten, Abstimmung mit Polizei und Rettungsdiensten).\n   - Stelle klar, dass trotz Maßnahmen ein Restrisiko verbleibt und die Gefährdungsbewertung originär bei den Sicherheitsbehörden liegt.\n\nFormatvorgaben für deine Antwort:\n- Die Ausgabe-Sprache ist {language} (nur de oder en).\n- Gib nur fortlaufenden Text ohne Markdown, Code-Fences oder JSON aus.\n- Struktur: Schreibe die 6 Blöcke nacheinander in der oben beschriebenen Reihenfolge und trenne sie durch genau zwei Zeilenumbrüche (\\n\\n).\n- Innerhalb eines Blocks darfst du mit normalen Zeilenumbrüchen oder Aufzählungen arbeiten, aber keine zusätzlichen nummerierten Überschriften erzeugen.\n- Erfinde keine neuen Normen oder Richtlinien und fokussiere ausschließlich auf HVM-/Zufahrtsschutzthemen."
     }
   },
   "en": {
@@ -657,20 +666,29 @@
     },
     "report": {
       "generating": "Generating report...",
-      "mainTitle": "Reduced Initial Report – Vehicle Access Protection Concept for {locationName}",
+      "mainTitle": "Risk assessment and access protection concept (DIN SPEC 91414-2) for {locationName}",
       "sections": {
         "purpose": { "title": "1. Purpose and Protection Objectives" },
         "threatAnalysis": { "title": "2. Threat Analysis & Risk Assessment" },
-        "vulnerabilities": { "title": "3. Vulnerability Analysis" },
-        "hvmMeasures": { "title": "4. Proposed HVM Measures" },
+        "vulnerabilities": { "title": "3. Access Corridor Vulnerability Analysis" },
+        "hvmMeasures": { "title": "4. Access Protection Concept & HVM Measures" },
         "siteConsiderations": { "title": "5. Site-Specific Considerations & Integration" },
-        "operationalImpact": { "title": "6. Operational and Aesthetic Impact" }
+        "operationalImpact": { "title": "6. Operational Requirements & Residual Risk" }
       },
-      "watermark": "Initial Draft",
+      "watermark": "Draft – does not replace police threat assessment",
+      "keyFacts": {
+        "title": "Key Facts",
+        "location": "Location",
+        "asset": "Asset / Event",
+        "securityLevel": "Target security level",
+        "protectionGrade": "Derived protection grade",
+        "dataBasis": "Data basis: {source}, Barricadix analysis as of {date}"
+      },
       "reportFilename": "Risk-Report-BarricadiX.pdf",
       "not_applicable": "N/A",
       "undefinedLocation": "[Location not defined on map]",
       "undefinedAsset": "[No specific protection asset specified]",
+      "threatListIntro": "The access corridor analysis highlights the following routes with potentially critical approach paths:",
       "threatsTable": {
         "title": "Identified Threat Roads",
         "street": "Street",
@@ -718,7 +736,7 @@
       "geminiError": "The AI-powered analysis could not be generated due to an error."
     },
     "ai": {
-      "reportPrompt": "You are a specialist for physical vehicle access protection creating a security report for protection against vehicle attacks and unauthorized vehicle intrusion (Vehicle Security Barriers / Hostile Vehicle Mitigation). The focus is on physical protection of buildings, squares and infrastructure against vehicle terrorist attacks, rampage attacks or accidents. IMPORTANT: This is NOT a cybersecurity report! Generate a JSON object with six keys: 'purpose', 'threatAnalysis', 'vulnerabilities', 'hvmMeasures', 'siteConsiderations', 'operationalImpact'. The content's language must be {language}. Here is the context data:\n\n- **Location Name**: {locationName}\n- **Asset to Protect**: {assetToProtect}\n- **Desired Security Level**: {securityLevel}\n- **Derived Protection Level**: {protectionGrade}\n- **Main Threats (Access Roads)**: {threatList}\n- **Type of HVM Solution**: {protectionPeriod}\n- **Recommended VSB Type**: {productType}\n- **Expected Minimum Impact Performance**: Penetration of {penetration}m and debris travel of {debrisDistance}m.\n\nFocus exclusively on: vehicle barriers, bollards, physical barriers, vehicle impact protection, ram attacks, test standards like PAS 68 or IWA 14, speeds, vehicle masses, impact angles, penetration depths. NEVER mention: malware, cyber attacks, network security, software, IT systems. Fill each of the following sections with meaningful, professional text based on the provided data."
+      "reportPrompt": "You are a security planner specialized in police-driven hostile vehicle mitigation (HVM) and access protection concepts.\n\nYou work in alignment with:\n- DIN SPEC 91414-1 and DIN SPEC 91414-2 (access protection concepts and risk assessment)\n- DIN ISO 22343-1/-2 (Security & Resilience - Protective Security - Urban Public Spaces)\n- the police guidance by Weicht on hostile vehicle attacks (focus on police perspective, approach corridors, attack vectors, protection concepts)\n- the TR Mobile Vehicle Barriers and relevant European guidance such as JRC publications and Security-by-Design principles\n\nYou receive the following placeholders from the system: {language}, {locationName}, {assetToProtect}, {securityLevel}, {protectionGrade}, {threatList}, {protectionPeriod}, {productType}, {penetration}, {debrisDistance}, {highestThreatRoads}, {threatLevelDistribution}, {recommendedProductTypes}, {productTypeJustification}, {locationContext}, {averageThreatLevel}. Additional pre-calculated access data from threatsMap may feed into these values.\n\nYour task: create a norm-aligned narrative risk report on access protection that supports planners and police stakeholders.\n\nThe report must contain EXACTLY 6 text blocks, in this order:\n\n1. purpose - purpose, trigger, protection objectives\n   - Describe the trigger and goal of the assessment.\n   - Mention {assetToProtect}, the site {locationName}, the target security level {securityLevel}, and the derived protection grade {protectionGrade}.\n   - State that the content follows DIN SPEC 91414-2 and the police guidance on hostile vehicle attacks.\n\n2. threatAnalysis - threat analysis & risk assessment\n   - Outline typical hostile vehicle / vehicle-as-a-weapon scenarios from a police perspective (per Weicht).\n   - Use {threatList}, {highestThreatRoads}, {threatLevelDistribution}, and {averageThreatLevel} to explain the local exposure.\n   - Summarize the qualitative risk model (likelihood x impact) and connect it to the protection grade {protectionGrade}.\n\n3. vulnerabilities - access corridor vulnerability analysis\n   - Treat every access listed in {threatList} and {highestThreatRoads} as its own corridor.\n   - Describe for each corridor the approach direction, acceleration potential, likely speed, existing or missing obstacles, and usage profile.\n   - Tie the observations to the DIN SPEC 91414-2 idea of Zone 0 toward the protected zone and highlight long, straight, unprotected corridors as critical.\n\n4. hvmMeasures - access protection concept & HVM measures\n   - Translate the weaknesses into corridor-specific protection objectives (stop vehicle, dissipate energy, lower speed, protect pedestrian flows).\n   - Use {productType}, {recommendedProductTypes}, {productTypeJustification}, {penetration}, {debrisDistance}, and {protectionPeriod} to justify suitable barrier categories and certifications (IWA/ISO, DIN ISO 22343-1/-2, TR Mobile Vehicle Barriers).\n   - Emphasize certified solutions and coordination with police authorities.\n\n5. siteConsiderations - site-specific considerations & integration\n   - Reference {locationContext} to address urban integration, escape and rescue routes, accessibility, delivery logistics, and event operations.\n   - Highlight Security-by-Design principles so that protective elements remain functional yet unobtrusive.\n\n6. operationalImpact - operational requirements & residual risk\n   - Describe operator responsibilities such as deployment, inspections, winter maintenance, keeping critical areas clear, and coordination with police/emergency services.\n   - Make clear that residual risk remains and threat classification ultimately lies with competent authorities.\n\nFormat requirements for your response:\n- Output language must be {language} (only de or en).\n- Provide plain continuous text without Markdown, code fences, or JSON.\n- Write the 6 blocks consecutively in the order above and separate them with exactly two line breaks (\\n\\n).\n- Inside a block you may use standard line breaks or bullet characters, but do not add extra numbered headings.\n- Do not invent new standards or topics outside HVM/access protection."
     }
   }
 }
