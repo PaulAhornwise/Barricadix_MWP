@@ -21,7 +21,7 @@ import { createRoot } from "react-dom/client";
 import "./src/styles/map3d-layout.css";
 import { fetchOsmBundleForPolygon, osmCache, OsmBundle } from './src/utils/osm.js';
 import { OsmSpeedLimiter, SpeedLimitConfig } from './src/utils/osmSpeedLimits.js';
-import { WeatherCondition } from './src/utils/osmParse.js';
+import { WeatherCondition, parseMaxspeed } from './src/utils/osmParse.js';
 // Entry Detection System Integration
 import { integrateEntryDetectionWithExistingOSM, addEntryDetectionStyles } from './src/features/map/integration/entryDetectionIntegration.js';
 // Geodata Provider Abstraction - NRW Integration
@@ -6682,13 +6682,20 @@ async function addProductRecommendationTooltips() {
                 return;
             }
             
-            // ⚠️ FIX: Entry Detection provides SHORT path to polygon edge, not acceleration distance!
-            // Entry Detection distance ist die gemessene Pfadlänge. Für realistische Geschwindigkeiten
-            // nutzen wir mindestens 100m Beschleunigungsweg, längere Pfade dürfen jedoch berücksichtigt werden.
-            const accelerationDistance = Math.max(candidate.distanceMeters, 100);
-            
-            const maxSpeed = Math.round(calculateVelocity(accelerationRange[1], accelerationDistance));
-            console.log(`🚗 Entry Detection candidate ${index + 1}: pathDistance=${candidate.distanceMeters}m, using accelerationDistance=${accelerationDistance}m, speed=${maxSpeed} km/h`);
+            // Calculate realistic speed using OSM constraints and improved heuristics
+            const speedResult = calculateRealisticSpeedForEntry(
+                candidate,
+                accelerationRange,
+                currentOsmData,
+                osmSpeedLimiter
+            );
+            const maxSpeed = speedResult.speed;
+
+            console.log(`🚗 Entry Detection candidate ${index + 1}:`, {
+                pathDistance: candidate.distanceMeters,
+                calculatedSpeed: maxSpeed,
+                reasoning: speedResult.reasoning
+            });
             
             // Find suitable products
             const recommendedProducts = findProductsForSpeed(maxSpeed);
@@ -6722,15 +6729,19 @@ function calculateMaxSpeedForSpecificEntryPoint(threatData: any, entryPointIndex
     const entryPoint = threatData.entryPoints[entryPointIndex];
     // Use the specific distance for this entry point instead of total length
     const distance = entryPoint.distance || threatData.totalLength;
-    
-    console.log(`🚗 Calculating speed for entry point ${entryPointIndex}: distance=${distance}m, acceleration=${accelerationRange[1]}m/s²`);
-    
-    const speed = calculateVelocity(accelerationRange[1], distance);
+
+    // Use 75% of max acceleration for more realistic speed calculation
+    const realisticAcceleration = accelerationRange[0] +
+        (accelerationRange[1] - accelerationRange[0]) * 0.75;
+
+    console.log(`🚗 Calculating speed for entry point ${entryPointIndex}: distance=${distance}m, realistic acceleration=${realisticAcceleration}m/s² (75% of max)`);
+
+    const speed = calculateVelocity(realisticAcceleration, distance);
     const roundedSpeed = Math.round(speed);
-    
+
     console.log(`🚗 RESULT: Raw speed=${speed}, Rounded speed=${roundedSpeed} km/h for entry point ${entryPointIndex}`);
     console.log(`🚗 Vehicle weight selected: ${selectedWeight}, acceleration range: [${accelerationRange[0]}, ${accelerationRange[1]}]`);
-    
+
     return roundedSpeed;
 }
 
@@ -11193,6 +11204,268 @@ function calculateVelocityWithOsm(acceleration: number, distance: number, pathCo
     }
     
     return baseVelocity;
+}
+
+/**
+ * Get heuristic speed limit based on OSM highway type
+ * Returns speed in km/h based on typical speed limits for each road type
+ * @param highwayTypes Array of highway type tags from OSM ways
+ * @returns Minimum speed limit from all highway types, or undefined if none recognized
+ */
+function getSpeedLimitForHighwayType(highwayTypes: string[]): number | undefined {
+    const typeSpeedMap: Record<string, number> = {
+        // Residential and low-speed zones
+        'living_street': 10,     // Verkehrsberuhigter Bereich
+        'residential': 30,       // Wohnstraße (typically 30 km/h in Germany)
+        'service': 20,          // Zufahrtsstraße (parking lots, driveways)
+        'track': 15,            // Feldweg, landwirtschaftlicher Weg
+        'path': 10,             // Fußweg (rarely for vehicles)
+        'footway': 10,          // Gehweg
+        'pedestrian': 10,       // Fußgängerzone (Schrittgeschwindigkeit)
+
+        // Urban roads
+        'unclassified': 50,     // Nebenstraße ohne spezielle Klassifikation
+        'tertiary': 50,         // Kreisstraße (typically 50 km/h in cities)
+        'tertiary_link': 40,    // Verbindungsstraße
+        'secondary': 50,        // Landesstraße in Ortslage
+        'secondary_link': 40,   // Verbindungsstraße
+        'primary': 50,          // Bundesstraße in Ortslage
+        'primary_link': 40,     // Verbindungsstraße
+
+        // Rural and high-speed roads
+        'trunk': 80,            // Autobahnähnliche Schnellstraße
+        'trunk_link': 60,       // Auf-/Abfahrt
+        'motorway': 100,        // Autobahn (no specific limit in Germany, but realistic for barrier planning)
+        'motorway_link': 60,    // Autobahnauf-/abfahrt
+
+        // Special cases
+        'busway': 40,           // Busspur
+        'bus_guideway': 40,     // Spurgeführter Bus
+        'road': 50,             // Unbekannter Typ → konservativ 50 km/h
+    };
+
+    if (!highwayTypes || highwayTypes.length === 0) {
+        return undefined;
+    }
+
+    // Find all recognized speeds
+    const recognizedSpeeds: number[] = [];
+    for (const type of highwayTypes) {
+        const speed = typeSpeedMap[type];
+        if (speed !== undefined) {
+            recognizedSpeeds.push(speed);
+        }
+    }
+
+    // Return minimum (most restrictive) speed
+    if (recognizedSpeeds.length > 0) {
+        return Math.min(...recognizedSpeeds);
+    }
+
+    return undefined;
+}
+
+/**
+ * Fallback heuristic: estimate realistic speed based on distance
+ * Used when no OSM data is available
+ * @param distanceMeters Length of the entry path in meters
+ * @returns Estimated speed limit in km/h
+ */
+function calculateDistanceBasedReduction(distanceMeters: number): number {
+    // Very short distances → likely driveways or parking lot entrances
+    // Minimum 25 km/h to ensure products are available
+    if (distanceMeters < 30) return 25;
+
+    // Short distances → likely residential street entrances
+    if (distanceMeters < 50) return 30;
+
+    // Medium short distances → neighborhood streets
+    if (distanceMeters < 100) return 40;
+
+    // Medium distances → urban roads
+    if (distanceMeters < 200) return 50;
+
+    // Longer distances → could be rural or faster roads
+    return 60;
+}
+
+/**
+ * Extract all OSM-based speed constraints for an entry candidate
+ * Collects maxspeed tags, highway types, and traffic calming from OSM data
+ * @param candidate The entry candidate to analyze
+ * @param osmData OSM bundle with ways and traffic calming nodes
+ * @param osmSpeedLimiter Speed limiter instance for constraint checking
+ * @returns Object containing all found speed constraints
+ */
+function getSpeedConstraintsForEntryCandidate(
+    candidate: EntryCandidate,
+    osmData: OsmBundle | null,
+    osmSpeedLimiter: OsmSpeedLimiter | null
+): {
+    maxspeedLimit?: number;
+    highwayTypeLimit?: number;
+    trafficCalmingLimit?: number;
+    hasConstraints: boolean;
+} {
+    const result: {
+        maxspeedLimit?: number;
+        highwayTypeLimit?: number;
+        trafficCalmingLimit?: number;
+        hasConstraints: boolean;
+    } = {
+        hasConstraints: false
+    };
+
+    if (!osmData) {
+        return result;
+    }
+
+    // 1. Extract maxspeed tags from candidate's wayIds
+    const maxspeedValues: number[] = [];
+    for (const wayId of candidate.wayIds) {
+        const way = osmData.ways.find(w => w.id === wayId);
+        if (way?.tags.maxspeed) {
+            const speed = parseMaxspeed(way.tags.maxspeed);
+            if (speed !== undefined) {
+                maxspeedValues.push(speed);
+            }
+        }
+    }
+
+    if (maxspeedValues.length > 0) {
+        result.maxspeedLimit = Math.min(...maxspeedValues);
+        result.hasConstraints = true;
+    }
+
+    // 2. Sample points along candidate path for osmSpeedLimiter constraints
+    if (osmSpeedLimiter && candidate.path.geometry.coordinates.length > 0) {
+        const coords = candidate.path.geometry.coordinates;
+        const sampleCount = Math.min(10, coords.length);
+        const step = Math.max(1, Math.floor(coords.length / sampleCount));
+
+        let minTrafficCalmingSpeed: number | undefined;
+
+        for (let i = 0; i < coords.length; i += step) {
+            const [lng, lat] = coords[i];
+            const constraints = osmSpeedLimiter.getConstraintsAt({ lat, lng });
+
+            // Check for traffic calming
+            if (constraints.trafficCalming) {
+                const calmingSpeed = constraints.trafficCalming.type === 'bump' ? 20 :
+                                    constraints.trafficCalming.type === 'hump' ? 30 :
+                                    constraints.trafficCalming.type === 'table' ? 20 :
+                                    constraints.trafficCalming.type === 'chicane' ? 30 :
+                                    constraints.trafficCalming.type === 'choker' ? 30 :
+                                    25; // Default for unknown types
+
+                if (minTrafficCalmingSpeed === undefined || calmingSpeed < minTrafficCalmingSpeed) {
+                    minTrafficCalmingSpeed = calmingSpeed;
+                }
+            }
+        }
+
+        if (minTrafficCalmingSpeed !== undefined) {
+            result.trafficCalmingLimit = minTrafficCalmingSpeed;
+            result.hasConstraints = true;
+        }
+    }
+
+    // 3. Extract highway types from candidate's wayIds
+    const highwayTypes: string[] = [];
+    for (const wayId of candidate.wayIds) {
+        const way = osmData.ways.find(w => w.id === wayId);
+        if (way?.tags.highway) {
+            highwayTypes.push(way.tags.highway);
+        }
+    }
+
+    if (highwayTypes.length > 0) {
+        const highwayLimit = getSpeedLimitForHighwayType(highwayTypes);
+        if (highwayLimit !== undefined) {
+            result.highwayTypeLimit = highwayLimit;
+            result.hasConstraints = true;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Calculate realistic speed for an entry candidate
+ * Combines OSM constraints, highway types, traffic calming, and physical limits
+ * Uses 75% of max acceleration instead of 100% for more realistic scenarios
+ * @param candidate The entry candidate to analyze
+ * @param accelerationRange [min, max] acceleration range for vehicle type
+ * @param osmData OSM bundle with ways and traffic calming nodes
+ * @param osmSpeedLimiter Speed limiter instance
+ * @returns Object with calculated speed and reasoning
+ */
+function calculateRealisticSpeedForEntry(
+    candidate: EntryCandidate,
+    accelerationRange: [number, number],
+    osmData: OsmBundle | null,
+    osmSpeedLimiter: OsmSpeedLimiter | null
+): { speed: number; reasoning: string } {
+    // 1. Get OSM constraints
+    const constraints = getSpeedConstraintsForEntryCandidate(candidate, osmData, osmSpeedLimiter);
+
+    // 2. Calculate physical limit with 75% of max acceleration (more realistic)
+    const realisticAcceleration = accelerationRange[0] +
+        (accelerationRange[1] - accelerationRange[0]) * 0.75;
+
+    const accelerationDistance = Math.max(candidate.distanceMeters, 100);
+    const physicalLimit = calculateVelocity(realisticAcceleration, accelerationDistance);
+
+    // 3. Apply constraints in priority order
+    let finalSpeed = physicalLimit;
+    let reasoning = `Physical limit: ${Math.round(physicalLimit)} km/h (75% acceleration over ${Math.round(candidate.distanceMeters)}m)`;
+
+    // Priority 1: OSM maxspeed (most authoritative)
+    if (constraints.maxspeedLimit !== undefined) {
+        finalSpeed = Math.min(finalSpeed, constraints.maxspeedLimit);
+        reasoning = `OSM maxspeed: ${constraints.maxspeedLimit} km/h`;
+    }
+    // Priority 2: Traffic calming (strong indicator of low speeds)
+    else if (constraints.trafficCalmingLimit !== undefined) {
+        finalSpeed = Math.min(finalSpeed, constraints.trafficCalmingLimit);
+        reasoning = `Traffic calming: ${constraints.trafficCalmingLimit} km/h`;
+    }
+    // Priority 3: Highway type heuristic
+    else if (constraints.highwayTypeLimit !== undefined) {
+        finalSpeed = Math.min(finalSpeed, constraints.highwayTypeLimit);
+        reasoning = `Highway type: ${constraints.highwayTypeLimit} km/h`;
+    }
+    // Fallback: Distance-based heuristic
+    else if (!constraints.hasConstraints) {
+        const distanceLimit = calculateDistanceBasedReduction(candidate.distanceMeters);
+        finalSpeed = Math.min(finalSpeed, distanceLimit);
+        reasoning = `Distance-based: ${distanceLimit} km/h (no OSM data)`;
+    }
+
+    // 4. Apply safety margin for very short distances
+    if (candidate.distanceMeters < 100) {
+        const safetyFactor = 0.85; // 15% reduction
+        const speedBeforeSafety = finalSpeed;
+        const speedWithMargin = Math.round(finalSpeed * safetyFactor);
+        // Only apply margin if result is still reasonable (>= 20 km/h)
+        if (speedWithMargin >= 20) {
+            finalSpeed = speedWithMargin;
+            reasoning += ` → ${finalSpeed} km/h (15% safety margin for short distance)`;
+        } else {
+            finalSpeed = Math.round(finalSpeed);
+        }
+    } else {
+        finalSpeed = Math.round(finalSpeed);
+    }
+
+    // 5. Ensure minimum speed (realistic for HVM products)
+    // Most HVM products start at 20-25 km/h, so use 20 as absolute minimum
+    finalSpeed = Math.max(finalSpeed, 20);
+
+    return {
+        speed: finalSpeed,
+        reasoning: reasoning
+    };
 }
 
 // ===============================================
