@@ -34,10 +34,12 @@ import { jsPDF } from 'jspdf';
 import { sanitizeDe } from './src/features/tender/createTenderPdf';
 import type { EntryCandidate } from './src/shared/graph/types';
 
-// Extend the Window interface to include jspdf for TypeScript.
+// Extend the Window interface to include jspdf, docx, and saveAs for TypeScript.
 declare global {
     interface Window {
       jspdf: any;
+      docx: any;
+      saveAs: (blob: Blob, filename: string) => void;
     }
 }
 
@@ -270,6 +272,8 @@ let generatedPdfUrl: string | null = null; // Object URL for iframe preview
 let generatedPdfFilename: string = ''; // To store the generated PDF filename
 let generatedTenderPdf: any = null; // To hold the generated Tender PDF object
 let generatedTenderPdfUrl: string | null = null; // Object URL for tender iframe preview
+let generatedWordBlob: Blob | null = null; // To hold the generated Word document
+let generatedWordFilename: string = ''; // To store the generated Word filename
 
 // Street highlighting system
 let highlightedStreetName: string | null = null;
@@ -399,131 +403,119 @@ const embeddedTranslations = {
         },
 
         "ai": {
-            "reportPrompt": `ROLLE / IDENTITÄT:
-Du bist ein hochspezialisierter Sicherheitsberater mit 30 Jahren Erfahrung in Terrorprävention, Täterverhalten, Zufahrtsschutz und Sicherheitsanforderungsmanagement. Du arbeitest als externer Experte für das Unternehmen BarricadiX.
+            "reportPrompt": `ROLLE:
+Du bist ein erfahrener Ingenieur für Zufahrtsschutz bei BarricadiX GmbH und erstellst eine technische Risikobewertung.
 
-STIL:
-- Schreibe in formalem „Verwaltungsdeutsch" / Gutachtenstil
-- Klar strukturiert, nachvollziehbar und normorientiert
-- Produktspezifisch neutral (produktoffen), d.h. keine Produktnamen nennen
+🚫 ABSOLUT VERBOTEN - NIEMALS GENERIEREN:
+- Anreden wie "Sehr geehrte Damen und Herren" oder "Liebe Leserinnen"
+- Persönliche Formulierungen (Ich-Form, Brief-Stil)
+- Zahlenfolgen wie "1, 2, 3, 4, 5..." oder "10, 20, 30..."
+- Wiederholte Wörter, Phrasen oder Sätze
+- Platzhalter wie "[...]", "..." oder "###"
+- Aufzählungen mit mehr als 5 Punkten
+- Fiktive Straßennamen (NUR die übergebenen verwenden)
+- Das Wort "Gutachten" (nutze "Risikobewertung")
 
-NORMATIVE GRUNDLAGEN:
-- DIN SPEC 91414-1/-2 (Zufahrtsschutzkonzepte, Risikobeurteilung, Sicherungsgrade)
-- DIN ISO 22343-1/-2 (Fahrzeugsicherheitsbarrieren – Leistungsanforderungen & Anwendung)
-- TR „Mobile Fahrzeugsperren" (Schutzklassen SK1/SK2, Betrieb)
+✅ PFLICHT - SCHREIBSTIL:
+- SACHLICH, UNPERSÖNLICH, WISSENSCHAFTLICH
+- Passiv-Konstruktionen verwenden ("Es wurde ermittelt..." statt "Wir haben ermittelt...")
+- 300-500 Wörter pro Kapitel als zusammenhängender Fließtext
+- Fachlich korrekt nach DIN SPEC 91414-1/-2, DIN ISO 22343-1/-2
+- Formaler technischer Berichtsstil
+- Produktneutral (keine Herstellernamen)
+
+NORMEN:
+- DIN SPEC 91414-1:2021 (Risikobeurteilung, Sicherungsgrade SG0-SG4)
+- DIN SPEC 91414-2:2022 (Planung von Zufahrtsschutzkonzepten)
+- DIN ISO 22343-1/-2:2025 (Fahrzeugsicherheitsbarrieren)
+- TR „Mobile Fahrzeugsperren" (SK1/SK2)
 - ProPK-Handreichung „Schutz vor Überfahrtaten"
-- Polizeilicher Pflichtenkatalog „Fachplanung Zufahrtsschutz"
 
-KONTEXTVARIABLEN (aus BarricadiX):
-- Veranstaltung/Schutzgut: {assetToProtect}
+SCHUTZKLASSEN:
+- SK1: 250-800 kJ (Pkw, leichte Transporter)
+- SK2: 800-1950 kJ (schwere Lkw)
+
+ENERGIESTUFEN:
+- E1: <250 kJ | E2: 250-800 kJ | E3: 800-1950 kJ | E4: >1950 kJ
+
+DATEN:
+- Schutzgut: {assetToProtect}
 - Standort: {locationName}
-- Lagebeschreibung: {locationContext}
-- Schutzzeitraum: {protectionPeriod}
-- Sicherheitsniveau: {securityLevel}, Sicherungsgrad: {protectionGrade}
-- Identifizierte Zufahrten: {threatList}
-- Bedrohungsniveau: {averageThreatLevel}/10, Verteilung: {threatLevelDistribution}
+- Zeitraum: {protectionPeriod}
+- Sicherungsgrad: {protectionGrade}
+- Bedrohungsniveau: {averageThreatLevel}/10
+- Zufahrten: {threatList}
 - Kritischste Zufahrten: {highestThreatRoads}
-- Empfohlene Produkttypen: {recommendedProductTypes}, {productType}
-- Begründung: {productTypeJustification}
-- Eindringtiefe: {penetration}, Trümmerflug: {debrisDistance}
-- Gefährdungsanalyse: {hazardAssessment}
-- Fahrdynamische Daten: {vehicleDynamicsTable}
-- Energiestufen: {energyClassification}
-
-FAHRZEUGKLASSEN (Referenzwerte):
-- Kleinwagen: m=1.200kg, a=2,75m/s²
-- Mittelklasse-Pkw: m=1.500kg, a=3,20m/s²
-- Full-Size-Pkw/Van: m=1.800kg, a=3,70m/s²
-- Performance-/Sportwagen: m=1.600kg, a=5,00m/s²
-- Pick-up: m=2.500kg, a=2,50m/s²
-- Transporter/Flatbed: m=3.500kg, a=1,90m/s²
-- Lkw 7,5t: m=7.200kg, a=2,00m/s²
-- Lkw 12t: m=12.000kg, a=1,25m/s²
-- Lkw 30t: m=30.000kg, a=0,75m/s²
-
-ENERGIESTUFEN (Schwellwerte):
-- E1 (niedrig): E < 250 kJ → einfache Sperren
-- E2 (mittel, SK1-Bereich): 250 kJ ≤ E < 800 kJ → SK1-Barrieren
-- E3 (hoch, SK2-Bereich): 800 kJ ≤ E < 1.950 kJ → SK2-Barrieren
-- E4 (sehr hoch): E ≥ 1.950 kJ → Hochsicherheitsbarrieren
-
-AUFGABE:
-Erstelle einen vollständigen, professionellen Risikobericht im Gutachtenstil. Nutze AUSSCHLIESSLICH die übergebenen Kontextvariablen – erfinde KEINE Orts- oder Straßennamen.
+- Empfohlene Systeme: {recommendedProductTypes}
 
 AUSGABEFORMAT:
-Gib GENAU 11 nummerierte Textblöcke aus, getrennt durch eine Leerzeile (zwei Zeilenumbrüche).
-Jeder Block beginnt mit seiner fettgedruckten Nummer und Titel. Kein JSON, keine Code-Fences.
+- Genau 11 Kapitel, durchnummeriert von 1 bis 11
+- Jedes Kapitel beginnt mit "**X. Kapiteltitel**" (wobei X die Nummer ist)
+- Jedes Kapitel enthält 2-3 prägnante Absätze (max. 250-400 Wörter)
+- KNAPP und PRÄZISE formulieren, keine Wiederholungen
+- Zwischen den Kapiteln eine Leerzeile
+- KEIN JSON, KEIN Markdown außer den Kapitelüberschriften
 
 **1. Auftrag, Zielsetzung und Geltungsbereich**
-- Auftraggeber (Kommune/Veranstalter), Bearbeiter (BarricadiX), Datum
-- Zielsetzung: Risikobewertung und Schutzkonzept für {assetToProtect} am Standort {locationName}
-- Räumlicher Geltungsbereich: definierter Sicherheitsperimeter
-- Zeitlicher Geltungsbereich: {protectionPeriod}
-- Hinweis: Gutachten ersetzt keine polizeiliche Gefährdungsbewertung
+WICHTIG: Formuliere einen sachlichen Fließtext. KEINE Anrede, KEINE Briefform, KEIN "Sehr geehrte..."!
+
+Die vorliegende fahrdynamische Risikobewertung wurde im Auftrag der Stadt {clientCity} durch die BarricadiX GmbH erstellt. Gegenstand der Untersuchung ist die Analyse und Bewertung des Zufahrtsschutzes für das Schutzgut "{assetToProtect}" am Standort {locationName}.
+
+Der räumliche Geltungsbereich umfasst den definierten Schutzperimeter einschließlich aller identifizierten Zufahrtsvektoren. Der zeitliche Geltungsbereich erstreckt sich auf den Zeitraum {protectionPeriod}. Zielsetzung ist die Identifikation, Bewertung und Klassifizierung aller potenziellen Anfahrtskorridore nach fahrdynamischen Gesichtspunkten sowie die Ableitung geeigneter Schutzmaßnahmen.
+
+Diese technische Risikobewertung dient als Planungsgrundlage für die Konzeption temporärer oder permanenter Fahrzeugsicherheitsbarrieren. Sie ersetzt keine hoheitliche Gefährdungsbewertung durch die zuständigen Sicherheitsbehörden.
 
 **2. Normative Grundlagen und Referenzen**
-- Liste aller angewandten Normen (DIN SPEC 91414-1/-2, DIN ISO 22343-1/-2, TR „Mobile Fahrzeugsperren")
-- Erläuterung der Sicherungsgrade SG0–SG4 und Schutzklassen SK1/SK2
-- Verweis auf ProPK-Handreichung und polizeiliche Vorgaben
+Formuliere KNAPP (max. 250 Wörter): Die Risikobewertung basiert auf DIN SPEC 91414-1:2021 (Risikobeurteilung, Sicherungsgrade SG0-SG4), DIN SPEC 91414-2:2022 (Planung), DIN ISO 22343-1/-2:2025 (Fahrzeugsicherheitsbarrieren), TR "Mobile Fahrzeugsperren" (Schutzklassen SK1/SK2) und ProPK-Handreichung "Schutz vor Überfahrtaten". Erläutere kurz die Bedeutung dieser Normen.
 
-**3. Beschreibung des Veranstaltungsbereichs**
-- 3.1 Lage und Nutzung: {locationContext}, städtebauliche Situation, Besonderheiten
-- 3.2 Erhebung durch BarricadiX: GIS-gestützte Analyse, identifizierte Zufahrten ({threatList})
-- Beschreibung des Sicherheitsperimeters und der Schutzzone
+**3. Beschreibung des Schutzbereichs**
+Formuliere einen sachlichen, beschreibenden Text (KEINE Anrede, KEINE Brief-Form):
+
+Der untersuchte Schutzbereich befindet sich in {locationContext}. Die städtebauliche Situation ist gekennzeichnet durch die typische Innenstadtlage mit verdichteter Bebauung. Die Nutzung des Bereichs umfasst {assetToProtect}. Im Rahmen der Ortsbegehung und GIS-Analyse wurden die folgenden Zufahrtswege identifiziert: {threatList}. Die Verkehrsflächen weisen unterschiedliche Fahrbahnbreiten und Oberflächenbeschaffenheiten auf. Besondere örtliche Gegebenheiten werden bei der fahrdynamischen Analyse berücksichtigt.
 
 **4. Bedrohungsanalyse und Täterverhalten**
-- 4.1 Relevante Bedrohungsszenarien: Vehicle-as-a-Weapon, spontane vs. geplante Taten
-- Fahrzeugtypen: Pkw, Transporter, Lkw (verschiedene Massen und Beschleunigungen)
-- 4.2 Zielattraktivität: Personendichte, Symbolik, mediale Wirkung, Fluchtmöglichkeiten
-- Integration der Gefährdungsanalyse: {hazardAssessment}
+Analysiere sachlich ohne persönliche Anrede:
+
+Die Bedrohungsanalyse berücksichtigt das Szenario "Vehicle-as-a-Weapon" (VaW) gemäß aktueller Erkenntnisse der Sicherheitsbehörden. Relevante Fahrzeugkategorien umfassen Personenkraftwagen (1.200-1.800 kg), Transporter (bis 3.500 kg) sowie Lastkraftwagen verschiedener Gewichtsklassen (7.500-30.000 kg). Bei intentionalen Anschlägen ist von maximaler Beschleunigung bis zum Aufprallpunkt auszugehen. Die Zielattraktivität wird nach dem ProPK-Gefährdungsraster bewertet: Personendichte, Symbolkraft und mediale Reichweite. Die spezifische Gefährdungsanalyse ergibt: {hazardAssessment}.
 
 **5. Methodik der BarricadiX-Analyse**
-- 5.1 GIS-gestützte Analyse des Straßennetzes (OpenStreetMap/Overpass)
-- 5.2 Fahrzeugklassen und Parameter (Masse m, Beschleunigung a)
-- 5.3 Anfahrtsstrecken der Zufahrten (effektive Beschleunigungsstrecke s)
-- Formeln: v = √(2·a·s) für Endgeschwindigkeit, E = m·a·s für kinetische Energie
+WICHTIG: Formuliere einen wissenschaftlich-technischen Fließtext OHNE persönliche Anreden. Verwende Passiv-Konstruktionen.
+
+Die vorliegende Risikobewertung basiert methodisch auf den normativen Grundlagen der DIN SPEC 91414-1/-2 sowie der Technischen Richtlinie "Mobile Fahrzeugsperren" des Bundesministeriums des Innern. Zur Identifikation potenzieller Anfahrtskorridore wird eine GIS-gestützte Analyse validierter Geo-Informationsdaten durchgeführt. Die räumliche Abgrenzung des Schutzperimeters ermöglicht die systematische Erfassung aller Zufahrtsvektoren.
+
+Die fahrdynamische Modellierung erfolgt nach dem Newton-Euler-Formalismus der klassischen Mehrkörperdynamik. Die energetische Betrachtung basiert auf der vektoriellen Formulierung der Bewegungsgleichungen starrer Körper. Für jede identifizierte Zufahrt wird die effektive Anfahrtsstrecke (s) unter Berücksichtigung von Kurvenradien, Fahrbahnbreiten, Neigungen und geschwindigkeitsreduzierenden Hindernissen ermittelt.
+
+Die Berechnung der maximalen Aufprallgeschwindigkeit erfolgt über die kinematische Grundgleichung v = sqrt(2·a·s) unter Annahme konstanter Beschleunigung. Die resultierende kinetische Aufprallenergie E_kin = 0,5·m·v² wird für zehn normative Prüffahrzeugklassen gemäß IWA 14-1 / PAS 68 (von M1/Pkw mit 1.500 kg bis N3G/4-Achser mit 36.000 kg) ermittelt und in Energiestufen E1-E4 klassifiziert. Diese Klassifizierung bildet die Grundlage für die Ableitung erforderlicher Schutzklassen gemäß TR Mobile Fahrzeugsperren.
 
 **6. Fahrdynamische Analyse und Maximalenergien**
-- 6.1 Grundlagen: Berechnung von Endgeschwindigkeit v [km/h] und Aufprallenergie E [kJ]
-- 6.2 Einteilung in Energiestufen E1–E4 mit Schwellwerten
-- 6.3 Worst-Case-Tabelle: Für jede Zufahrt die maximale Energie E_max und zugehörige Fahrzeugklasse
-- Nutze {vehicleDynamicsTable} und {energyClassification}
+Formuliere sachlich (KEINE Anrede, KEINE Brief-Form, KEINE Ich-Perspektive):
 
-**7. Risikoanalyse nach dem ALARP-Prinzip**
-- 7.1 Bewertungsansatz: ALARP (As Low As Reasonably Practicable)
-- 7.2 Energetische Einstufung der Zufahrten (E1–E4)
-- 7.3 Eintrittswahrscheinlichkeit: Pkw-Szenarien (höher) vs. Lkw-Szenarien (niedriger, aber schwerwiegender)
-- 7.4 Schadensausmaß: sehr hoch bei Personendichte im Schutzbereich
-- 7.5 Risikokategorien (niedrig/mittel/hoch) und abgeleitete Schutzklassen (SK1/SK2)
-- Bedrohungsniveau: {averageThreatLevel}/10, Verteilung: {threatLevelDistribution}
+Die fahrdynamische Analyse umfasst die systematische Berechnung der maximalen Aufprallenergie für jede identifizierte Zufahrt unter Berücksichtigung der neun Referenz-Fahrzeugklassen. Die Ergebnisse werden in die Energiekategorien E1 (unter 250 kJ), E2 (250-800 kJ), E3 (800-1950 kJ) und E4 (über 1950 kJ) klassifiziert.
 
-**8. Schutzzieldefinition**
-- Spezifisches Schutzziel für {assetToProtect} am Standort {locationName}
-- Verhindern des Eindringens mehrspuriger Fahrzeuge (Pkw bis schwere Lkw) in den Schutzbereich
-- Auch im Worst Case (schwerstes Fahrzeug mit maximaler Anfahrenergie)
-- Abgeleiteter Sicherungsgrad: {protectionGrade}
+Als kritischste Zufahrten wurden identifiziert: {highestThreatRoads}. Die Worst-Case-Betrachtung erfolgt mit einem 30-Tonnen-Lastkraftwagen unter Annahme maximaler Beschleunigung. Die detaillierten Berechnungsergebnisse sind dem Anhang zu entnehmen.
 
-**9. Schutzkonzept und produktoffene Empfehlungen**
-- 9.1 Kategorisierung der Zufahrten nach Schutzbedarf:
-  - Kategorie A (hochkritisch, E3/E4): SK2-Barrieren erforderlich
-  - Kategorie B (mittel, E2): SK1-Barrieren ausreichend
-  - Kategorie C (gering, E1): einfache Sperren
-- 9.2 Anforderungen an Fahrzeugsperren (DIN ISO 22343-1, IWA 14-1)
-- 9.3 Systemtypen (produktoffen): Hochsicherheitspoller, Roadblocker, mobile Sperren, crash-getestete Stadtmöbel
-- 9.4 Rettungswege und Betriebsorganisation: BOS-Zufahrten, Öffnungskonzept
-- Empfohlene Produkttypen: {recommendedProductTypes}
+**7. Risikoanalyse nach ALARP-Prinzip**
+Formuliere sachlich (KEINE persönliche Anrede, KEIN Brief-Stil):
 
-**10. Restgefahren und Grenzen**
-- Verbleibende Restgefahren: atypische Fahrzeuge, kombinierte Szenarien, Fehlbedienung
-- Grenzen der technischen Maßnahmen
-- Notwendigkeit organisatorischer Ergänzung (Betriebskonzept, Schulung, Überwachung)
-- Hinweis auf regelmäßige Überprüfung und Fortschreibung
+Die Risikobewertung erfolgt nach dem ALARP-Prinzip ("As Low As Reasonably Practicable"). Dieses etablierte Konzept des Risikomanagements unterscheidet drei Bereiche:
 
-**11. Schlussfolgerungen und Empfehlung**
-- Gesamtbewertung: Mit Umsetzung der SK1-/SK2-Maßnahmen und Betriebskonzept wird Risiko auf ALARP-Niveau reduziert
-- Klare Empfehlung an Kommune/Veranstalter
-- Nächste Schritte: Detailplanung, Ausschreibung, Umsetzung
-- Abschließender Hinweis: Dieser Bericht ist eine technische Planungsgrundlage und ersetzt keine hoheitliche Gefährdungsbewertung der Polizei`,
+Der inakzeptable Bereich umfasst Zufahrten mit E4-Energien (über 1950 kJ) ohne Schutzmaßnahmen. Hier ist die Installation von Hochsicherheitsbarrieren zwingend erforderlich. Der ALARP-Bereich betrifft Zufahrten mit E2- und E3-Energien, bei denen eine Kosten-Nutzen-Abwägung zwischen Schutzwirkung und Aufwand durchzuführen ist. Der akzeptable Bereich beinhaltet Zufahrten mit E1-Energien (unter 250 kJ), bei denen einfache Absperrungen ausreichend sind.
+
+Für den vorliegenden Schutzbereich ergibt die Analyse ein durchschnittliches Bedrohungsniveau von {averageThreatLevel}/10. Die Eintrittswahrscheinlichkeit wird anhand des Veranstaltungstyps und der Symbolkraft bewertet. Das potenzielle Schadensausmaß ist bei der zu erwartenden Personendichte als sehr hoch einzustufen.
+
+**8. Schutzzieldefinition und Sicherungsgrad**
+Das Schutzziel für {assetToProtect} wird wie folgt definiert: Verhinderung des unberechtigten Eindringens mehrspuriger Kraftfahrzeuge in den definierten Schutzbereich. Der abgeleitete Sicherungsgrad {protectionGrade} ergibt sich aus der Risikoanalyse und den Anforderungen gemäß DIN SPEC 91414-1 und ISO 22343. Die konkreten Leistungsanforderungen an die Fahrzeugsicherheitsbarrieren werden aus den ermittelten Energiestufen abgeleitet.
+
+**9. Schutzkonzept und Maßnahmenempfehlungen**
+Basierend auf der fahrdynamischen Analyse wird folgendes Schutzkonzept empfohlen: Die Zufahrten werden in drei Kategorien eingeteilt - Kategorie A (hochkritisch, SK2-Barrieren erforderlich), Kategorie B (mittlerer Schutzbedarf, SK1-Barrieren ausreichend) und Kategorie C (geringer Schutzbedarf, einfache Sperren). Als Systemtypen werden empfohlen: {recommendedProductTypes}. Bei der Planung sind BOS-Zufahrten und Rettungswege gemäß DIN 14090 zu berücksichtigen.
+
+**10. Restgefahren und Betriebskonzept**
+Auch bei Umsetzung der empfohlenen Maßnahmen verbleiben Restgefahren: atypische Fahrzeuge außerhalb der Referenzklassen, kombinierte Angriffsszenarien sowie mögliche Fehlbedienungen. Diese Grenzen technischer Maßnahmen sind im Betriebskonzept zu berücksichtigen. Das Betriebskonzept umfasst Personalschulung, definierte Wartungsintervalle, Überwachungsroutinen sowie ein Notfall- und Räumungskonzept. Eine Überprüfung der Risikobewertung wird in 12-monatigen Intervallen empfohlen.
+
+**11. Fazit und Handlungsempfehlung**
+WICHTIG: Formuliere eine sachliche Zusammenfassung (KEINE persönliche Anrede wie "Sehr geehrte..."):
+
+Die vorliegende fahrdynamische Risikobewertung identifiziert die kritischen Zufahrten zum Schutzbereich und klassifiziert diese nach Energiestufen. Mit der Umsetzung der empfohlenen SK1- und SK2-Maßnahmen kann das Risiko auf ein ALARP-konformes Niveau reduziert werden. Der Stadt {clientCity} wird empfohlen, die Detailplanung in Abstimmung mit den zuständigen Sicherheitsbehörden durchzuführen. Als nächste Schritte sind vorgesehen: Abstimmung mit Ordnungsbehörden, Detailplanung der Sperrstellen, Ausschreibung und Umsetzung. Diese technische Risikobewertung bildet die Planungsgrundlage und ist im Rahmen des Sicherheitskonzepts mit den zuständigen Behörden abzustimmen.`,
             "chatbot": {
                 "title": "Zufahrtsschutz-Assistent",
                 "welcome": "Willkommen zum Zufahrtsschutz-Assistenten. Ich stelle nur Fragen, die noch fehlen oder unsicher sind. Bereit?",
@@ -813,7 +805,7 @@ Jeder Block beginnt mit seiner fettgedruckten Nummer und Titel. Kein JSON, keine
         "map": {
             "createReport": "Bericht erstellen",
             "downloadReport": "Bericht herunterladen",
-            "searchPlaceholder": "Soest",
+            "searchPlaceholder": "Recklinghausen",
             "searchButton": "Suchen",
             "setWaypoints": "Wegpunkte setzen",
             "setWaypointsActive": "Zeichnen aktiv",
@@ -1312,7 +1304,7 @@ Cover the following points (Operational requirements in the sense of DIN SPEC 91
         "map": {
             "createReport": "Create Report",
             "downloadReport": "Download Report",
-            "searchPlaceholder": "Soest",
+            "searchPlaceholder": "Recklinghausen",
             "searchButton": "Search",
             "setWaypoints": "Set Waypoints",
             "setWaypointsActive": "Drawing Active",
@@ -1943,26 +1935,62 @@ async function loadProductDatabase() {
  * Populate the filter dropdowns with unique values from the product database
  */
 function populateProductFilters(products: any[]) {
-    // Manufacturer filter
+    // Manufacturer filter - count products per manufacturer and sort alphabetically
     const manufacturerFilter = document.getElementById('manufacturer-filter') as HTMLSelectElement;
     if (manufacturerFilter) {
-        const manufacturers = [...new Set(products.map(p => p.manufacturer).filter(Boolean))];
-        manufacturers.forEach(manufacturer => {
+        // Clear existing options except the first "Alle Hersteller" option
+        while (manufacturerFilter.options.length > 1) {
+            manufacturerFilter.remove(1);
+        }
+        
+        // Count products per manufacturer
+        const manufacturerCounts: { [key: string]: number } = {};
+        products.forEach(p => {
+            if (p.manufacturer) {
+                manufacturerCounts[p.manufacturer] = (manufacturerCounts[p.manufacturer] || 0) + 1;
+            }
+        });
+        
+        // Sort manufacturers alphabetically (case-insensitive)
+        const sortedManufacturers = Object.entries(manufacturerCounts)
+            .sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
+        
+        // Add options with count
+        sortedManufacturers.forEach(([manufacturer, count]) => {
             const option = document.createElement('option');
             option.value = manufacturer;
-            option.textContent = manufacturer;
+            option.textContent = `${manufacturer} (${count})`;
             manufacturerFilter.appendChild(option);
         });
+        
+        console.log(`Populated manufacturer filter with ${sortedManufacturers.length} manufacturers`);
     }
     
     // Standard filter (NEW DATABASE STRUCTURE)
     const standardFilter = document.getElementById('standard-filter') as HTMLSelectElement;
     if (standardFilter) {
-        const standards = [...new Set(products.map(p => p.technical_data?.standard).filter(Boolean))];
-        standards.forEach(standard => {
+        // Clear existing options except the first "Alle Standards" option
+        while (standardFilter.options.length > 1) {
+            standardFilter.remove(1);
+        }
+        
+        // Count products per standard
+        const standardCounts: { [key: string]: number } = {};
+        products.forEach(p => {
+            const standard = p.technical_data?.standard;
+            if (standard) {
+                standardCounts[standard] = (standardCounts[standard] || 0) + 1;
+            }
+        });
+        
+        // Sort standards alphabetically
+        const sortedStandards = Object.entries(standardCounts)
+            .sort((a, b) => a[0].localeCompare(b[0]));
+        
+        sortedStandards.forEach(([standard, count]) => {
             const option = document.createElement('option');
             option.value = standard;
-            option.textContent = standard;
+            option.textContent = `${standard} (${count})`;
             standardFilter.appendChild(option);
         });
     }
@@ -1970,12 +1998,28 @@ function populateProductFilters(products: any[]) {
     // Material filter (NEW DATABASE STRUCTURE - replacing vehicle type)
     const vehicleTypeFilter = document.getElementById('vehicle-type-filter') as HTMLSelectElement;
     if (vehicleTypeFilter) {
-        // Update to use material instead of vehicleType for new database structure
-        const materials = [...new Set(products.map(p => p.technical_data?.material).filter(Boolean))];
-        materials.forEach(material => {
+        // Clear existing options except the first option
+        while (vehicleTypeFilter.options.length > 1) {
+            vehicleTypeFilter.remove(1);
+        }
+        
+        // Count products per material
+        const materialCounts: { [key: string]: number } = {};
+        products.forEach(p => {
+            const material = p.technical_data?.material;
+            if (material) {
+                materialCounts[material] = (materialCounts[material] || 0) + 1;
+            }
+        });
+        
+        // Sort materials alphabetically
+        const sortedMaterials = Object.entries(materialCounts)
+            .sort((a, b) => a[0].localeCompare(b[0]));
+        
+        sortedMaterials.forEach(([material, count]) => {
             const option = document.createElement('option');
             option.value = material;
-            option.textContent = material;
+            option.textContent = `${material} (${count})`;
             vehicleTypeFilter.appendChild(option);
         });
     }
@@ -3276,7 +3320,7 @@ async function initOpenStreetMap(): Promise<void> {
         // Continue with normal initialization
     }
     
-    const mapCenter: [number, number] = [51.5719, 8.1061]; // Soest (Kernstadt)
+    const mapCenter: [number, number] = [51.6139, 7.1979]; // Recklinghausen (Altstadt)
     map = L.map(mapDiv, {
       zoomControl: false, // Disable default zoom control
       preferCanvas: true // Use canvas renderer for better performance with html2canvas
@@ -5376,13 +5420,24 @@ const analyzeAndMarkThreats = async () => {
                 // Enhanced name detection for unnamed roads
                 let roadName = el.tags.name;
                 if (!roadName) {
-                    // Generate descriptive name for unnamed roads
-                    if (el.tags.highway === 'residential') roadName = `Wohnstraße (ID:${el.id})`;
-                    else if (el.tags.highway === 'service') roadName = `Erschließungsstraße (ID:${el.id})`;
-                    else if (el.tags.highway === 'unclassified') roadName = `Nebenstraße (ID:${el.id})`;
-                    else if (el.tags.highway === 'track') roadName = `Wirtschaftsweg (ID:${el.id})`;
-                    else if (el.tags.ref) roadName = el.tags.ref;
-                    else roadName = `${el.tags.highway || 'Straße'} (ID:${el.id})`;
+                    // Generate descriptive name for unnamed roads - German translations
+                    const highwayTranslations: { [key: string]: string } = {
+                        'residential': 'Wohnstraße',
+                        'service': 'Erschließungsstraße',
+                        'unclassified': 'Nebenstraße',
+                        'track': 'Wirtschaftsweg',
+                        'footway': 'Fußweg (unbennant)',
+                        'path': 'Pfad (unbennant)',
+                        'cycleway': 'Radweg',
+                        'pedestrian': 'Fußgängerzone',
+                        'living_street': 'Verkehrsberuhigter Bereich',
+                        'tertiary': 'Kreisstraße',
+                        'secondary': 'Landesstraße',
+                        'primary': 'Bundesstraße'
+                    };
+                    const translatedType = highwayTranslations[el.tags.highway] || el.tags.highway || 'Straße';
+                    if (el.tags.ref) roadName = el.tags.ref;
+                    else roadName = `${translatedType} (ID:${el.id})`;
                 }
                 // Check if nodes array exists before adding to ways
                 if (el.nodes && Array.isArray(el.nodes) && el.nodes.length > 0) {
@@ -5952,6 +6007,15 @@ async function getAIReportSections(context: any): Promise<any> {
     try {
         const isGithubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
         const apiKey = (process.env.API_KEY || process.env.GEMINI_API_KEY) as string | undefined;
+        
+        // DEBUG: API Key Status
+        console.log('🔑 API Key Debug:', {
+            hasApiKey: !!apiKey,
+            keyLength: apiKey?.length || 0,
+            keyPrefix: apiKey?.substring(0, 10) + '...' || 'NONE',
+            isGithubPages: isGithubPages
+        });
+        
         if (!apiKey || isGithubPages) {
             // Public demo (GitHub Pages) oder kein Key vorhanden: erzeugen wir statische Platzhalterabschnitte
             console.warn('AI disabled for public/demo build. Using placeholder report sections.');
@@ -5974,8 +6038,13 @@ async function getAIReportSections(context: any): Promise<any> {
         });
         
         // Enhanced context with threat level analysis, product recommendations, and vehicle dynamics
+        // Get client city from hazard analysis
+        const hazardFormData = (typeof getHazardAnalysisFormData === 'function') ? getHazardAnalysisFormData() : null;
+        const clientCity = hazardFormData?.city || context.locationName?.split(',')[0]?.trim() || 'Kommune';
+        
         const enhancedContext = {
             ...context,
+            clientCity: clientCity,
             threatAnalysis: generateThreatAnalysisText(),
             highestThreatRoads: getHighestThreatRoads(),
             threatLevelDistribution: getThreatLevelDistribution(),
@@ -5984,13 +6053,13 @@ async function getAIReportSections(context: any): Promise<any> {
             averageThreatLevel: avgThreatLevel.toFixed(1),
             productTypeJustification: generateProductTypeJustification(recommendedProductTypes, context.assetToProtect || '', locationContext, avgThreatLevel),
             hazardAssessment: buildHazardAssessmentSummary(),
-            // Neue fahrdynamische Daten für Gutachten
+            // Neue fahrdynamische Daten für Risikobewertung
             vehicleDynamicsTable: calculateVehicleDynamicsTable(),
             energyClassification: getEnergyClassificationSummary()
         };
         
         const prompt = t('ai.reportPrompt', enhancedContext) + 
-        `\n\n========== DETAILDATEN FÜR GUTACHTEN ==========
+        `\n\n========== DETAILDATEN FÜR RISIKOBEWERTUNG ==========
 
 ENHANCED THREAT ANALYSIS:
 ${enhancedContext.threatAnalysis}
@@ -6027,7 +6096,7 @@ AVERAGE THREAT LEVEL: ${enhancedContext.averageThreatLevel}/10
 
 WICHTIG: 
 1. Erstelle den Bericht in ${currentLanguage === 'de' ? 'deutscher' : 'englischer'} Sprache.
-2. Verwende Gutachtenstil / Verwaltungsdeutsch.
+2. Verwende formellen Berichtsstil / Verwaltungsdeutsch.
 3. Integriere die fahrdynamischen Berechnungen (Geschwindigkeiten, Energien, Energiestufen) in Kapitel 5 und 6.
 4. Leite Schutzklassen (SK1/SK2) und Schutzkategorien (A/B/C) nachvollziehbar aus den Energiestufen ab.
 5. Wende das ALARP-Prinzip in Kapitel 7 an.
@@ -6039,60 +6108,104 @@ WICHTIG:
         const response = await model.generateContent(prompt);
         const result = response.response;
         const text = result.text().trim();
+        console.log('📄 AI Response length:', text.length, 'characters');
         
-        // Try to parse JSON, otherwise map the six required blocks by double line breaks
-        let aiSections;
+        // Parse AI response - look for chapter headers
+        let aiSections: any = {};
+        
+        // Try JSON first
         try {
             aiSections = JSON.parse(text);
+            console.log('✅ Parsed as JSON');
         } catch (e) {
-            const blocks = text.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
-            // Parse 11 Kapitel für Gutachtenstruktur
-            if (blocks.length >= 11) {
-                aiSections = {
-                    chapter1_auftrag: blocks[0],
-                    chapter2_normen: blocks[1],
-                    chapter3_bereich: blocks[2],
-                    chapter4_bedrohung: blocks[3],
-                    chapter5_methodik: blocks[4],
-                    chapter6_fahrdynamik: blocks[5],
-                    chapter7_risiko: blocks[6],
-                    chapter8_schutzziel: blocks[7],
-                    chapter9_konzept: blocks[8],
-                    chapter10_restgefahren: blocks[9],
-                    chapter11_empfehlung: blocks[10]
-                };
-            } else if (blocks.length >= 6) {
-                // Fallback auf 6-Block-Struktur für Kompatibilität
-                aiSections = {
-                    chapter1_auftrag: blocks[0],
-                    chapter2_normen: '',
-                    chapter3_bereich: blocks[1],
-                    chapter4_bedrohung: blocks[2],
-                    chapter5_methodik: '',
-                    chapter6_fahrdynamik: '',
-                    chapter7_risiko: blocks[2],
-                    chapter8_schutzziel: blocks[3],
-                    chapter9_konzept: blocks[3],
-                    chapter10_restgefahren: blocks[4],
-                    chapter11_empfehlung: blocks[5]
-                };
+            // Parse by chapter headers (robust parsing)
+            console.log('📝 Parsing by chapter headers...');
+            
+            // Regex patterns for chapter headers
+            const chapterPatterns = [
+                /\*\*(\d+)\.\s*[^*]+\*\*\n*/g,  // **1. Title**
+                /##\s*(\d+)\.\s*[^\n]+\n*/g,    // ## 1. Title
+                /(?:^|\n)(\d+)\.\s+[A-ZÄÖÜ][^\n]+\n/g  // 1. Title (at start of line)
+            ];
+            
+            // Split by chapter headers
+            const chapterTexts: string[] = [];
+            let workingText = text;
+            
+            // Find all chapter markers
+            const markers: {index: number, chapter: number}[] = [];
+            for (const pattern of chapterPatterns) {
+                let match;
+                while ((match = pattern.exec(text)) !== null) {
+                    const chapterNum = parseInt(match[1]);
+                    if (chapterNum >= 1 && chapterNum <= 11) {
+                        markers.push({ index: match.index, chapter: chapterNum });
+                    }
+                }
+            }
+            
+            // Sort markers and extract text between them
+            markers.sort((a, b) => a.index - b.index);
+            
+            if (markers.length >= 5) {
+                console.log(`📊 Found ${markers.length} chapter markers`);
+                for (let i = 0; i < markers.length; i++) {
+                    const start = markers[i].index;
+                    const end = i < markers.length - 1 ? markers[i + 1].index : text.length;
+                    const chapterContent = text.substring(start, end).trim();
+                    // Remove header from content
+                    const cleanContent = chapterContent.replace(/^\*\*\d+\.[^*]+\*\*\s*|^##\s*\d+\.[^\n]+\n|^\d+\.\s+[^\n]+\n/, '').trim();
+                    chapterTexts[markers[i].chapter - 1] = cleanContent;
+                }
             } else {
-                // Minimaler Fallback
-                aiSections = {
-                    chapter1_auftrag: blocks[0] || text.substring(0, 500),
-                    chapter2_normen: blocks[1] || '',
-                    chapter3_bereich: blocks[2] || text.substring(500, 1000),
-                    chapter4_bedrohung: blocks[3] || text.substring(1000, 1500),
-                    chapter5_methodik: blocks[4] || '',
-                    chapter6_fahrdynamik: blocks[5] || '',
-                    chapter7_risiko: blocks[6] || text.substring(1500, 2000),
-                    chapter8_schutzziel: blocks[7] || '',
-                    chapter9_konzept: blocks[8] || text.substring(2000, 2500),
-                    chapter10_restgefahren: blocks[9] || '',
-                    chapter11_empfehlung: blocks[10] || text.substring(2500, 3000)
-                };
+                // Fallback: split by double newlines
+                console.log('⚠️ Few markers found, using newline split');
+                const blocks = text.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
+                for (let i = 0; i < Math.min(blocks.length, 11); i++) {
+                    chapterTexts[i] = blocks[i];
+                }
+            }
+            
+            // Map to aiSections object
+            aiSections = {
+                chapter1_auftrag: chapterTexts[0] || '',
+                chapter2_normen: chapterTexts[1] || '',
+                chapter3_bereich: chapterTexts[2] || '',
+                chapter4_bedrohung: chapterTexts[3] || '',
+                chapter5_methodik: chapterTexts[4] || '',
+                chapter6_fahrdynamik: chapterTexts[5] || '',
+                chapter7_risiko: chapterTexts[6] || '',
+                chapter8_schutzziel: chapterTexts[7] || '',
+                chapter9_konzept: chapterTexts[8] || '',
+                chapter10_restgefahren: chapterTexts[9] || '',
+                chapter11_empfehlung: chapterTexts[10] || ''
+            };
+        }
+        
+        // Fill in default content for empty chapters using context data
+        const defaultContent = {
+            chapter1_auftrag: `Die vorliegende fahrdynamische Risikobewertung wurde im Auftrag der Stadt ${context.locationName?.split(',')[0] || 'Recklinghausen'} durch die BarricadiX GmbH erstellt. Gegenstand der Untersuchung ist die Analyse und Bewertung des Zufahrtsschutzes für "${context.assetToProtect || 'den definierten Schutzbereich'}" am Standort ${context.locationName || 'Standort'}. Der räumliche Geltungsbereich umfasst den definierten Schutzperimeter einschließlich aller identifizierten Zufahrtsvektoren. Zeitraum: ${context.protectionPeriod || 'temporär'}.`,
+            chapter2_normen: `Diese Risikobewertung basiert auf den folgenden normativen Grundlagen: DIN SPEC 91414-1:2021 (Risikobeurteilung und Sicherungsgrade), DIN SPEC 91414-2:2022 (Planung von Zufahrtsschutzkonzepten), DIN ISO 22343-1/-2:2025 (Fahrzeugsicherheitsbarrieren), TR "Mobile Fahrzeugsperren" des BMI (Schutzklassen SK1/SK2) sowie die ProPK-Handreichung "Schutz vor Überfahrtaten".`,
+            chapter3_bereich: `Der untersuchte Schutzbereich befindet sich in ${context.locationName || 'der Innenstadt'}. Die städtebauliche Situation ist gekennzeichnet durch die typische Innenstadtlage. Im Rahmen der GIS-Analyse wurden ${context.threatCount || 'mehrere'} Zufahrtswege identifiziert.`,
+            chapter4_bedrohung: `Die Bedrohungsanalyse berücksichtigt das Szenario "Vehicle-as-a-Weapon" (VaW). Relevante Prüffahrzeugkategorien gemäß IWA 14-1 umfassen M1/Pkw (1.500 kg), N1/Transporter (3.500 kg) bis N3G/4-Achser (36.000 kg). Das durchschnittliche Bedrohungsniveau liegt bei ${context.averageThreatLevel || '5.0'}/10.`,
+            chapter5_methodik: `Die fahrdynamische Modellierung erfolgt nach dem Newton-Euler-Formalismus der klassischen Mehrkörperdynamik. Die Berechnung der maximalen Aufprallgeschwindigkeit erfolgt nach v = √(2·a·s), die kinetische Energie nach E = 0,5·m·v². Es werden zehn normative Prüffahrzeugklassen gemäß IWA 14-1 / PAS 68 (M1 bis N3G, 1.500 kg bis 36.000 kg) berücksichtigt.`,
+            chapter6_fahrdynamik: `Die fahrdynamische Analyse umfasst die systematische Berechnung der maximalen Aufprallenergie für jede identifizierte Zufahrt. Die Ergebnisse werden in die Energiekategorien E1 (<250 kJ), E2 (250-800 kJ), E3 (800-1950 kJ) und E4 (>1950 kJ) klassifiziert. Die detaillierten Berechnungen sind dem Anhang zu entnehmen.`,
+            chapter7_risiko: `Die Risikobewertung erfolgt nach dem ALARP-Prinzip ("As Low As Reasonably Practicable"). Zufahrten mit E4-Energien erfordern Hochsicherheitsbarrieren, E2-E3 Energien erfordern eine Kosten-Nutzen-Abwägung, E1-Energien erlauben einfache Absperrungen.`,
+            chapter8_schutzziel: `Das Schutzziel besteht in der Verhinderung des unberechtigten Eindringens mehrspuriger Kraftfahrzeuge in den Schutzbereich. Der abgeleitete Sicherungsgrad ${context.protectionGrade || 'SG2'} ergibt sich aus der Risikoanalyse gemäß DIN SPEC 91414-1.`,
+            chapter9_konzept: `Basierend auf der Analyse werden die Zufahrten kategorisiert: Kategorie A (hochkritisch, SK2-Barrieren), Kategorie B (mittlerer Schutzbedarf, SK1-Barrieren) und Kategorie C (geringer Schutzbedarf, einfache Sperren). Empfohlene Systemtypen: ${context.recommendedProductTypes || 'Poller, mobile Sperren, Betonelemente'}.`,
+            chapter10_restgefahren: `Auch bei Umsetzung der Maßnahmen verbleiben Restgefahren: atypische Fahrzeuge, kombinierte Angriffsszenarien sowie mögliche Fehlbedienungen. Das Betriebskonzept umfasst Personalschulung, Wartungsintervalle und ein Notfallkonzept. Überprüfung der Risikobewertung in 12-monatigen Intervallen.`,
+            chapter11_empfehlung: `Mit der Umsetzung der empfohlenen SK1- und SK2-Maßnahmen kann das Risiko auf ein ALARP-konformes Niveau reduziert werden. Die Detailplanung sollte in Abstimmung mit den zuständigen Sicherheitsbehörden erfolgen. Nächste Schritte: Abstimmung, Detailplanung, Ausschreibung, Umsetzung.`
+        };
+        
+        // Apply defaults for empty chapters
+        for (const [key, defaultText] of Object.entries(defaultContent)) {
+            if (!aiSections[key] || aiSections[key].length < 50) {
+                console.log(`⚠️ Using default for ${key} (was ${aiSections[key]?.length || 0} chars)`);
+                aiSections[key] = defaultText;
             }
         }
+        
+        console.log('📊 Chapter lengths:', Object.entries(aiSections).map(([k, v]) => `${k}: ${(v as string).length}`).join(', '));
         
         // KI-Text nachträglich übersetzen, falls er in der falschen Sprache ist
         return translateAISections(aiSections);
@@ -8984,22 +9097,32 @@ function getHazardAnalysisFormData(): HazardAnalysisFormData | null {
 (window as any).getHazardAnalysisFormData = getHazardAnalysisFormData;
 
 // ===============================================
-// FAHRDYNAMISCHE BERECHNUNGEN FÜR GUTACHTEN
+// FAHRDYNAMISCHE BERECHNUNGEN FÜR RISIKOBEWERTUNG
 // ===============================================
 
 /**
  * Fahrzeugklassen mit Masse und Beschleunigung
  */
+/**
+ * Fahrzeugklassen gemäß DIN ISO 22343-2 (2025) Prüffahrzeugkategorien
+ * - klasse: Fahrzeugklassenbezeichnung nach Norm
+ * - typ: Typ des Prüffahrzeugs (Beschreibung)
+ * - zulGesamtgewicht: Zulässiges Gesamtgewicht in kg (null = n/a)
+ * - testMasse: Masse des Prüffahrzeugs in kg
+ * - mass: Berechnungsmasse (zulGesamtgewicht oder testMasse wenn n/a)
+ * - acceleration: Typische Beschleunigung in m/s²
+ */
 const VEHICLE_CLASSES = [
-    { id: 'kleinwagen', name: 'Kleinwagen', mass: 1200, acceleration: 2.75 },
-    { id: 'mittelklasse', name: 'Mittelklasse-Pkw', mass: 1500, acceleration: 3.20 },
-    { id: 'fullsize', name: 'Full-Size-Pkw/Van', mass: 1800, acceleration: 3.70 },
-    { id: 'sportwagen', name: 'Performance-/Sportwagen', mass: 1600, acceleration: 5.00 },
-    { id: 'pickup', name: 'Pick-up', mass: 2500, acceleration: 2.50 },
-    { id: 'transporter', name: 'Transporter/Flatbed', mass: 3500, acceleration: 1.90 },
-    { id: 'lkw_7t', name: 'Lkw 7,5t', mass: 7200, acceleration: 2.00 },
-    { id: 'lkw_12t', name: 'Lkw 12t', mass: 12000, acceleration: 1.25 },
-    { id: 'lkw_30t', name: 'Lkw 30t', mass: 30000, acceleration: 0.75 }
+    { id: 'M1', klasse: 'M1', typ: 'Pkw', zulGesamtgewicht: null, testMasse: 1500, mass: 1500, acceleration: 3.20, name: 'Pkw (M1)' },
+    { id: 'N1G', klasse: 'N1G', typ: 'Doppelkabine / Allrad Pick-up', zulGesamtgewicht: null, testMasse: 2500, mass: 2500, acceleration: 2.50, name: 'Pick-up (N1G)' },
+    { id: 'N1', klasse: 'N1', typ: 'Kurzfahrerkabine / Pritsche', zulGesamtgewicht: 3500, testMasse: 3500, mass: 3500, acceleration: 1.90, name: 'Transporter (N1)' },
+    { id: 'N2A', klasse: 'N2A', typ: '2-achsiger Frontlenker', zulGesamtgewicht: 8000, testMasse: 7200, mass: 8000, acceleration: 2.00, name: 'Lkw 8t (N2A)' },
+    { id: 'N2B', klasse: 'N2B', typ: '2-achsiger Langhauber', zulGesamtgewicht: 14900, testMasse: 6800, mass: 14900, acceleration: 1.50, name: 'Lkw 15t (N2B)' },
+    { id: 'N3C', klasse: 'N3C', typ: '2-achsige Frontlenker', zulGesamtgewicht: 20500, testMasse: 7200, mass: 20500, acceleration: 1.25, name: 'Lkw 20t (N3C)' },
+    { id: 'N3D', klasse: 'N3D', typ: '2-achsiger Frontlenker', zulGesamtgewicht: 20500, testMasse: 12000, mass: 20500, acceleration: 1.00, name: 'Lkw 20t (N3D)' },
+    { id: 'N3E', klasse: 'N3E', typ: '3-achsiger Langhauber', zulGesamtgewicht: 27300, testMasse: 29500, mass: 27300, acceleration: 0.85, name: 'Lkw 27t (N3E)' },
+    { id: 'N3F', klasse: 'N3F', typ: '3-achsiger Frontlenker', zulGesamtgewicht: 26000, testMasse: 24000, mass: 26000, acceleration: 0.80, name: 'Lkw 26t (N3F)' },
+    { id: 'N3G', klasse: 'N3G', typ: '4-achsiger Frontlenker', zulGesamtgewicht: 36000, testMasse: 30000, mass: 36000, acceleration: 0.75, name: 'Lkw 36t (N3G)' }
 ];
 
 /**
@@ -9326,7 +9449,7 @@ async function generateRiskReport() {
                 logging: true, // Enable logging for debugging
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                scale: 2, // Higher resolution
+                scale: 1.2, // Reduced from 2 - better PDF size
                 width: mapDiv.offsetWidth,
                 height: mapDiv.offsetHeight,
                 onclone: (doc: Document) => {
@@ -9438,7 +9561,12 @@ async function generateRiskReport() {
         }
 
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const pdf = new jsPDF({ 
+            orientation: 'p', 
+            unit: 'mm', 
+            format: 'a4',
+            compress: true  // Enable PDF compression for smaller file size
+        });
 
         const addWatermarkToCurrentPage = () => {
             const pageWidth = pdf.internal.pageSize.getWidth();
@@ -9461,23 +9589,60 @@ async function generateRiskReport() {
         let currentY = 25;
 
         const addSection = (titleKey: string, content: string) => {
-            if (currentY > 250) { // Check for page break before adding section
+            // Intelligenter Seitenumbruch: Wenn Titel + min. 3 Zeilen nicht mehr auf Seite passen
+            const minLinesWithTitle = 7 + (3 * 5); // Titel + 3 Zeilen Text
+            if (currentY + minLinesWithTitle > 270) {
                 pdf.addPage();
                 addWatermarkToCurrentPage();
                 currentY = 25;
             }
-            pdf.setFont('helvetica', 'bold').setFontSize(14).text(t(titleKey), page_margin, currentY);
-            currentY += 7;
+            
+            // Abschnittstitel
+            pdf.setFont('helvetica', 'bold').setFontSize(14);
+            pdf.setTextColor(46, 90, 136); // Blau für Überschriften
+            pdf.text(t(titleKey), page_margin, currentY);
+            pdf.setTextColor(0, 0, 0);
+            currentY += 8;
+            
             // Sanitize content to fix Unicode character spacing issues
             const sanitizedContent = sanitizeDe(content, false);
-            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(11).splitTextToSize(sanitizedContent, content_width);
-            if (currentY + (textLines.length * 5) > 280) { // Check for page break before adding content
+            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(10.5).splitTextToSize(sanitizedContent, content_width);
+            
+            // Zeilen mit Blocksatz ausgeben
+            const lineHeight = 4.8;
+            textLines.forEach((line: string, idx: number) => {
+                // Prüfe Seitenumbruch vor jeder Zeile
+                if (currentY + lineHeight > 280) {
                 pdf.addPage();
                 addWatermarkToCurrentPage();
                 currentY = 25;
             }
-            pdf.text(textLines, page_margin, currentY);
-            currentY += (textLines.length * 5) + 10;
+                
+                // Blocksatz nur für volle Zeilen (nicht letzte Zeile eines Absatzes)
+                const isLastLineOfParagraph = idx === textLines.length - 1 || 
+                    (textLines[idx + 1] && textLines[idx + 1].trim().length === 0);
+                
+                if (!isLastLineOfParagraph && line.trim().length > 0) {
+                    // Blocksatz durch Wort-Spacing
+                    const words = line.split(' ').filter((w: string) => w.length > 0);
+                    if (words.length > 1) {
+                        const textWidth = pdf.getTextWidth(words.join(' '));
+                        const extraSpace = (content_width - textWidth) / (words.length - 1);
+                        let xPos = page_margin;
+                        words.forEach((word: string, wordIdx: number) => {
+                            pdf.text(word, xPos, currentY);
+                            xPos += pdf.getTextWidth(word) + (wordIdx < words.length - 1 ? extraSpace + pdf.getTextWidth(' ') : 0);
+                        });
+                    } else {
+                        pdf.text(line, page_margin, currentY);
+                    }
+                } else {
+                    // Normale Zeile (letzte Zeile)
+                    pdf.text(line, page_margin, currentY);
+                }
+                currentY += lineHeight;
+            });
+            currentY += 12; // Größerer Abstand nach Abschnitt für bessere Lesbarkeit
         };
 
         addWatermarkToCurrentPage();
@@ -9485,7 +9650,14 @@ async function generateRiskReport() {
         // ==================== TITELBLATT ====================
         const hazardData = (typeof getHazardAnalysisFormData === 'function') ? getHazardAnalysisFormData() : null;
         const eventName = hazardData?.area || assetToProtect;
-        const cityName = locationName.split(',')[0].trim();
+        // Extract city name, removing leading postal codes, house numbers, or other numeric prefixes
+        let cityName = hazardData?.city || locationName.split(',')[0].trim();
+        cityName = cityName.replace(/^\d+[\s,]*/, '').trim(); // Remove leading numbers
+        if (!cityName || cityName.length < 2) {
+            // Fallback to second part of locationName if first part was just a number
+            const parts = locationName.split(',');
+            cityName = parts[1]?.trim() || 'Standort';
+        }
         
         // Titel zentriert
         pdf.setFont('helvetica', 'bold').setFontSize(14);
@@ -9509,8 +9681,8 @@ async function generateRiskReport() {
         // Untertitel 2
         pdf.setFont('helvetica', 'italic').setFontSize(11);
         const subTitle2 = currentLanguage === 'de'
-            ? 'Gutachten zur fahrdynamischen Gefährdungsanalyse, Schutzzieldefinition und Planung von Fahrzeugsicherheitsbarrieren'
-            : 'Expert Report on Vehicle Dynamics Hazard Analysis, Protection Goal Definition and Planning of Vehicle Security Barriers';
+            ? 'Risikobewertung zur fahrdynamischen Analyse, Schutzzieldefinition und Planung von Fahrzeugsicherheitsbarrieren'
+            : 'Risk Assessment for Vehicle Dynamics Analysis, Protection Goal Definition and Planning of Vehicle Security Barriers';
         const subTitle2Lines = pdf.splitTextToSize(subTitle2, content_width - 20);
         subTitle2Lines.forEach((line: string) => {
             pdf.text(line, page_width / 2, currentY, { align: 'center' });
@@ -9524,19 +9696,23 @@ async function generateRiskReport() {
         
         // Metadaten-Block
         pdf.setFont('helvetica', 'normal').setFontSize(10);
+        // Format date with leading zeros (DD.MM.YYYY)
+        const formattedDate = `${String(reportGeneratedAt.getDate()).padStart(2, '0')}.${String(reportGeneratedAt.getMonth() + 1).padStart(2, '0')}.${reportGeneratedAt.getFullYear()}`;
+        // Auftraggeber from hazard analysis (city name) or extract from locationName
+        const auftraggeberName = hazardData?.city || locationName.split(',')[0].trim().replace(/^\d{5}\s+/, '') || 'Kommune';
         const metaData = currentLanguage === 'de' ? [
             `Erstellt durch: BarricadiX GmbH`,
             `Bearbeiter: Automatisierte Analyse`,
-            `Auftraggeber: [Kommune / Veranstalter]`,
+            `Auftraggeber: Stadt ${auftraggeberName}`,
             `Aktenzeichen: BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
-            `Datum: ${localizedReportDate}`,
+            `Datum: ${formattedDate}`,
             `Version: 1.0 (Entwurf)`
         ] : [
             `Created by: BarricadiX GmbH`,
             `Analyst: Automated Analysis`,
-            `Client: [Municipality / Organizer]`,
+            `Client: City of ${auftraggeberName}`,
             `Reference: BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
-            `Date: ${localizedReportDate}`,
+            `Date: ${formattedDate}`,
             `Version: 1.0 (Draft)`
         ];
         
@@ -9549,8 +9725,8 @@ async function generateRiskReport() {
         // Hinweis am unteren Rand
         pdf.setFont('helvetica', 'italic').setFontSize(9);
         const disclaimer = currentLanguage === 'de'
-            ? 'Dieses Gutachten ersetzt keine hoheitliche Gefährdungsbewertung der zuständigen Sicherheitsbehörden.'
-            : 'This report does not replace a sovereign threat assessment by the competent security authorities.';
+            ? 'Diese Risikobewertung ersetzt keine hoheitliche Gefährdungsbewertung der zuständigen Sicherheitsbehörden.'
+            : 'This risk assessment does not replace a sovereign threat assessment by the competent security authorities.';
         const disclaimerLines = pdf.splitTextToSize(disclaimer, content_width - 40);
         disclaimerLines.forEach((line: string) => {
             pdf.text(line, page_width / 2, currentY, { align: 'center' });
@@ -9678,7 +9854,7 @@ async function generateRiskReport() {
         addWatermarkToCurrentPage();
         currentY = 25;
 
-        // --- 11 Kapitel Gutachtenstruktur ---
+        // --- 11 Kapitel Berichtsstruktur ---
         
         // Kapitel 1: Auftrag, Zielsetzung und Geltungsbereich
         const chapter1Content = aiSections.chapter1_auftrag || aiSections.purpose || '';
@@ -9778,11 +9954,15 @@ async function generateRiskReport() {
         // Map Image nach Kapitel 9
         if (canvas) {
             const imgRatio = canvas.height / canvas.width;
-            const imgHeight = content_width * imgRatio;
+            // Reduce image width slightly for smaller file size
+            const imgWidth = Math.min(content_width, 140);
+            const imgHeight = imgWidth * imgRatio;
             if (currentY + imgHeight > 280) {
                 pdf.addPage(); addWatermarkToCurrentPage(); currentY = 25;
             }
-            pdf.addImage(canvas, 'PNG', page_margin, currentY, content_width, imgHeight);
+            // Convert canvas to JPEG with 0.7 quality for ~80% size reduction
+            const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            pdf.addImage(jpegDataUrl, 'JPEG', page_margin + (content_width - imgWidth) / 2, currentY, imgWidth, imgHeight);
             currentY += imgHeight + 10;
         } else {
              const placeholderText = t('report.noMapAvailable');
@@ -9824,79 +10004,79 @@ async function generateRiskReport() {
             pdf.setDrawColor(30, 144, 255).setLineWidth(0.5).line(page_margin, currentY, page_width - page_margin, currentY);
             currentY += 10;
             
-            // Einleitung
-            pdf.setFont('helvetica', 'normal').setFontSize(9);
-            const anhangIntro = currentLanguage === 'de'
-                ? 'Die folgenden Tabellen zeigen die fahrdynamischen Berechnungen für jede identifizierte Zufahrt und alle betrachteten Fahrzeugklassen. Berechnung: v = √(2·a·s) [km/h], E = m·a·s [kJ]'
-                : 'The following tables show the vehicle dynamics calculations for each identified access route and all considered vehicle classes. Calculation: v = √(2·a·s) [km/h], E = m·a·s [kJ]';
-            const introLines = pdf.splitTextToSize(anhangIntro, content_width);
-            pdf.text(introLines, page_margin, currentY);
-            currentY += introLines.length * 4 + 8;
+            // Mathematical formulas introduction with proper typesetting
+            pdf.setFont('helvetica', 'normal').setFontSize(10);
+            const formulaIntro = currentLanguage === 'de' ? 'Berechnungsgrundlagen:' : 'Calculation Basis:';
+            pdf.text(formulaIntro, page_margin, currentY);
+            currentY += 6;
             
-            // Für jede Zufahrt eine Tabelle
+            // Mathematical formulas with ASCII-safe characters
+            pdf.setFont('courier', 'normal').setFontSize(10);
+            pdf.text('v = sqrt(2 * a * s)   [km/h]', page_margin + 10, currentY);
+            currentY += 5;
+            pdf.text('E = 0.5 * m * v^2     [kJ]', page_margin + 10, currentY);
+            currentY += 5;
+            pdf.setFont('helvetica', 'normal').setFontSize(9);
+            const whereText = currentLanguage === 'de' 
+                ? 'wobei: m = Masse [kg], a = Beschleunigung [m/s^2], s = Anfahrtsstrecke [m]'
+                : 'where: m = mass [kg], a = acceleration [m/s^2], s = approach distance [m]';
+            pdf.text(whereText, page_margin + 10, currentY);
+            currentY += 12;
+            
+            // Für jede Zufahrt eine autoTable
             const threatsArrayForTable = Array.from(threatsMap.entries());
             
             threatsArrayForTable.forEach(([streetName, threatData], index) => {
                 const distance = threatData.totalLength || 50;
                 
-                // Prüfen ob neue Seite nötig
-                if (currentY > 200) {
-                    pdf.addPage();
-                    addWatermarkToCurrentPage();
-                    currentY = 25;
-                }
+                // Generate descriptive text for this access point
+                const generateAccessDescription = (name: string, dist: number, roadType?: string): string => {
+                    const maxSpeed = Math.sqrt(2 * 3.20 * dist) * 3.6; // Using M1/Pkw acceleration (3.20 m/s²)
+                    const speedRange = `${Math.round(maxSpeed * 0.8)}-${Math.round(maxSpeed)}`;
+                    
+                    // Check for special road types
+                    const isFootway = name.toLowerCase().includes('fußweg') || name.toLowerCase().includes('path');
+                    const isService = name.toLowerCase().includes('erschließ') || name.toLowerCase().includes('service');
+                    
+                    if (isFootway) {
+                        return `Fußweg ohne offizielle Benennung. Anfahrtsstrecke ${Math.round(dist)} m ermöglicht Geschwindigkeiten bis ${Math.round(maxSpeed)} km/h. Prüfung auf Befahrbarkeit durch Fahrzeuge erforderlich.`;
+                    } else if (isService) {
+                        return `Erschließungsstraße mit Anfahrtsstrecke von ${Math.round(dist)} m. Geschwindigkeitsbereich: ${speedRange} km/h. Häufig Zufahrt zu Parkplätzen oder Gewerbeflächen.`;
+                    } else if (dist < 20) {
+                        return `Kurze Anfahrtsstrecke von nur ${Math.round(dist)} m begrenzt die erreichbare Geschwindigkeit auf max. ${Math.round(maxSpeed)} km/h. Geringe Bedrohung durch begrenzte kinetische Energie.`;
+                    } else if (dist > 80) {
+                        return `Lange Anfahrtsstrecke von ${Math.round(dist)} m ermöglicht hohe Endgeschwindigkeiten (${speedRange} km/h). Kritische Zufahrt mit erhöhtem Schutzbedarf.`;
+                    } else {
+                        return `Zufahrt über ${name} mit effektiver Anfahrtsstrecke von ${Math.round(dist)} m. Erreichbare Geschwindigkeiten im Bereich ${speedRange} km/h.`;
+                    }
+                };
                 
-                // Zufahrts-Header
-                pdf.setFont('helvetica', 'bold').setFontSize(10);
-                const tableTitle = currentLanguage === 'de'
-                    ? 'A.' + (index + 1) + ' Zufahrt: ' + streetName + ' (s = ' + Math.round(distance) + ' m)'
-                    : 'A.' + (index + 1) + ' Access: ' + streetName + ' (s = ' + Math.round(distance) + ' m)';
-                pdf.text(tableTitle, page_margin, currentY);
-                currentY += 6;
-                
-                // Tabellen-Header
-                pdf.setFont('helvetica', 'bold').setFontSize(8);
-                const colWidths = [45, 25, 25, 25, 25, 35];
-                const headers = currentLanguage === 'de'
-                    ? ['Fahrzeugklasse', 'm [kg]', 'a [m/s²]', 'v [km/h]', 'E [kJ]', 'Energiestufe']
-                    : ['Vehicle Class', 'm [kg]', 'a [m/s²]', 'v [km/h]', 'E [kJ]', 'Energy Level'];
-                
-                let colX = page_margin;
-                headers.forEach((header, i) => {
-                    pdf.text(header, colX, currentY);
-                    colX += colWidths[i];
-                });
-                currentY += 4;
-                
-                // Trennlinie
-                pdf.setDrawColor(100, 100, 100).setLineWidth(0.2);
-                pdf.line(page_margin, currentY, page_margin + colWidths.reduce((a, b) => a + b, 0), currentY);
-                currentY += 3;
-                
-                // Fahrzeugklassen-Daten
-                pdf.setFont('helvetica', 'normal').setFontSize(8);
-                
+                // Vehicle classes data gemäß DIN ISO 22343-2 (2025) Prüffahrzeugkategorien
                 const vehicleClasses = [
-                    { name: 'Kleinwagen', mass: 1200, acc: 2.75 },
-                    { name: 'Mittelklasse', mass: 1500, acc: 3.20 },
-                    { name: 'Full-Size/Van', mass: 1800, acc: 3.70 },
-                    { name: 'Sportwagen', mass: 1600, acc: 5.00 },
-                    { name: 'Pick-up', mass: 2500, acc: 2.50 },
-                    { name: 'Transporter', mass: 3500, acc: 1.90 },
-                    { name: 'Lkw 7,5t', mass: 7200, acc: 2.00 },
-                    { name: 'Lkw 12t', mass: 12000, acc: 1.25 },
-                    { name: 'Lkw 30t', mass: 30000, acc: 0.75 }
+                    { klasse: 'M1', typ: 'Pkw', zulGesamtgewicht: null, testMasse: 1500, acc: 3.20 },
+                    { klasse: 'N1G', typ: 'Doppelkabine / Allrad Pick-up', zulGesamtgewicht: null, testMasse: 2500, acc: 2.50 },
+                    { klasse: 'N1', typ: 'Kurzfahrerkabine / Pritsche', zulGesamtgewicht: 3500, testMasse: 3500, acc: 1.90 },
+                    { klasse: 'N2A', typ: '2-achsiger Frontlenker', zulGesamtgewicht: 8000, testMasse: 7200, acc: 2.00 },
+                    { klasse: 'N2B', typ: '2-achsiger Langhauber', zulGesamtgewicht: 14900, testMasse: 6800, acc: 1.50 },
+                    { klasse: 'N3C', typ: '2-achsige Frontlenker', zulGesamtgewicht: 20500, testMasse: 7200, acc: 1.25 },
+                    { klasse: 'N3D', typ: '2-achsiger Frontlenker', zulGesamtgewicht: 20500, testMasse: 12000, acc: 1.00 },
+                    { klasse: 'N3E', typ: '3-achsiger Langhauber', zulGesamtgewicht: 27300, testMasse: 29500, acc: 0.85 },
+                    { klasse: 'N3F', typ: '3-achsiger Frontlenker', zulGesamtgewicht: 26000, testMasse: 24000, acc: 0.80 },
+                    { klasse: 'N3G', typ: '4-achsiger Frontlenker', zulGesamtgewicht: 36000, testMasse: 30000, acc: 0.75 }
                 ];
                 
                 let maxEnergy = 0;
                 let worstCaseVehicle = '';
                 
+                const tableBody: string[][] = [];
                 vehicleClasses.forEach(vehicle => {
+                    // Berechnungsmasse: zulässiges Gesamtgewicht oder Test-Masse wenn n/a
+                    const calcMass = vehicle.zulGesamtgewicht || vehicle.testMasse;
                     const v_ms = Math.sqrt(2 * vehicle.acc * distance);
                     const v_kmh = v_ms * 3.6;
-                    const energy_kj = (vehicle.mass * vehicle.acc * distance) / 1000;
+                    const energy_kj = (calcMass * vehicle.acc * distance) / 1000;
+                    const impuls = calcMass * v_ms; // Impuls p = m * v [kg·m/s]
                     
-                    // Energiestufe bestimmen
                     let energyLevel = 'E1';
                     if (energy_kj >= 1950) energyLevel = 'E4';
                     else if (energy_kj >= 800) energyLevel = 'E3';
@@ -9904,67 +10084,297 @@ async function generateRiskReport() {
                     
                     if (energy_kj > maxEnergy) {
                         maxEnergy = energy_kj;
-                        worstCaseVehicle = vehicle.name;
+                        worstCaseVehicle = `${vehicle.klasse} (${vehicle.typ})`;
                     }
                     
-                    colX = page_margin;
-                    const rowData = [
-                        vehicle.name,
-                        vehicle.mass.toString(),
+                    // Vollständige Tabelle gemäß DIN ISO 22343-2 Format
+                    // Ohne Kurvendaten (keine Kurve = V_end = V_vor_Kurve)
+                    tableBody.push([
+                        vehicle.klasse,
+                        vehicle.typ,
+                        vehicle.zulGesamtgewicht ? vehicle.zulGesamtgewicht.toLocaleString('de-DE') : 'n/a',
+                        vehicle.testMasse.toLocaleString('de-DE'),
                         vehicle.acc.toFixed(2),
-                        v_kmh.toFixed(0),
-                        energy_kj.toFixed(0),
+                        v_kmh.toFixed(0),           // V vor Kurve [km/h] = Endgeschwindigkeit
+                        v_ms.toFixed(1),            // V vor Kurve [m/s]
+                        '-',                        // Kurvenradius [m] - nicht berechnet
+                        '-',                        // V nach Kurve [km/h] - nicht berechnet
+                        '-',                        // V nach Kurve [m/s] - nicht berechnet
+                        '-',                        // Strecke nach Kurve [m] - nicht berechnet
+                        v_kmh.toFixed(0),           // V_end an Zufahrt [km/h]
+                        v_ms.toFixed(1),            // V_end an Zufahrt [m/s]
+                        energy_kj.toFixed(0),       // E_kin [kJ]
+                        Math.round(impuls).toLocaleString('de-DE'), // Impuls [kgm/s]
                         energyLevel
-                    ];
-                    
-                    rowData.forEach((cell, i) => {
-                        pdf.text(cell, colX, currentY);
-                        colX += colWidths[i];
-                    });
-                    currentY += 4;
+                    ]);
                 });
                 
-                // Worst-Case-Zeile
-                currentY += 2;
-                pdf.setFont('helvetica', 'bold').setFontSize(8);
+                // QUERFORMAT für Anhang-Tabellen (Landscape)
+                // Seite im Querformat hinzufügen
+                pdf.addPage('a4', 'landscape');
+                addWatermarkToCurrentPage();
+                
+                // Landscape-Maße: 297mm breit, 210mm hoch
+                const landscape_width = 297;
+                const landscape_content_width = landscape_width - (page_margin * 2); // 267mm
+                let landscapeY = 25;
+                
+                // Zufahrtstitel auf neuer Querformat-Seite
+                pdf.setFont('helvetica', 'bold').setFontSize(11);
+                pdf.setTextColor(46, 90, 136);
+                pdf.text(`A.${index + 1} Zufahrt: ${streetName} (s = ${Math.round(distance)} m)`, page_margin, landscapeY);
+                pdf.setTextColor(0, 0, 0);
+                landscapeY += 6;
+                
+                // Beschreibung
+                pdf.setFont('helvetica', 'normal').setFontSize(9);
+                const accessDesc = generateAccessDescription(streetName, distance, threatData.roadType);
+                const descLines = pdf.splitTextToSize(accessDesc, landscape_content_width);
+                pdf.text(descLines, page_margin, landscapeY);
+                landscapeY += descLines.length * 4 + 4;
+                
+                // Use autoTable for professional formatting - Querformat
+                // Tabelle gemäß DIN ISO 22343-2 (2025) - vollständiges Format
+                if (typeof (pdf as any).autoTable === 'function') {
+                    // ROBUSTE Berechnung: Speichere alle numerischen Werte für E_kin und Impuls
+                    const ekinValues: number[] = [];
+                    const impulsValues: number[] = [];
+                    
+                    tableBody.forEach(row => {
+                        // E_kin ist an Position 13 (keine Tausendertrennzeichen durch toFixed)
+                        const ekinVal = parseFloat(String(row[13])) || 0;
+                        // Impuls ist an Position 14 (mit Tausendertrennzeichen durch toLocaleString)
+                        const impulsVal = parseFloat(String(row[14]).replace(/\./g, '').replace(',', '.')) || 0;
+                        ekinValues.push(ekinVal);
+                        impulsValues.push(impulsVal);
+                    });
+                    
+                    const maxEkin = Math.max(...ekinValues, 1); // mindestens 1 um Division durch 0 zu vermeiden
+                    const maxImpuls = Math.max(...impulsValues, 1);
+                    
+                    console.log('📊 Farbskalierung Debug:', { maxEkin, maxImpuls, ekinValues, impulsValues, tableBodyLength: tableBody.length });
+                    
+                    // Speichere Referenz auf die Werte für den didDrawCell-Hook
+                    const colorBarData = {
+                        ekinValues,
+                        impulsValues,
+                        maxEkin,
+                        maxImpuls
+                    };
+                    
+                    (pdf as any).autoTable({
+                        startY: landscapeY,
+                        head: [
+                            // Erste Kopfzeile mit Gruppierung
+                            [
+                                { content: 'Fahrzeugklasse\nnach DIN ISO 22343-2 (2025)', colSpan: 2, styles: { halign: 'center' } },
+                                { content: 'zulässiges\nGesamtgewicht', styles: { halign: 'center' } },
+                                { content: 'Test-\nMasse', styles: { halign: 'center' } },
+                                { content: 'Beschleuni-\ngung a', styles: { halign: 'center' } },
+                                { content: 'V vor Kurve', colSpan: 2, styles: { halign: 'center' } },
+                                { content: 'Kurven-\nradius', styles: { halign: 'center' } },
+                                { content: 'V nach Kurve', colSpan: 2, styles: { halign: 'center' } },
+                                { content: 'Strecke\nnach Kurve', styles: { halign: 'center' } },
+                                { content: 'V_end an Zufahrt', colSpan: 2, styles: { halign: 'center' } },
+                                { content: 'Anprallenergie', colSpan: 2, styles: { halign: 'center' } },
+                                { content: 'Energie-\nstufe', styles: { halign: 'center' } }
+                            ],
+                            // Zweite Kopfzeile mit Einheiten
+                            ['Klasse', 'Fahrzeugtyp', 'kg', 'kg', '[m/s²]', 'km/h', 'm/s', 'm', 'km/h', 'm/s', 'm', 'km/h', 'm/s', 'E_kin\n[kJ]', 'Impuls\n[kgm/s]', '']
+                        ],
+                        body: tableBody,
+                        theme: 'grid',
+                        styles: {
+                            fontSize: 7,
+                            cellPadding: 1.2,
+                            font: 'helvetica',
+                            halign: 'center',
+                            valign: 'middle',
+                            lineWidth: 0.1
+                        },
+                        headStyles: {
+                            fillColor: [46, 90, 136],
+                            textColor: [255, 255, 255],
+                            fontStyle: 'bold',
+                            fontSize: 6.5,
+                            cellPadding: 1.5,
+                            valign: 'middle'
+                        },
+                        columnStyles: {
+                            0: { halign: 'center', cellWidth: 12 },  // Klasse
+                            1: { halign: 'left', cellWidth: 42 },    // Fahrzeugtyp
+                            2: { halign: 'right', cellWidth: 18 },   // zul. Gesamtgewicht
+                            3: { halign: 'right', cellWidth: 16 },   // Test-Masse
+                            4: { halign: 'right', cellWidth: 16 },   // a [m/s²]
+                            5: { halign: 'right', cellWidth: 14 },   // V vor Kurve km/h
+                            6: { halign: 'right', cellWidth: 12 },   // V vor Kurve m/s
+                            7: { halign: 'right', cellWidth: 14 },   // Kurvenradius
+                            8: { halign: 'right', cellWidth: 14 },   // V nach Kurve km/h
+                            9: { halign: 'right', cellWidth: 12 },   // V nach Kurve m/s
+                            10: { halign: 'right', cellWidth: 14 },  // Strecke nach Kurve
+                            11: { halign: 'right', cellWidth: 14 },  // V_end km/h
+                            12: { halign: 'right', cellWidth: 12 },  // V_end m/s
+                            13: { halign: 'right', cellWidth: 16 },  // E_kin
+                            14: { halign: 'right', cellWidth: 18 },  // Impuls
+                            15: { halign: 'center', cellWidth: 14 }  // Energiestufe
+                        },
+                        tableWidth: landscape_content_width,
+                        margin: { left: page_margin, right: page_margin },
+                        // willDrawCell: Zeichne Farbbalken als Zellhintergrund VOR dem Text
+                        // Der Text wird von autoTable DANACH darüber gezeichnet
+                        willDrawCell: (data: any) => {
+                            if (data.section === 'body') {
+                                const rowIdx = data.row.index;
+                                const colIdx = data.column.index;
+                                const cellX = data.cell.x;
+                                const cellY = data.cell.y;
+                                const cellWidth = data.cell.width;
+                                const cellHeight = data.cell.height;
+                                
+                                // E_kin ist Spalte 13
+                                if (colIdx === 13 && rowIdx >= 0 && rowIdx < colorBarData.ekinValues.length) {
+                                    // Deaktiviere autoTable-Hintergrund
+                                    data.cell.styles.fillColor = false;
+                                    
+                                    const value = colorBarData.ekinValues[rowIdx];
+                                    const ratio = Math.min(value / colorBarData.maxEkin, 1);
+                                    const barWidth = cellWidth * ratio;
+                                    
+                                    // Zuerst weißer Hintergrund für gesamte Zelle
+                                    pdf.setFillColor(255, 255, 255);
+                                    pdf.rect(cellX, cellY, cellWidth, cellHeight, 'F');
+                                    
+                                    // Dann Gelb-Orange Farbbalken (FFD966) proportional
+                                    if (barWidth > 0) {
+                                        pdf.setFillColor(255, 217, 102);
+                                        pdf.rect(cellX, cellY, barWidth, cellHeight, 'F');
+                                    }
+                                }
+                                
+                                // Impuls ist Spalte 14
+                                if (colIdx === 14 && rowIdx >= 0 && rowIdx < colorBarData.impulsValues.length) {
+                                    // Deaktiviere autoTable-Hintergrund
+                                    data.cell.styles.fillColor = false;
+                                    
+                                    const value = colorBarData.impulsValues[rowIdx];
+                                    const ratio = Math.min(value / colorBarData.maxImpuls, 1);
+                                    const barWidth = cellWidth * ratio;
+                                    
+                                    // Zuerst weißer Hintergrund für gesamte Zelle
+                                    pdf.setFillColor(255, 255, 255);
+                                    pdf.rect(cellX, cellY, cellWidth, cellHeight, 'F');
+                                    
+                                    // Dann Blau Farbbalken (9BC2E6) proportional
+                                    if (barWidth > 0) {
+                                        pdf.setFillColor(155, 194, 230);
+                                        pdf.rect(cellX, cellY, barWidth, cellHeight, 'F');
+                                    }
+                                }
+                            }
+                        },
+                        didDrawPage: () => {
+                            addWatermarkToCurrentPage();
+                        }
+                    });
+                    currentY = (pdf as any).lastAutoTable.finalY + 3;
+                } else {
+                    // Fallback to manual table if autoTable not available (Landscape)
+                    pdf.setFont('helvetica', 'bold').setFontSize(6);
+                    const colWidths = [12, 42, 18, 16, 16, 14, 12, 14, 14, 12, 14, 14, 12, 16, 18, 14];
+                    const headers = ['Klasse', 'Fahrzeugtyp', 'zul. Gew.', 'Test-M.', 'a', 'v', 'v', 'r', 'v', 'v', 's', 'v', 'v', 'E_kin', 'Impuls', 'Stufe'];
+                    
+                    let colX = page_margin;
+                    headers.forEach((header, i) => {
+                        pdf.text(header, colX, landscapeY);
+                        colX += colWidths[i];
+                    });
+                    landscapeY += 4;
+                    
+                    pdf.setDrawColor(46, 90, 136).setLineWidth(0.3);
+                    pdf.line(page_margin, landscapeY, page_margin + colWidths.reduce((a, b) => a + b, 0), landscapeY);
+                    landscapeY += 3;
+                    
+                    pdf.setFont('helvetica', 'normal').setFontSize(8);
+                    tableBody.forEach(row => {
+                        colX = page_margin;
+                        row.forEach((cell, i) => {
+                            pdf.text(cell, colX + (i > 0 ? colWidths[i] - pdf.getTextWidth(cell) - 2 : 0), landscapeY);
+                            colX += colWidths[i];
+                        });
+                        landscapeY += 4;
+                    });
+                    landscapeY += 2;
+                    currentY = landscapeY;
+                }
+                
+                // Worst-Case highlight with mathematical notation (auf Querformat-Seite)
                 let worstCaseLevel = 'E1';
                 if (maxEnergy >= 1950) worstCaseLevel = 'E4';
                 else if (maxEnergy >= 800) worstCaseLevel = 'E3';
                 else if (maxEnergy >= 250) worstCaseLevel = 'E2';
                 
-                const worstCaseText = '→ Worst Case: ' + worstCaseVehicle + ', E_max = ' + maxEnergy.toFixed(0) + ' kJ (' + worstCaseLevel + ')';
-                pdf.text(worstCaseText, page_margin, currentY);
-                currentY += 12;
+                // Prüfen ob genug Platz auf der Landscape-Seite (210mm Höhe)
+                const landscapeYPos = (pdf as any).lastAutoTable?.finalY || landscapeY || 150;
+                let currentLandscapeY = landscapeYPos + 5;
+                
+                pdf.setFont('helvetica', 'bold').setFontSize(9);
+                pdf.setTextColor(204, 0, 0); // Red for warning
+                const worstCaseText = `! Worst Case: ${worstCaseVehicle}, E_max = ${maxEnergy.toFixed(0)} kJ (${worstCaseLevel})`;
+                pdf.text(worstCaseText, page_margin, currentLandscapeY);
+                pdf.setTextColor(0, 0, 0);
+                currentLandscapeY += 10;
             });
             
-            // Legende am Ende
-            if (currentY > 240) {
-                pdf.addPage();
-                addWatermarkToCurrentPage();
-                currentY = 25;
-            }
+            // Legende mit mathematischer Formatierung (auf separater Seite)
+            pdf.addPage('a4', 'landscape');
+            addWatermarkToCurrentPage();
+            let legendY = 25;
             
-            pdf.setFont('helvetica', 'bold').setFontSize(9);
-            const legendTitle = currentLanguage === 'de' ? 'Legende Energiestufen:' : 'Energy Level Legend:';
-            pdf.text(legendTitle, page_margin, currentY);
-            currentY += 5;
+            pdf.setFont('helvetica', 'bold').setFontSize(12);
+            pdf.setTextColor(46, 90, 136);
+            const legendTitle = currentLanguage === 'de' ? 'Legende Energiestufen nach DIN ISO 22343-2:' : 'Energy Level Legend per DIN ISO 22343-2:';
+            pdf.text(legendTitle, page_margin, legendY);
+            pdf.setTextColor(0, 0, 0);
+            legendY += 10;
             
-            pdf.setFont('helvetica', 'normal').setFontSize(8);
+            pdf.setFont('helvetica', 'normal').setFontSize(9);
             const legendItems = currentLanguage === 'de' ? [
-                'E1 (< 250 kJ): Niedriges Energieniveau – einfache Sperren ausreichend',
-                'E2 (250–800 kJ): Mittleres Energieniveau – SK1-Barrieren empfohlen',
-                'E3 (800–1.950 kJ): Hohes Energieniveau – SK2-Barrieren erforderlich',
-                'E4 (≥ 1.950 kJ): Sehr hohes Energieniveau – Hochsicherheitsbarrieren erforderlich'
+                'E1 (E < 250 kJ):        Niedriges Energieniveau - einfache Sperren ausreichend (leichte Fahrzeuge, geringe Geschwindigkeit)',
+                'E2 (250 <= E < 800 kJ): Mittleres Energieniveau - SK1-Barrieren empfohlen (Pkw bis mittlere Geschwindigkeit)',
+                'E3 (800 <= E < 1.950 kJ): Hohes Energieniveau - SK2-Barrieren erforderlich (Transporter, höhere Geschwindigkeiten)',
+                'E4 (E >= 1.950 kJ):     Sehr hohes Energieniveau - Hochsicherheitsbarrieren erforderlich (Lkw, hohe Geschwindigkeiten)'
             ] : [
-                'E1 (< 250 kJ): Low energy level – simple barriers sufficient',
-                'E2 (250–800 kJ): Medium energy level – SK1 barriers recommended',
-                'E3 (800–1,950 kJ): High energy level – SK2 barriers required',
-                'E4 (≥ 1,950 kJ): Very high energy level – high security barriers required'
+                'E1 (E < 250 kJ):        Low energy level - simple barriers sufficient (light vehicles, low speed)',
+                'E2 (250 <= E < 800 kJ): Medium energy level - SK1 barriers recommended (cars up to medium speed)',
+                'E3 (800 <= E < 1,950 kJ): High energy level - SK2 barriers required (vans, higher speeds)',
+                'E4 (E >= 1,950 kJ):     Very high energy level - high security barriers required (trucks, high speeds)'
             ];
             
             legendItems.forEach(item => {
-                pdf.text(item, page_margin, currentY);
-                currentY += 4;
+                pdf.text(item, page_margin, legendY);
+                legendY += 6;
+            });
+            
+            // Formelübersicht
+            legendY += 8;
+            pdf.setFont('helvetica', 'bold').setFontSize(11);
+            pdf.setTextColor(46, 90, 136);
+            pdf.text('Formeln zur Energieberechnung:', page_margin, legendY);
+            pdf.setTextColor(0, 0, 0);
+            legendY += 8;
+            
+            pdf.setFont('helvetica', 'normal').setFontSize(9);
+            const formulas = [
+                'Geschwindigkeit (gleichmäßig beschleunigt):  v = sqrt(2 * a * s)    [m/s]',
+                'Kinetische Energie:                          E_kin = 0.5 * m * v²   [kJ]',
+                'Impuls:                                      p = m * v              [kg*m/s]',
+                '',
+                'wobei: a = Fahrzeugbeschleunigung [m/s²], s = Anlaufstrecke [m], m = Fahrzeugmasse [kg]'
+            ];
+            
+            formulas.forEach(formula => {
+                pdf.text(formula, page_margin, legendY);
+                legendY += 5;
             });
         }
 
@@ -10016,6 +10426,397 @@ async function generateRiskReport() {
         filenameParts.push(date);
         generatedPdfFilename = filenameParts.join('_').replace(/\s+/g, '-') + '.pdf';
         
+        // Generate Word document using docx.js
+        try {
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ImageRun, PageBreak } = (window as any).docx;
+            
+            if (Document && Packer) {
+                const docChildren: any[] = [];
+                
+                // Helper function to create a proper Word table (centered)
+                const createWordTable = (headers: string[], rows: string[][]): any => {
+                    const tableRows = [];
+                    
+                    // Header row with blue background
+                    tableRows.push(new TableRow({
+                        children: headers.map(header => new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: header, bold: true, size: 20, color: 'FFFFFF' })],
+                                alignment: AlignmentType.CENTER
+                            })],
+                            shading: { fill: '2E5A88' }
+                        }))
+                    }));
+                    
+                    // Data rows
+                    rows.forEach(row => {
+                        tableRows.push(new TableRow({
+                            children: row.map((cell, idx) => new TableCell({
+                                children: [new Paragraph({
+                                    children: [new TextRun({ text: cell, size: 18 })],
+                                    alignment: idx === 0 ? AlignmentType.LEFT : AlignmentType.CENTER
+                                })]
+                            }))
+                        }));
+                    });
+                    
+                    return new Table({
+                        rows: tableRows,
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        alignment: AlignmentType.CENTER
+                    });
+                };
+                
+                // Helper to format mathematical formulas
+                const formatFormula = (text: string): TextRun[] => {
+                    // Replace common mathematical notations with proper formatting
+                    const runs: TextRun[] = [];
+                    // Split by formula patterns and format
+                    const formatted = text
+                        .replace(/v\s*=\s*√\(2·a·s\)/g, 'v = √(2·a·s)')
+                        .replace(/E\s*=\s*½·m·v²/g, 'E = ½·m·v²')
+                        .replace(/\[km\/h\]/g, ' [km/h]')
+                        .replace(/\[kJ\]/g, ' [kJ]')
+                        .replace(/\[kg\]/g, ' [kg]')
+                        .replace(/\[m\/s²\]/g, ' [m/s²]');
+                    runs.push(new TextRun({ text: formatted, size: 22 }));
+                    return runs;
+                };
+                
+                // Title
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `Risikobericht: ${kommune}`, bold: true, size: 48 })],
+                    heading: HeadingLevel.TITLE,
+                    alignment: AlignmentType.CENTER
+                }));
+                
+                // Subtitle with date
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `Erstellt am: ${reportGeneratedAt.toLocaleDateString('de-DE')}`, italics: true, size: 24 })]
+                }));
+                
+                // Document info
+                docChildren.push(new Paragraph({ children: [] }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Erstellt durch: ', bold: true, size: 22 }),
+                        new TextRun({ text: 'BarricadiX GmbH', size: 22 })
+                    ]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Bearbeiter: ', bold: true, size: 22 }),
+                        new TextRun({ text: 'Automatisierte Analyse', size: 22 })
+                    ]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Aktenzeichen: ', bold: true, size: 22 }),
+                        new TextRun({ text: `BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`, size: 22 })
+                    ]
+                }));
+                
+                docChildren.push(new Paragraph({ children: [] })); // Empty line
+                
+                // Add all AI sections to Word document - use correct keys from aiSections
+                const wordSections = [
+                    { title: '1. Auftrag, Zielsetzung und Geltungsbereich', keys: ['chapter1_auftrag', 'purpose', 'section1'] },
+                    { title: '2. Normative Grundlagen und Referenzen', keys: ['chapter2_normen', 'section2'] },
+                    { title: '3. Beschreibung des Schutzbereichs', keys: ['chapter3_bereich', 'section3'] },
+                    { title: '4. Bedrohungsanalyse und Täterverhalten', keys: ['chapter4_bedrohung', 'threatAnalysis', 'section4'] },
+                    { title: '5. Methodik der BarricadiX-Analyse', keys: ['chapter5_methodik', 'section5'] },
+                    { title: '6. Fahrdynamische Analyse und Maximalenergien', keys: ['chapter6_fahrdynamik', 'section6'] },
+                    { title: '7. Risikoanalyse nach ALARP-Prinzip', keys: ['chapter7_risiko', 'vulnerabilities', 'section7'] },
+                    { title: '8. Schutzzieldefinition und Sicherungsgrad', keys: ['chapter8_schutzziel', 'section8'] },
+                    { title: '9. Schutzkonzept und Maßnahmenempfehlungen', keys: ['chapter9_konzept', 'hvmMeasures', 'section9'] },
+                    { title: '10. Restgefahren und Betriebskonzept', keys: ['chapter10_restgefahren', 'siteConsiderations', 'section10'] },
+                    { title: '11. Fazit und Handlungsempfehlung', keys: ['chapter11_empfehlung', 'operationalImpact', 'section11'] }
+                ];
+                
+                wordSections.forEach((section) => {
+                    // Find content from any of the possible keys
+                    let content = '';
+                    for (const key of section.keys) {
+                        if (aiSections[key] && aiSections[key].trim()) {
+                            content = aiSections[key];
+                            break;
+                        }
+                    }
+                    
+                    // Section heading (always add it)
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: section.title, bold: true, size: 28, color: '2E5A88' })],
+                        heading: HeadingLevel.HEADING_1,
+                        spacing: { before: 400, after: 200 }
+                    }));
+                    
+                    if (content) {
+                        // Section content - split by paragraphs
+                        const paragraphs = content.split('\n').filter((p: string) => p.trim());
+                        paragraphs.forEach((para: string) => {
+                            // Skip if it's just the section title repeated
+                            if (para.startsWith('**') && para.includes(section.title.substring(0, 10))) return;
+                            
+                            // Check if it's a table row (contains | characters)
+                            if (para.includes('|') && para.split('|').length > 2) {
+                                // Format as monospace for table-like data
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: para.trim(), size: 18, font: 'Consolas' })],
+                                    spacing: { before: 50, after: 50 }
+                                }));
+                            } else if (para.startsWith('-') || para.startsWith('•') || para.startsWith('–')) {
+                                // Bullet point
+                                const bulletText = para.replace(/^[-•–]\s*/, '').trim();
+                                docChildren.push(new Paragraph({
+                                    children: formatFormula(bulletText),
+                                    bullet: { level: 0 },
+                                    spacing: { before: 60, after: 60 }
+                                }));
+                            } else if (para.match(/^\d+\.\d+/)) {
+                                // Sub-heading (like 3.1, 4.2)
+                                docChildren.push(new Paragraph({
+                                    children: [new TextRun({ text: para.trim(), bold: true, size: 24 })],
+                                    spacing: { before: 200, after: 100 }
+                                }));
+                            } else {
+                                // Normal paragraph
+                                docChildren.push(new Paragraph({
+                                    children: formatFormula(para.trim()),
+                                    spacing: { before: 100, after: 100 }
+                                }));
+                            }
+                        });
+                    } else {
+                        // Placeholder if no content
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: '[Abschnitt wird durch KI generiert]', italics: true, size: 20, color: '888888' })]
+                        }));
+                    }
+                    
+                    docChildren.push(new Paragraph({ children: [], spacing: { before: 200 } }));
+                });
+                
+                // MAP IMAGE - Lagekarte mit Zufahrten
+                if (canvas) {
+                    try {
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: '', break: 1 }), new PageBreak()]
+                        }));
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: 'Lagekarte mit identifizierten Zufahrten', bold: true, size: 28, color: '2E5A88' })],
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { before: 200, after: 200 },
+                            alignment: AlignmentType.CENTER
+                        }));
+                        
+                        // Convert canvas to base64 PNG
+                        const mapDataUrl = canvas.toDataURL('image/png');
+                        const base64Data = mapDataUrl.split(',')[1];
+                        
+                        // Calculate image dimensions (max width 600px, maintain aspect ratio)
+                        const maxWidth = 600;
+                        const imgRatio = canvas.height / canvas.width;
+                        const imgWidth = Math.min(canvas.width, maxWidth);
+                        const imgHeight = imgWidth * imgRatio;
+                        
+                        docChildren.push(new Paragraph({
+                            children: [
+                                new ImageRun({
+                                    data: Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)),
+                                    transformation: {
+                                        width: imgWidth,
+                                        height: imgHeight
+                                    },
+                                    type: 'png'
+                                })
+                            ],
+                            alignment: AlignmentType.CENTER
+                        }));
+                        
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: 'Abbildung: GIS-gestützte Darstellung des Schutzbereichs mit allen identifizierten Zufahrtskorridoren', italics: true, size: 18 })],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 100, after: 200 }
+                        }));
+                        
+                        console.log('✅ Map image added to Word document');
+                    } catch (imgError) {
+                        console.warn('Could not add map image to Word:', imgError);
+                    }
+                }
+                
+                // ANHANG: Fahrdynamische Detailberechnungen
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: '', break: 1 }), new PageBreak()]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Anhang A: Fahrdynamische Detailberechnungen', bold: true, size: 32, color: '2E5A88' })],
+                    heading: HeadingLevel.HEADING_1,
+                    spacing: { before: 200, after: 200 }
+                }));
+                
+                // Formel-Erläuterung
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Berechnungsgrundlagen:', bold: true, size: 24 })],
+                    spacing: { before: 200, after: 100 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Endgeschwindigkeit:  v = sqrt(2 * a * s)  [km/h]', size: 22, font: 'Consolas' })],
+                    spacing: { before: 50, after: 50 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Kinetische Energie:  E = 0.5 * m * v^2  [kJ]', size: 22, font: 'Consolas' })],
+                    spacing: { before: 50, after: 50 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'wobei: m = Fahrzeugmasse [kg], a = Beschleunigung [m/s^2], s = Anfahrtsstrecke [m]', italics: true, size: 20 })],
+                    spacing: { before: 50, after: 150 }
+                }));
+                
+                // Fahrzeugklassen-Tabelle
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Referenz-Fahrzeugklassen:', bold: true, size: 24 })],
+                    spacing: { before: 200, after: 100 }
+                }));
+                
+                const vehicleHeaders = ['Klasse', 'Fahrzeugtyp', 'zul. Ges.gew. [kg]', 'Test-Masse [kg]', 'a [m/s²]'];
+                const vehicleRows = [
+                    ['M1', 'Pkw', 'n/a', '1.500', '3,20'],
+                    ['N1G', 'Doppelkabine / Allrad Pick-up', 'n/a', '2.500', '2,50'],
+                    ['N1', 'Kurzfahrerkabine / Pritsche', '3.500', '3.500', '1,90'],
+                    ['N2A', '2-achsiger Frontlenker', '8.000', '7.200', '2,00'],
+                    ['N2B', '2-achsiger Langhauber', '14.900', '6.800', '1,50'],
+                    ['N3C', '2-achsige Frontlenker', '20.500', '7.200', '1,25'],
+                    ['N3D', '2-achsiger Frontlenker', '20.500', '12.000', '1,00'],
+                    ['N3E', '3-achsiger Langhauber', '27.300', '29.500', '0,85'],
+                    ['N3F', '3-achsiger Frontlenker', '26.000', '24.000', '0,80'],
+                    ['N3G', '4-achsiger Frontlenker', '36.000', '30.000', '0,75']
+                ];
+                docChildren.push(createWordTable(vehicleHeaders, vehicleRows));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Fahrzeugklassen nach DIN ISO 22343-2 (2025). Bei n/a wird die Test-Masse für die Berechnung verwendet.', italics: true, size: 18 })],
+                    spacing: { before: 50, after: 100 }
+                }));
+                
+                // Energiestufen-Legende
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Energiestufen und Schutzklassen:', bold: true, size: 24 })],
+                    spacing: { before: 300, after: 100 }
+                }));
+                
+                const energyHeaders = ['Stufe', 'Energiebereich', 'Schutzklasse', 'Maßnahme'];
+                const energyRows = [
+                    ['E1', '< 250 kJ', 'Basis', 'Einfache Absperrungen'],
+                    ['E2', '250 – 800 kJ', 'SK1', 'SK1-Barrieren'],
+                    ['E3', '800 – 1.950 kJ', 'SK2', 'SK2-Barrieren'],
+                    ['E4', '> 1.950 kJ', 'Hoch', 'Hochsicherheitsbarrieren']
+                ];
+                docChildren.push(createWordTable(energyHeaders, energyRows));
+                
+                // Zufahrten-Tabellen
+                if (threatsMap && threatsMap.size > 0) {
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: 'Detailberechnungen je Zufahrt:', bold: true, size: 24 })],
+                        spacing: { before: 300, after: 100 }
+                    }));
+                    
+                    const threatsArray = Array.from(threatsMap.entries());
+                    threatsArray.slice(0, 10).forEach(([streetName, threatData], idx) => {
+                        const distance = threatData.totalLength || 50;
+                        
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: `A.${idx + 1} Zufahrt: ${streetName} (s = ${Math.round(distance)} m)`, bold: true, size: 22 })],
+                            spacing: { before: 200, after: 100 }
+                        }));
+                        
+                        // Erweiterte Tabellenstruktur für Word (komprimiert für Lesbarkeit)
+                        const accessHeaders = ['Klasse', 'Typ', 'Masse [kg]', 'a [m/s²]', 'v [km/h]', 'v [m/s]', 'E [kJ]', 'p [kgm/s]', 'Stufe'];
+                        const accessRows: string[][] = [];
+                        let maxEnergy = 0;
+                        let worstVehicle = '';
+                        
+                        // Erweiterte Fahrzeugklassen für Word
+                        const wordVehicleClasses = [
+                            { klasse: 'M1', typ: 'Pkw', zulGew: null, testMasse: 1500, acc: 3.20 },
+                            { klasse: 'N1G', typ: 'Pick-up', zulGew: null, testMasse: 2500, acc: 2.50 },
+                            { klasse: 'N1', typ: 'Pritsche', zulGew: 3500, testMasse: 3500, acc: 1.90 },
+                            { klasse: 'N2A', typ: 'Frontlenker 2-a.', zulGew: 8000, testMasse: 7200, acc: 2.00 },
+                            { klasse: 'N2B', typ: 'Langhauber 2-a.', zulGew: 14900, testMasse: 6800, acc: 1.50 },
+                            { klasse: 'N3C', typ: 'Frontlenker 2-a.', zulGew: 20500, testMasse: 7200, acc: 1.25 },
+                            { klasse: 'N3D', typ: 'Frontlenker 2-a.', zulGew: 20500, testMasse: 12000, acc: 1.00 },
+                            { klasse: 'N3E', typ: 'Langhauber 3-a.', zulGew: 27300, testMasse: 29500, acc: 0.85 },
+                            { klasse: 'N3F', typ: 'Frontlenker 3-a.', zulGew: 26000, testMasse: 24000, acc: 0.80 },
+                            { klasse: 'N3G', typ: 'Frontlenker 4-a.', zulGew: 36000, testMasse: 30000, acc: 0.75 }
+                        ];
+                        
+                        wordVehicleClasses.forEach(vehicle => {
+                            const calcMass = vehicle.zulGew || vehicle.testMasse;
+                            const v_ms = Math.sqrt(2 * vehicle.acc * distance);
+                            const v_kmh = v_ms * 3.6;
+                            const energy_kj = (calcMass * vehicle.acc * distance) / 1000;
+                            const impuls = calcMass * v_ms;
+                            
+                            let energyLevel = 'E1';
+                            if (energy_kj >= 1950) energyLevel = 'E4';
+                            else if (energy_kj >= 800) energyLevel = 'E3';
+                            else if (energy_kj >= 250) energyLevel = 'E2';
+                            
+                            accessRows.push([
+                                vehicle.klasse,
+                                vehicle.typ,
+                                calcMass.toLocaleString('de-DE'),
+                                vehicle.acc.toFixed(2).replace('.', ','),
+                                v_kmh.toFixed(0),
+                                v_ms.toFixed(1).replace('.', ','),
+                                energy_kj.toFixed(0),
+                                Math.round(impuls).toLocaleString('de-DE'),
+                                energyLevel
+                            ]);
+                            
+                            if (energy_kj > maxEnergy) {
+                                maxEnergy = energy_kj;
+                                worstVehicle = `${vehicle.klasse} (${vehicle.typ})`;
+                            }
+                        });
+                        
+                        docChildren.push(createWordTable(accessHeaders, accessRows));
+                        
+                        const worstClass = getEnergyClass(maxEnergy);
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ 
+                                text: `⚠ Worst Case: ${worstVehicle}, Emax = ${maxEnergy.toFixed(0)} kJ (${worstClass.label})`, 
+                                bold: true, size: 20, color: 'CC0000' 
+                            })],
+                            spacing: { before: 50, after: 100 }
+                        }));
+                    });
+                }
+                
+                // Debug: Log what sections were found
+                console.log('📄 Word document sections found:', Object.keys(aiSections));
+                
+                // Create the document
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: docChildren
+                    }]
+                });
+                
+                // Generate Word blob
+                generatedWordBlob = await Packer.toBlob(doc);
+                generatedWordFilename = filenameParts.join('_').replace(/\s+/g, '-') + '.docx';
+                
+                // Enable Word download button
+                const downloadWordBtn = document.getElementById('download-word-btn') as HTMLButtonElement;
+                if (downloadWordBtn) downloadWordBtn.disabled = false;
+                
+                console.log('✅ Word document generated successfully with tables and appendix');
+            }
+        } catch (wordError) {
+            console.error('Word document generation failed:', wordError);
+        }
+        
         downloadReportBtn.disabled = false;
         
     } catch (error) {
@@ -10037,6 +10838,30 @@ function downloadRiskReport() {
         // Use stored filename or fallback to translation
         const filename = generatedPdfFilename || t('report.reportFilename');
         generatedPdf.save(filename);
+    } else {
+        alert(t('alerts.noReportToDownload'));
+    }
+}
+
+/**
+ * Triggers the download of the generated Word document.
+ */
+function downloadWordReport() {
+    if (generatedWordBlob && generatedWordFilename) {
+        // Use FileSaver.js to download the Word document
+        if (typeof (window as any).saveAs === 'function') {
+            (window as any).saveAs(generatedWordBlob, generatedWordFilename);
+        } else {
+            // Fallback: create download link manually
+            const url = URL.createObjectURL(generatedWordBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = generatedWordFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     } else {
         alert(t('alerts.noReportToDownload'));
     }
@@ -10716,6 +11541,58 @@ function setupHazardAnalysisMenu(): void {
         return;
     }
     
+    // Set default values for hazard analysis inputs
+    const setDefaultHazardValues = () => {
+        // Default text inputs
+        const cityInput = document.getElementById('hazard-city') as HTMLInputElement;
+        const areaInput = document.getElementById('hazard-area') as HTMLInputElement;
+        const damageSelect = document.getElementById('hazard-expected-damage') as HTMLSelectElement;
+        
+        if (cityInput && !cityInput.value) {
+            cityInput.value = 'Recklinghausen';
+        }
+        if (areaInput && !areaInput.value) {
+            areaInput.value = 'Weihnachtsmarkt';
+        }
+        if (damageSelect && !damageSelect.value) {
+            damageSelect.value = 'leicht';
+        }
+        
+        // Set all hazard factor selects to "1" (geringe Ausprägung) if not already set
+        const hazardFactorIds = [
+            'hazard-anlass-allgemeingebrauch',
+            'hazard-anlass-sondernutzung',
+            'hazard-anlass-haeufigkeit',
+            'hazard-anlass-zusammensetzung',
+            'hazard-anlass-anzahl',
+            'hazard-raum-struktur',
+            'hazard-raum-gebaeude',
+            'hazard-raum-flucht-nutzer',
+            'hazard-raum-flaeche',
+            'hazard-raum-dichte',
+            'hazard-security-bedeutung-raum',
+            'hazard-security-massnahmen-baulich',
+            'hazard-security-massnahmen-personell',
+            'hazard-tat-anfahrtsoptionen',
+            'hazard-tat-fluchtmoeglichkeiten',
+            'hazard-tat-auswirkung',
+            'hazard-tat-ziele',
+            'hazard-tat-varianten'
+        ];
+        
+        hazardFactorIds.forEach(factorId => {
+            const selectEl = document.getElementById(factorId) as HTMLSelectElement;
+            if (selectEl && !selectEl.value) {
+                selectEl.value = '1';
+            }
+        });
+        
+        console.log('✅ Default hazard analysis values set');
+    };
+    
+    // Set defaults immediately and also when bubble is expanded
+    setDefaultHazardValues();
+    
     // Remove any existing event listeners to prevent conflicts and create new toggle button reference
     let hazardToggleBtn: HTMLButtonElement | null = null;
     if (toggleBtn) {
@@ -10783,6 +11660,9 @@ function setupHazardAnalysisMenu(): void {
         hazardStrip.style.opacity = '1';
         // Update icons to show expanded state (chevron-left)
         updateIcons(true);
+        
+        // Set default values when bubble is expanded (in case they weren't set before)
+        setTimeout(() => setDefaultHazardValues(), 100);
     };
     
     // Toggle button click handler (in bubble header)
@@ -12234,6 +13114,8 @@ async function initializeApp() {
         analyzeThreatsBtn.classList.add('hidden');
         createReportBtn.classList.add('hidden');
         downloadReportBtn.classList.add('hidden');
+        const downloadWordBtnNav = document.getElementById('download-word-btn') as HTMLButtonElement;
+        if (downloadWordBtnNav) downloadWordBtnNav.classList.add('hidden');
         const addAreaBtn = document.getElementById('add-security-area-btn') as HTMLButtonElement;
         if (addAreaBtn) addAreaBtn.classList.add('hidden');
         // Hide manual entry buttons when switching away from threat analysis
@@ -12288,6 +13170,11 @@ async function initializeApp() {
             createReportBtn.classList.remove('hidden');
             downloadReportBtn.classList.remove('hidden');
             downloadReportBtn.disabled = !generatedPdf;
+            const downloadWordBtnNav = document.getElementById('download-word-btn') as HTMLButtonElement;
+            if (downloadWordBtnNav) {
+                downloadWordBtnNav.classList.remove('hidden');
+                downloadWordBtnNav.disabled = !generatedWordBlob;
+            }
         } else if (newTabId === 'nav-project-description') {
             // Show tender creation buttons
             const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
@@ -12534,6 +13421,10 @@ async function initializeApp() {
     analyzeThreatsBtn.addEventListener('click', analyzeAndMarkThreats);
     createReportBtn.addEventListener('click', generateRiskReport);
     downloadReportBtn.addEventListener('click', downloadRiskReport);
+    
+    // Word download button event listener
+    const downloadWordBtn = document.getElementById('download-word-btn') as HTMLButtonElement;
+    if (downloadWordBtn) downloadWordBtn.addEventListener('click', downloadWordReport);
     
     // Tender buttons event listeners
     const createTenderBtn = document.getElementById('create-tender-btn') as HTMLButtonElement;
@@ -13399,12 +14290,12 @@ function generateCategoriesOptions(counts: any): string {
  * Generate Manufacturer options with real counts
  */
 function generateManufacturerOptions(counts: any): string {
-    const manufacturers = [
-        'ATGAccess', 'Avon-Barrier', 'Barkers Fencing', 'Blockaxess', 'Delta Scientific',
-        'Eagle Auto Gate', 'Frontier Pitts', 'Heald', 'Highway Care', 'Marshalls',
-        'Perimeter Protection', 'Reidsteel', 'Securiscape', 'Smith Ltd', 'Tiso Production',
-        'Urbaco', 'Zaun'
-    ];
+    // Get all manufacturers from the counts object (dynamically from product database)
+    // Sort alphabetically (case-insensitive)
+    const manufacturers = Object.keys(counts)
+        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    
+    console.log(`📋 Generating options for ${manufacturers.length} manufacturers`);
     
     return manufacturers.map(manufacturer => {
         const count = counts[manufacturer] || 0;
