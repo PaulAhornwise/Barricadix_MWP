@@ -9736,6 +9736,7 @@ async function generateRiskReport() {
             pdf.setTextColor(0, 0, 0);
             currentY += 8;
             
+<<<<<<< HEAD
             // Sanitize content and apply hyphenation
             const sanitizedContent = sanitizeDe(content, false);
             const hyphenatedContent = hyphenateGerman(sanitizedContent);
@@ -9808,6 +9809,47 @@ async function generateRiskReport() {
             });
             
             currentY += 12; // Größerer Abstand nach Kapitel für bessere Lesbarkeit
+=======
+            // Sanitize content to fix Unicode character spacing issues
+            const sanitizedContent = sanitizeDe(content, false);
+            const textLines = pdf.setFont('helvetica', 'normal').setFontSize(10.5).splitTextToSize(sanitizedContent, content_width);
+            
+            // Zeilen mit Blocksatz ausgeben
+            const lineHeight = 4.8;
+            textLines.forEach((line: string, idx: number) => {
+                // Prüfe Seitenumbruch vor jeder Zeile
+                if (currentY + lineHeight > 280) {
+                pdf.addPage();
+                addWatermarkToCurrentPage();
+                currentY = 25;
+            }
+                
+                // Blocksatz nur für volle Zeilen (nicht letzte Zeile eines Absatzes)
+                const isLastLineOfParagraph = idx === textLines.length - 1 || 
+                    (textLines[idx + 1] && textLines[idx + 1].trim().length === 0);
+                
+                if (!isLastLineOfParagraph && line.trim().length > 0) {
+                    // Blocksatz durch Wort-Spacing
+                    const words = line.split(' ').filter((w: string) => w.length > 0);
+                    if (words.length > 1) {
+                        const textWidth = pdf.getTextWidth(words.join(' '));
+                        const extraSpace = (content_width - textWidth) / (words.length - 1);
+                        let xPos = page_margin;
+                        words.forEach((word: string, wordIdx: number) => {
+                            pdf.text(word, xPos, currentY);
+                            xPos += pdf.getTextWidth(word) + (wordIdx < words.length - 1 ? extraSpace + pdf.getTextWidth(' ') : 0);
+                        });
+                    } else {
+                        pdf.text(line, page_margin, currentY);
+                    }
+                } else {
+                    // Normale Zeile (letzte Zeile)
+                    pdf.text(line, page_margin, currentY);
+                }
+                currentY += lineHeight;
+            });
+            currentY += 12; // Größerer Abstand nach Abschnitt für bessere Lesbarkeit
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
         };
 
         addWatermarkToCurrentPage();
@@ -10188,6 +10230,7 @@ async function generateRiskReport() {
             pdf.text(whereText, page_margin + 10, currentY);
             currentY += 12;
             
+<<<<<<< HEAD
             // Reset array to store table screenshots for Word document
             appendixTableImages = [];
             
@@ -10341,6 +10384,8 @@ async function generateRiskReport() {
                 }
             };
             
+=======
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
             // Für jede Zufahrt eine autoTable
             const threatsArrayForTable = Array.from(threatsMap.entries());
             
@@ -10453,6 +10498,7 @@ async function generateRiskReport() {
                 pdf.text(descLines, page_margin, landscapeY);
                 landscapeY += descLines.length * 4 + 4;
                 
+<<<<<<< HEAD
                 // ROBUSTE Berechnung: Speichere alle numerischen Werte für E_kin und Impuls
                 // (berechnet vor autoTable, damit auch für Screenshot verfügbar)
                 const ekinValues: number[] = [];
@@ -10475,6 +10521,28 @@ async function generateRiskReport() {
                 // Use autoTable for professional formatting - Querformat
                 // Tabelle gemäß DIN ISO 22343-2 (2025) - vollständiges Format
                 if (typeof (pdf as any).autoTable === 'function') {
+=======
+                // Use autoTable for professional formatting - Querformat
+                // Tabelle gemäß DIN ISO 22343-2 (2025) - vollständiges Format
+                if (typeof (pdf as any).autoTable === 'function') {
+                    // ROBUSTE Berechnung: Speichere alle numerischen Werte für E_kin und Impuls
+                    const ekinValues: number[] = [];
+                    const impulsValues: number[] = [];
+                    
+                    tableBody.forEach(row => {
+                        // E_kin ist an Position 13 (keine Tausendertrennzeichen durch toFixed)
+                        const ekinVal = parseFloat(String(row[13])) || 0;
+                        // Impuls ist an Position 14 (mit Tausendertrennzeichen durch toLocaleString)
+                        const impulsVal = parseFloat(String(row[14]).replace(/\./g, '').replace(',', '.')) || 0;
+                        ekinValues.push(ekinVal);
+                        impulsValues.push(impulsVal);
+                    });
+                    
+                    const maxEkin = Math.max(...ekinValues, 1); // mindestens 1 um Division durch 0 zu vermeiden
+                    const maxImpuls = Math.max(...impulsValues, 1);
+                    
+                    console.log('📊 Farbskalierung Debug:', { maxEkin, maxImpuls, ekinValues, impulsValues, tableBodyLength: tableBody.length });
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     
                     // Speichere Referenz auf die Werte für den didDrawCell-Hook
                     const colorBarData = {
@@ -10645,6 +10713,7 @@ async function generateRiskReport() {
                 pdf.text(worstCaseText, page_margin, currentLandscapeY);
                 pdf.setTextColor(0, 0, 0);
                 currentLandscapeY += 10;
+<<<<<<< HEAD
                 
                 // Create table screenshot for Word document (using same data as PDF)
                 const tableScreenshot = await createTableScreenshot(
@@ -10660,6 +10729,9 @@ async function generateRiskReport() {
                     appendixTableImages.push(tableScreenshot);
                 }
             } // end for loop
+=======
+            });
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
             
             // Legende mit mathematischer Formatierung (auf separater Seite)
             pdf.addPage('a4', 'landscape');
@@ -10764,12 +10836,17 @@ async function generateRiskReport() {
         
         // Generate Word document using docx.js
         try {
+<<<<<<< HEAD
             const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ImageRun, PageBreak, PageOrientation, VerticalAlign, TextWrappingType, TextWrappingSide, PositionalTabStopType, PositionalTabAlignmentType, SectionType } = (window as any).docx;
             
             // Debug: Check what PageOrientation actually is
             console.log('📄 docx.js PageOrientation:', PageOrientation);
             console.log('📄 docx.js PageOrientation.LANDSCAPE:', PageOrientation?.LANDSCAPE);
 
+=======
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, ImageRun, PageBreak } = (window as any).docx;
+            
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
             if (Document && Packer) {
                 const docChildren: any[] = [];
                 
@@ -10777,23 +10854,39 @@ async function generateRiskReport() {
                 const createWordTable = (headers: string[], rows: string[][]): any => {
                     const tableRows = [];
                     
+<<<<<<< HEAD
                 // Header row with blue background
                     tableRows.push(new TableRow({
                         children: headers.map(header => new TableCell({
                             children: [new Paragraph({
                                 children: [new TextRun({ text: header, bold: true, size: 21, color: 'FFFFFF', font: 'Arial' })],
+=======
+                    // Header row with blue background
+                    tableRows.push(new TableRow({
+                        children: headers.map(header => new TableCell({
+                            children: [new Paragraph({
+                                children: [new TextRun({ text: header, bold: true, size: 20, color: 'FFFFFF' })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                                 alignment: AlignmentType.CENTER
                             })],
                             shading: { fill: '2E5A88' }
                         }))
                     }));
+<<<<<<< HEAD
 
+=======
+                    
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     // Data rows
                     rows.forEach(row => {
                         tableRows.push(new TableRow({
                             children: row.map((cell, idx) => new TableCell({
                                 children: [new Paragraph({
+<<<<<<< HEAD
                                     children: [new TextRun({ text: cell, size: 21, font: 'Arial' })],  // 10.5pt to match PDF
+=======
+                                    children: [new TextRun({ text: cell, size: 18 })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                                     alignment: idx === 0 ? AlignmentType.LEFT : AlignmentType.CENTER
                                 })]
                             }))
@@ -10819,6 +10912,7 @@ async function generateRiskReport() {
                         .replace(/\[kJ\]/g, ' [kJ]')
                         .replace(/\[kg\]/g, ' [kg]')
                         .replace(/\[m\/s²\]/g, ' [m/s²]');
+<<<<<<< HEAD
                     runs.push(new TextRun({ text: formatted, size: 21, font: 'Arial' }));  // 10.5pt to match PDF, Arial font
                     return runs;
                 };
@@ -11049,6 +11143,47 @@ async function generateRiskReport() {
                     spacing: { before: 400 }
                 }));
                 
+=======
+                    runs.push(new TextRun({ text: formatted, size: 22 }));
+                    return runs;
+                };
+                
+                // Title
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `Risikobericht: ${kommune}`, bold: true, size: 48 })],
+                    heading: HeadingLevel.TITLE,
+                    alignment: AlignmentType.CENTER
+                }));
+                
+                // Subtitle with date
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: `Erstellt am: ${reportGeneratedAt.toLocaleDateString('de-DE')}`, italics: true, size: 24 })]
+                }));
+                
+                // Document info
+                docChildren.push(new Paragraph({ children: [] }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Erstellt durch: ', bold: true, size: 22 }),
+                        new TextRun({ text: 'BarricadiX GmbH', size: 22 })
+                    ]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Bearbeiter: ', bold: true, size: 22 }),
+                        new TextRun({ text: 'Automatisierte Analyse', size: 22 })
+                    ]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: 'Aktenzeichen: ', bold: true, size: 22 }),
+                        new TextRun({ text: `BX-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`, size: 22 })
+                    ]
+                }));
+                
+                docChildren.push(new Paragraph({ children: [] })); // Empty line
+                
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                 // Add all AI sections to Word document - use correct keys from aiSections
                 const wordSections = [
                     { title: '1. Auftrag, Zielsetzung und Geltungsbereich', keys: ['chapter1_auftrag', 'purpose', 'section1'] },
@@ -11074,11 +11209,19 @@ async function generateRiskReport() {
                         }
                     }
                     
+<<<<<<< HEAD
                     // Section heading with professional styling
                     docChildren.push(new Paragraph({
                         children: [new TextRun({ text: section.title, bold: true, size: 28, color: '2E5A88', font: 'Arial' })],
                         heading: HeadingLevel.HEADING_1,
                         spacing: { before: 400, after: 160 }
+=======
+                    // Section heading (always add it)
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: section.title, bold: true, size: 28, color: '2E5A88' })],
+                        heading: HeadingLevel.HEADING_1,
+                        spacing: { before: 400, after: 200 }
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     }));
                     
                     if (content) {
@@ -11092,20 +11235,33 @@ async function generateRiskReport() {
                             if (para.includes('|') && para.split('|').length > 2) {
                                 // Format as monospace for table-like data
                                 docChildren.push(new Paragraph({
+<<<<<<< HEAD
                                     children: [new TextRun({ text: para.trim(), size: 21, font: 'Consolas' })],  // 10.5pt to match PDF
                                     spacing: { before: 96, after: 96 }
                                 }));
                             } else if (para.startsWith('-') || para.startsWith('•') || para.startsWith('–')) {
                                 // Bullet point with proper size - formatFormula already uses size: 21
+=======
+                                    children: [new TextRun({ text: para.trim(), size: 18, font: 'Consolas' })],
+                                    spacing: { before: 50, after: 50 }
+                                }));
+                            } else if (para.startsWith('-') || para.startsWith('•') || para.startsWith('–')) {
+                                // Bullet point
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                                 const bulletText = para.replace(/^[-•–]\s*/, '').trim();
                                 docChildren.push(new Paragraph({
                                     children: formatFormula(bulletText),
                                     bullet: { level: 0 },
+<<<<<<< HEAD
                                     spacing: { before: 96, after: 96 }
+=======
+                                    spacing: { before: 60, after: 60 }
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                                 }));
                             } else if (para.match(/^\d+\.\d+/)) {
                                 // Sub-heading (like 3.1, 4.2)
                                 docChildren.push(new Paragraph({
+<<<<<<< HEAD
                                     children: [new TextRun({ text: para.trim(), bold: true, size: 24, font: 'Arial' })],  // 12pt for sub-headings
                                     spacing: { before: 240, after: 120 }
                                 }));
@@ -11115,18 +11271,36 @@ async function generateRiskReport() {
                                     children: formatFormula(para.trim()),  // formatFormula uses size: 21 (10.5pt) and Arial
                                     spacing: { before: 96, after: 96 },
                                     alignment: AlignmentType.JUSTIFIED
+=======
+                                    children: [new TextRun({ text: para.trim(), bold: true, size: 24 })],
+                                    spacing: { before: 200, after: 100 }
+                                }));
+                            } else {
+                                // Normal paragraph
+                                docChildren.push(new Paragraph({
+                                    children: formatFormula(para.trim()),
+                                    spacing: { before: 100, after: 100 }
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                                 }));
                             }
                         });
                     } else {
                         // Placeholder if no content
                         docChildren.push(new Paragraph({
+<<<<<<< HEAD
                             children: [new TextRun({ text: '[Abschnitt wird durch KI generiert]', italics: true, size: 21, color: '888888', font: 'Arial' })],  // 10.5pt
                             spacing: { after: 100 }
                         }));
                     }
                     
                     docChildren.push(new Paragraph({ children: [], spacing: { before: 240 } }));
+=======
+                            children: [new TextRun({ text: '[Abschnitt wird durch KI generiert]', italics: true, size: 20, color: '888888' })]
+                        }));
+                    }
+                    
+                    docChildren.push(new Paragraph({ children: [], spacing: { before: 200 } }));
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                 });
                 
                 // MAP IMAGE - Lagekarte mit Zufahrten
@@ -11136,7 +11310,11 @@ async function generateRiskReport() {
                             children: [new TextRun({ text: '', break: 1 }), new PageBreak()]
                         }));
                         docChildren.push(new Paragraph({
+<<<<<<< HEAD
                             children: [new TextRun({ text: 'Lagekarte mit identifizierten Zufahrten', bold: true, size: 28, color: '2E5A88', font: 'Arial' })],
+=======
+                            children: [new TextRun({ text: 'Lagekarte mit identifizierten Zufahrten', bold: true, size: 28, color: '2E5A88' })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                             heading: HeadingLevel.HEADING_1,
                             spacing: { before: 200, after: 200 },
                             alignment: AlignmentType.CENTER
@@ -11167,7 +11345,11 @@ async function generateRiskReport() {
                         }));
                         
                         docChildren.push(new Paragraph({
+<<<<<<< HEAD
                             children: [new TextRun({ text: 'Abbildung: GIS-gestützte Darstellung des Schutzbereichs mit allen identifizierten Zufahrtskorridoren', italics: true, size: 18, font: 'Arial' })],
+=======
+                            children: [new TextRun({ text: 'Abbildung: GIS-gestützte Darstellung des Schutzbereichs mit allen identifizierten Zufahrtskorridoren', italics: true, size: 18 })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                             alignment: AlignmentType.CENTER,
                             spacing: { before: 100, after: 200 }
                         }));
@@ -11180,14 +11362,22 @@ async function generateRiskReport() {
                 
                 // ANHANG: Fahrdynamische Detailberechnungen
                 docChildren.push(new Paragraph({
+<<<<<<< HEAD
                     children: [new PageBreak()]
                 }));
                 docChildren.push(new Paragraph({
                     children: [new TextRun({ text: 'Anhang A: Fahrdynamische Detailtabellen', bold: true, size: 32, color: '2E5A88', font: 'Arial' })],
+=======
+                    children: [new TextRun({ text: '', break: 1 }), new PageBreak()]
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Anhang A: Fahrdynamische Detailberechnungen', bold: true, size: 32, color: '2E5A88' })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     heading: HeadingLevel.HEADING_1,
                     spacing: { before: 200, after: 200 }
                 }));
                 
+<<<<<<< HEAD
                 // Horizontal line
                 docChildren.push(new Paragraph({
                     children: [],
@@ -11218,11 +11408,33 @@ async function generateRiskReport() {
                 docChildren.push(new Paragraph({
                     children: [new TextRun({ text: 'wobei: m = Masse [kg], a = Beschleunigung [m/s^2], s = Anfahrtsstrecke [m]', italics: true, size: 18, font: 'Arial' })],  // 9pt for explanations
                     spacing: { before: 96, after: 240 }
+=======
+                // Formel-Erläuterung
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Berechnungsgrundlagen:', bold: true, size: 24 })],
+                    spacing: { before: 200, after: 100 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Endgeschwindigkeit:  v = sqrt(2 * a * s)  [km/h]', size: 22, font: 'Consolas' })],
+                    spacing: { before: 50, after: 50 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Kinetische Energie:  E = 0.5 * m * v^2  [kJ]', size: 22, font: 'Consolas' })],
+                    spacing: { before: 50, after: 50 }
+                }));
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'wobei: m = Fahrzeugmasse [kg], a = Beschleunigung [m/s^2], s = Anfahrtsstrecke [m]', italics: true, size: 20 })],
+                    spacing: { before: 50, after: 150 }
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                 }));
                 
                 // Fahrzeugklassen-Tabelle
                 docChildren.push(new Paragraph({
+<<<<<<< HEAD
                     children: [new TextRun({ text: 'Referenz-Fahrzeugklassen:', bold: true, size: 24, font: 'Arial' })],  // 12pt for sub-section headers
+=======
+                    children: [new TextRun({ text: 'Referenz-Fahrzeugklassen:', bold: true, size: 24 })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     spacing: { before: 200, after: 100 }
                 }));
                 
@@ -11241,6 +11453,7 @@ async function generateRiskReport() {
                 ];
                 docChildren.push(createWordTable(vehicleHeaders, vehicleRows));
                 docChildren.push(new Paragraph({
+<<<<<<< HEAD
                     children: [new TextRun({ text: 'Fahrzeugklassen nach DIN ISO 22343-2 (2025). Bei n/a wird die Test-Masse für die Berechnung verwendet.', italics: true, size: 18, font: 'Arial' })],
                     spacing: { before: 50, after: 100 }
                 }));
@@ -11248,6 +11461,15 @@ async function generateRiskReport() {
                 // Energiestufen-Legende
                 docChildren.push(new Paragraph({
                     children: [new TextRun({ text: 'Energiestufen und Schutzklassen:', bold: true, size: 24, font: 'Arial' })],  // 12pt for sub-section headers
+=======
+                    children: [new TextRun({ text: 'Fahrzeugklassen nach DIN ISO 22343-2 (2025). Bei n/a wird die Test-Masse für die Berechnung verwendet.', italics: true, size: 18 })],
+                    spacing: { before: 50, after: 100 }
+                }));
+                
+                // Energiestufen-Legende
+                docChildren.push(new Paragraph({
+                    children: [new TextRun({ text: 'Energiestufen und Schutzklassen:', bold: true, size: 24 })],
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                     spacing: { before: 300, after: 100 }
                 }));
                 
@@ -11260,6 +11482,7 @@ async function generateRiskReport() {
                 ];
                 docChildren.push(createWordTable(energyHeaders, energyRows));
                 
+<<<<<<< HEAD
                 // NOTE: Detailed threat tables will be added as landscape sections below
                 
                 // Debug: Log what sections were found
@@ -11435,6 +11658,96 @@ async function generateRiskReport() {
                 // Create the document with proper margins and watermark
                 const doc = new Document({
                     sections: documentSections
+=======
+                // Zufahrten-Tabellen
+                if (threatsMap && threatsMap.size > 0) {
+                    docChildren.push(new Paragraph({
+                        children: [new TextRun({ text: 'Detailberechnungen je Zufahrt:', bold: true, size: 24 })],
+                        spacing: { before: 300, after: 100 }
+                    }));
+                    
+                    const threatsArray = Array.from(threatsMap.entries());
+                    threatsArray.slice(0, 10).forEach(([streetName, threatData], idx) => {
+                        const distance = threatData.totalLength || 50;
+                        
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ text: `A.${idx + 1} Zufahrt: ${streetName} (s = ${Math.round(distance)} m)`, bold: true, size: 22 })],
+                            spacing: { before: 200, after: 100 }
+                        }));
+                        
+                        // Erweiterte Tabellenstruktur für Word (komprimiert für Lesbarkeit)
+                        const accessHeaders = ['Klasse', 'Typ', 'Masse [kg]', 'a [m/s²]', 'v [km/h]', 'v [m/s]', 'E [kJ]', 'p [kgm/s]', 'Stufe'];
+                        const accessRows: string[][] = [];
+                        let maxEnergy = 0;
+                        let worstVehicle = '';
+                        
+                        // Erweiterte Fahrzeugklassen für Word
+                        const wordVehicleClasses = [
+                            { klasse: 'M1', typ: 'Pkw', zulGew: null, testMasse: 1500, acc: 3.20 },
+                            { klasse: 'N1G', typ: 'Pick-up', zulGew: null, testMasse: 2500, acc: 2.50 },
+                            { klasse: 'N1', typ: 'Pritsche', zulGew: 3500, testMasse: 3500, acc: 1.90 },
+                            { klasse: 'N2A', typ: 'Frontlenker 2-a.', zulGew: 8000, testMasse: 7200, acc: 2.00 },
+                            { klasse: 'N2B', typ: 'Langhauber 2-a.', zulGew: 14900, testMasse: 6800, acc: 1.50 },
+                            { klasse: 'N3C', typ: 'Frontlenker 2-a.', zulGew: 20500, testMasse: 7200, acc: 1.25 },
+                            { klasse: 'N3D', typ: 'Frontlenker 2-a.', zulGew: 20500, testMasse: 12000, acc: 1.00 },
+                            { klasse: 'N3E', typ: 'Langhauber 3-a.', zulGew: 27300, testMasse: 29500, acc: 0.85 },
+                            { klasse: 'N3F', typ: 'Frontlenker 3-a.', zulGew: 26000, testMasse: 24000, acc: 0.80 },
+                            { klasse: 'N3G', typ: 'Frontlenker 4-a.', zulGew: 36000, testMasse: 30000, acc: 0.75 }
+                        ];
+                        
+                        wordVehicleClasses.forEach(vehicle => {
+                            const calcMass = vehicle.zulGew || vehicle.testMasse;
+                            const v_ms = Math.sqrt(2 * vehicle.acc * distance);
+                            const v_kmh = v_ms * 3.6;
+                            const energy_kj = (calcMass * vehicle.acc * distance) / 1000;
+                            const impuls = calcMass * v_ms;
+                            
+                            let energyLevel = 'E1';
+                            if (energy_kj >= 1950) energyLevel = 'E4';
+                            else if (energy_kj >= 800) energyLevel = 'E3';
+                            else if (energy_kj >= 250) energyLevel = 'E2';
+                            
+                            accessRows.push([
+                                vehicle.klasse,
+                                vehicle.typ,
+                                calcMass.toLocaleString('de-DE'),
+                                vehicle.acc.toFixed(2).replace('.', ','),
+                                v_kmh.toFixed(0),
+                                v_ms.toFixed(1).replace('.', ','),
+                                energy_kj.toFixed(0),
+                                Math.round(impuls).toLocaleString('de-DE'),
+                                energyLevel
+                            ]);
+                            
+                            if (energy_kj > maxEnergy) {
+                                maxEnergy = energy_kj;
+                                worstVehicle = `${vehicle.klasse} (${vehicle.typ})`;
+                            }
+                        });
+                        
+                        docChildren.push(createWordTable(accessHeaders, accessRows));
+                        
+                        const worstClass = getEnergyClass(maxEnergy);
+                        docChildren.push(new Paragraph({
+                            children: [new TextRun({ 
+                                text: `⚠ Worst Case: ${worstVehicle}, Emax = ${maxEnergy.toFixed(0)} kJ (${worstClass.label})`, 
+                                bold: true, size: 20, color: 'CC0000' 
+                            })],
+                            spacing: { before: 50, after: 100 }
+                        }));
+                    });
+                }
+                
+                // Debug: Log what sections were found
+                console.log('📄 Word document sections found:', Object.keys(aiSections));
+                
+                // Create the document
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: docChildren
+                    }]
+>>>>>>> 4574c56fb78678e88dd005905ddb9b809baabacc
                 });
                 
                 // Generate Word blob
